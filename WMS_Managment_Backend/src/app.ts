@@ -1,0 +1,57 @@
+import express, { Application, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { sendSuccess, sendError } from './utils/response';
+import { AppError } from './utils/AppError';
+import { env } from './utils/env';
+import { requestLogger } from './middlewares/logger.middleware';
+import { languageMiddleware } from './middlewares/language.middleware';
+import authRoutes from './modules/auth/auth.routes';
+import categoriesRoutes from './modules/categories/categories.routes';
+import unitsRoutes from './modules/units/units.routes';
+import suppliersRoutes from './modules/suppliers/suppliers.routes';
+import departmentsRoutes from './modules/departments/departments.routes';
+import warehousesRoutes from './modules/warehouses/warehouses.routes';
+import usersRoutes from './modules/users/users.routes';
+import itemsRoutes from './modules/items/items.routes';
+import unitConversionsRoutes from './modules/unit-conversions/unit-conversions.routes';
+import transactionsRoutes from './modules/transactions/transactions.routes';
+import stockMovementsRoutes from './modules/stock-movements/stock-movements.routes';
+import reportsRoutes from './modules/reports/reports.routes';
+
+const app: Application = express();
+
+app.use(helmet());
+app.use(cors({ origin: env.CORS_ORIGINS }));
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.use(express.json({ limit: '10mb' }));
+app.use(requestLogger);
+app.use(languageMiddleware);
+
+app.use('/api/auth', authRoutes);
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/units', unitsRoutes);
+app.use('/api/suppliers', suppliersRoutes);
+app.use('/api/departments', departmentsRoutes);
+app.use('/api/warehouses', warehousesRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/items', itemsRoutes);
+app.use('/api/unit-conversions', unitConversionsRoutes);
+app.use('/api/transactions', transactionsRoutes);
+app.use('/api/stock-movements', stockMovementsRoutes);
+app.use('/api/reports', reportsRoutes);
+
+app.get('/health', (_req: Request, res: Response) => {
+  sendSuccess(res, { status: 'ok', timestamp: new Date() });
+});
+
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof AppError) {
+    return sendError(res, err.message, err.status, err.code, err.details);
+  }
+  console.error('Unhandled error:', err);
+  return sendError(res, 'Internal Server Error', 500, 'INTERNAL_SERVER_ERROR');
+});
+
+export default app;
