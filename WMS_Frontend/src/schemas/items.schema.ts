@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createItemSchema = z.object({
-  item_code: z.string().min(1, 'Item code is required').max(100),
+  item_code: z.string().min(1, 'Item code is required').max(100).optional(),
   name_ar: z.string().min(1, 'Name is required').max(255),
   description: z.string().optional().or(z.literal('')),
   category_code: z.string().min(1, 'Category is required'),

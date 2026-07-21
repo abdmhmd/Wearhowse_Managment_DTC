@@ -4,7 +4,7 @@ import { pool } from '../../config/database';
 export interface TransactionHeader {
   id?: number;
   transaction_no: string;
-  type: 'RV' | 'LN' | 'TRF';
+  type: 'RV' | 'LN' | 'TRF'; // TRF kept for backward compatibility with existing records
   status: 'draft' | 'approved';
   transaction_date?: Date;
   supplier_id?: number | null;

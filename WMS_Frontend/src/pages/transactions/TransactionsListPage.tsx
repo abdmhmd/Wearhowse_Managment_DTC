@@ -23,7 +23,6 @@ export default function TransactionsListPage() {
       RTV: 'bg-yellow-100 text-yellow-800',
       RTI: 'bg-blue-100 text-blue-800',
       ADJ: 'bg-purple-100 text-purple-800',
-      TRF: 'bg-indigo-100 text-indigo-800',
     };
     return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colors[type]}`}>{t('transaction.types.' + type)}</span>;
   };
@@ -70,7 +69,7 @@ export default function TransactionsListPage() {
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
         >
           <option value="">{t('common.all')} {t('table.type')}</option>
-          {(['RV', 'LN', 'TRF'] as TransactionType[]).map((key) => (
+          {(['RV', 'LN'] as TransactionType[]).map((key) => (
             <option key={key} value={key}>{t('transaction.types.' + key)}</option>
           ))}
         </select>

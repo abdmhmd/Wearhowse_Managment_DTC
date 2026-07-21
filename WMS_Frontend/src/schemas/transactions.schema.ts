@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const transactionTypeEnum = z.enum(['RV', 'LN', 'TRF']);
+export const transactionTypeEnum = z.enum(['RV', 'LN']);
 
 export const transactionHeaderSchema = z.object({
   type: transactionTypeEnum,

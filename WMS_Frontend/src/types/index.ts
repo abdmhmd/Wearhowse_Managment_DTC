@@ -1,6 +1,6 @@
 export type UserRole = 'system_admin' | 'warehouse_manager' | 'storekeeper' | 'accountant';
 
-export type TransactionType = 'RV' | 'LN' | 'TRF';
+export type TransactionType = 'RV' | 'LN';
 export type TransactionStatus = 'draft' | 'approved';
 export type MovementType = 'IN' | 'OUT';
 
@@ -211,7 +211,6 @@ export interface InventoryReportItem {
 export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   RV: 'Receiving Voucher',
   LN: 'Issuing / Lending',
-  TRF: 'Transfer',
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {

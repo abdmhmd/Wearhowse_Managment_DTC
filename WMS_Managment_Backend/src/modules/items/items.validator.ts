@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createItemSchema = z.object({
-  item_code: z.string().min(1).max(100),
+  item_code: z.string().min(1).max(100).optional(),
   name_ar: z.string().min(1).max(255),
   description: z.string().optional(),
   category_code: z.string().min(1).max(50),

@@ -113,7 +113,6 @@ export default function ItemsPage() {
   const ItemForm = ({ form, onSubmit, isLoading }: { form: any; onSubmit: any; isLoading: boolean }) => (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <Input label={t('form.itemCode')} {...form.register('item_code')} error={form.formState.errors.item_code?.message} />
         <Input label={t('form.nameAr')} {...form.register('name_ar')} error={form.formState.errors.name_ar?.message} />
       </div>
       <Input label={t('form.description')} {...form.register('description')} />

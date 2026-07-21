@@ -36,7 +36,6 @@ const navItems: NavItem[] = [
   { labelKey: 'nav.unitConversions', path: '/unit-conversions', icon: ArrowsRightLeftIcon, roles: ['system_admin', 'warehouse_manager'] },
   { labelKey: 'nav.transactions', path: '/transactions', icon: DocumentTextIcon },
   { labelKey: 'nav.stockMovements', path: '/stock-movements', icon: ClipboardDocumentListIcon },
-  { labelKey: 'nav.reports', path: '/reports', icon: ChartBarIcon, roles: ['system_admin', 'warehouse_manager', 'accountant'] },
   { labelKey: 'nav.users', path: '/users', icon: UserGroupIcon, roles: ['system_admin'] },
 ];
 

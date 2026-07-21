@@ -7,6 +7,14 @@ import { PaginationMeta } from '../../utils/response';
 import { AppError, NotFoundError, ValidationError } from '../../utils/AppError';
 
 export class ItemsService {
+  private async generateItemCode(): Promise<string> {
+    const res = await pool.query(
+      `SELECT MAX(CAST(SUBSTRING(item_code, 2) AS INTEGER)) AS max_code FROM items WHERE item_code ~ '^P[0-9]+$'`
+    );
+    const maxCode = res.rows[0].max_code;
+    const nextNum = (maxCode || 0) + 1;
+    return `P${String(nextNum).padStart(3, '0')}`;
+  }
   async getAll(page = 1, limit = 20, filter?: ItemsFilter): Promise<{ items: any[]; pagination: PaginationMeta }> {
     const offset = (page - 1) * limit;
     const [items, total] = await Promise.all([
@@ -47,13 +55,16 @@ export class ItemsService {
   }
 
   async createItem(data: {
-    item_code: string; name_ar: string; description?: string;
+    item_code?: string; name_ar: string; description?: string;
     category_code: string; unit_code: string; warehouse_id: number;
     min_stock_level?: number; max_stock_level?: number;
     current_balance?: number; location?: string;
   }) {
+    if (!data.item_code) {
+      data.item_code = await this.generateItemCode();
+    }
     await this.validateItemData(data);
-    return itemsRepository.createItem(data);
+    return itemsRepository.createItem(data as any);
   }
 
   async updateItem(id: number, data: Partial<any>) {

@@ -112,7 +112,7 @@ export default function CreateTransactionPage() {
                 {...register('header.type')}
                 className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               >
-                {(['RV', 'LN', 'TRF'] as TransactionType[]).map((key) => (
+                {(['RV', 'LN'] as TransactionType[]).map((key) => (
                   <option key={key} value={key}>{t('transaction.types.' + key)} ({key})</option>
                 ))}
               </select>
