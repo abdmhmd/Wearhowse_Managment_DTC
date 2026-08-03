@@ -4,12 +4,13 @@ import { departmentsService } from '../src/modules/departments/departments.servi
 import { itemsService } from '../src/modules/items/items.service';
 import { suppliersService } from '../src/modules/suppliers/suppliers.service';
 import { unitsService } from '../src/modules/units/units.service';
-import { unitConversionsService } from '../src/modules/unit-conversions/unit-conversions.service';
 import { usersService } from '../src/modules/users/users.service';
 import { warehousesService } from '../src/modules/warehouses/warehouses.service';
 import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedUser, seedItem, cleanup } from './helpers';
-import { authenticate, authorize } from '../src/middlewares/auth.middleware';
+import { authorize } from '../src/middlewares/auth.middleware';
 import { generateToken } from '../src/utils/jwt';
+import { createUnitConversionSchema } from '../src/modules/unit-conversions/unit-conversions.validator';
+import { createUserSchema } from '../src/modules/users/users.validator';
 import { Request, Response } from 'express';
 
 const prefix = `${TEST_PREFIX}err_test_`;
@@ -87,21 +88,23 @@ describe('400 Validation Errors', () => {
 
   describe('Unit Conversions', () => {
     test('create rejects negative factor', async () => {
-      await expect(unitConversionsService.create({
+      const parsed = createUnitConversionSchema.safeParse({
         item_id: itemId, from_unit_code: unitCode,
         to_unit_code: unitCode, factor: -1,
-      })).rejects.toThrow();
+      });
+      expect(parsed.success).toBe(false);
     });
   });
 
   describe('Users', () => {
     test('create rejects short password', async () => {
-      await expect(usersService.create({
+      const parsed = createUserSchema.safeParse({
         username: `${prefix}${shortId()}`,
-        password_hash: '12345',
+        password: '12345',
         full_name: 'Test',
         role: 'storekeeper',
-      })).rejects.toThrow();
+      });
+      expect(parsed.success).toBe(false);
     });
   });
 
@@ -125,9 +128,8 @@ describe('404 Not Found Errors', () => {
     expect(result).toBeNull();
   });
 
-  test('getItemById returns null for non-existent', async () => {
-    const result = await itemsService.getItemCard(999999999);
-    await expect(result).rejects.toThrow();
+  test('getItemCard throws for non-existent', async () => {
+    await expect(itemsService.getItemCard(999999999)).rejects.toThrow();
   });
 
   test('getSupplierById returns null for non-existent', async () => {
@@ -173,21 +175,24 @@ describe('403 Forbidden Errors', () => {
     const { req, res } = mockReqRes('storekeeper');
     const next = jest.fn();
     authorize(['warehouse_manager', 'system_admin'])(req as any, res as Response, next);
-    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).toHaveBeenCalled();
+    expect(next.mock.calls[0][0].status).toBe(403);
   });
 
   test('storekeeper cannot delete items', () => {
     const { req, res } = mockReqRes('storekeeper');
     const next = jest.fn();
     authorize(['system_admin'])(req as any, res as Response, next);
-    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).toHaveBeenCalled();
+    expect(next.mock.calls[0][0].status).toBe(403);
   });
 
   test('accountant cannot approve transactions', () => {
     const { req, res } = mockReqRes('accountant');
     const next = jest.fn();
     authorize(['warehouse_manager', 'system_admin'])(req as any, res as Response, next);
-    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).toHaveBeenCalled();
+    expect(next.mock.calls[0][0].status).toBe(403);
   });
 
   test('warehouse_manager can create categories', () => {

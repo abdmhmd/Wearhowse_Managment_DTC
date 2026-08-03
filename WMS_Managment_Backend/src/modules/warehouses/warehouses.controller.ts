@@ -15,7 +15,9 @@ export class WarehousesController {
   }
   async getById(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await warehousesService.getById(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid warehouse ID');
+      const data = await warehousesService.getById(id);
       if (!data) throw new NotFoundError('Warehouse', 'WAREHOUSE_NOT_FOUND', { id: req.params.id });
       sendSuccess(res, data);
     } catch (e) { next(e); }
@@ -30,16 +32,20 @@ export class WarehousesController {
   }
   async update(req: Request, res: Response, next: NextFunction) {
     try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid warehouse ID');
       const parsed = updateWarehouseSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
-      const data = await warehousesService.update(Number(req.params.id), parsed.data);
+      const data = await warehousesService.update(id, parsed.data);
       if (!data) throw new NotFoundError('Warehouse', 'WAREHOUSE_NOT_FOUND', { id: req.params.id });
       sendSuccess(res, data);
     } catch (e) { next(e); }
   }
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await warehousesService.delete(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid warehouse ID');
+      const data = await warehousesService.delete(id);
       if (!data) throw new NotFoundError('Warehouse', 'WAREHOUSE_NOT_FOUND', { id: req.params.id });
       sendSuccess(res, data);
     } catch (e) { next(e); }

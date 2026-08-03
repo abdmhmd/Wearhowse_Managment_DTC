@@ -2,7 +2,7 @@ import { pool } from '../../config/database';
 
 export class UnitConversionsRepository {
   async findAll(limit?: number, offset?: number) {
-    let query = 'SELECT id, item_id, from_unit_code, to_unit_code, factor FROM unit_conversions ORDER BY id';
+    let query = 'SELECT id, item_id, from_unit_code, to_unit_code, factor FROM unit_conversions WHERE is_active = true ORDER BY id';
     const params: any[] = [];
     if (limit !== undefined && offset !== undefined) {
       query += ' LIMIT $1 OFFSET $2';
@@ -19,7 +19,7 @@ export class UnitConversionsRepository {
 
   async findByItemId(item_id: number) {
     const res = await pool.query(
-      'SELECT id, item_id, from_unit_code, to_unit_code, factor FROM unit_conversions WHERE item_id = $1 ORDER BY id',
+      'SELECT id, item_id, from_unit_code, to_unit_code, factor FROM unit_conversions WHERE item_id = $1 AND is_active = true ORDER BY id',
       [item_id]
     );
     return res.rows;
@@ -59,7 +59,10 @@ export class UnitConversionsRepository {
   }
 
   async delete(id: number) {
-    const res = await pool.query('DELETE FROM unit_conversions WHERE id = $1 RETURNING *', [id]);
+    const res = await pool.query(
+      'UPDATE unit_conversions SET is_active = false WHERE id = $1 AND is_active = true RETURNING *',
+      [id]
+    );
     if (res.rows.length === 0) return null;
     return res.rows[0];
   }

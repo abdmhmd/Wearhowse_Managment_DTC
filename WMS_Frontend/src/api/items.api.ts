@@ -18,10 +18,16 @@ export const itemsApi = {
   getCard: (id: number) =>
     api.get<ApiResponse<ItemCard>>(`/items/${id}`),
 
+  generateCode: (categoryCode: string) =>
+    api.get<ApiResponse<{ item_code: string }>>(`/items/generate-code/${categoryCode}`),
+
   create: (data: {
-    item_code: string; name_ar: string; description?: string;
+    name_ar: string; description?: string;
     category_code: string; unit_code: string; warehouse_id: number;
-    min_stock_level?: number; max_stock_level?: number; location?: string;
+    min_stock_level?: number; max_stock_level?: number;
+    opening_price?: number; location?: string;
+    is_consumable?: boolean; expiry_alert_days?: number;
+    sap_material_number?: string; gl_account?: string;
   }) => api.post<ApiResponse<Item>>('/items', data),
 
   update: (id: number, data: Partial<Item>) =>

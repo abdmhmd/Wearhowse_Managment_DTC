@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Bars3Icon, UserIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/auth.store';
-import { ROLE_LABELS } from '@/types';
+import { getLocalizedRoleLabel } from '@/i18n/helpers';
 import i18n from '@/i18n';
 
 interface TopbarProps {
@@ -38,7 +38,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
 
         <div className="text-end hidden sm:block">
           <p className="text-sm font-medium text-gray-900">{user?.full_name}</p>
-          <p className="text-xs text-gray-500">{user ? ROLE_LABELS[user.role] : ''}</p>
+          <p className="text-xs text-gray-500">{user ? getLocalizedRoleLabel(user.role) : ''}</p>
         </div>
         <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
           <UserIcon className="h-4 w-4 text-primary-600" />

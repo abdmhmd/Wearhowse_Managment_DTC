@@ -28,7 +28,7 @@ describe('unit-conversions CRUD', () => {
       to_unit_code: unitB,
       factor: 2.5,
     });
-    expect(result).toMatchObject({ item_id: itemId, from_unit_code: unitA, to_unit_code: unitB, factor: '2.5' });
+    expect(result).toMatchObject({ item_id: itemId, from_unit_code: unitA, to_unit_code: unitB, factor: '2.5000' });
     expect(result.id).toBeGreaterThan(0);
     createdId = result.id;
   });
@@ -55,6 +55,7 @@ describe('unit-conversions CRUD', () => {
     expect(result).not.toBeNull();
     expect(result?.id).toBe(createdId);
     const check = await pool.query('SELECT * FROM unit_conversions WHERE id = $1', [createdId]);
-    expect(check.rows).toHaveLength(0);
+    expect(check.rows).toHaveLength(1);
+    expect(check.rows[0].is_active).toBe(false);
   });
 });

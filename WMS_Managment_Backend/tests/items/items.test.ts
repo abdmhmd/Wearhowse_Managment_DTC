@@ -27,7 +27,7 @@ describe('items CRUD', () => {
       warehouse_id: whId,
       current_balance: 100,
     });
-    expect(result).toMatchObject({ item_code: itemCode, name_ar: 'Test Item', current_balance: '100' });
+    expect(result).toMatchObject({ item_code: itemCode, name_ar: 'Test Item', current_balance: '100.0000' });
     expect(result.id).toBeGreaterThan(0);
     createdId = result.id;
   });

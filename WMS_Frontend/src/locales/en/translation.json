@@ -15,7 +15,19 @@
     "transactions": "Transactions",
     "stockMovements": "Stock Movements",
     "reports": "Reports",
-    "users": "Users"
+    "users": "Users",
+    "settings": "Settings",
+    "projects": "Projects",
+    "custodies": "Custodies",
+    "materialRequests": "Requests"
+  },
+  "roles": {
+    "system_admin": "System Admin",
+    "warehouse_manager": "Warehouse Manager",
+    "storekeeper": "Storekeeper",
+    "accountant": "Accountant",
+    "department_manager": "Department Manager",
+    "viewer": "Viewer"
   },
   "auth": {
     "login": "Sign in",
@@ -103,7 +115,10 @@
     "toUnit": "To Unit",
     "statusBadge": "Status",
     "approvedBy": "Approved By",
-    "noResults": "No results found"
+    "noResults": "No results found",
+    "unitCost": "Unit Cost",
+    "totalValue": "Total Value",
+    "lastPurchasePrice": "Last Purchase Price"
   },
   "form": {
     "code": "Code",
@@ -150,7 +165,9 @@
     "addItem": "Add Item",
     "removeItem": "Remove",
     "lineItems": "Line Items",
-    "addLineItem": "Add Line Item"
+    "addLineItem": "Add Line Item",
+    "openingPrice": "Opening Price",
+    "prefix": "Prefix"
   },
   "transaction": {
     "types": {
@@ -179,7 +196,10 @@
     "supplierId": "Supplier ID",
     "departmentId": "Department ID",
     "approvedBy": "Approved By",
-    "user": "User"
+    "user": "User",
+    "unitPriceRequired": "Unit price is required for receiving",
+    "unitCostAuto": "Unit cost (auto from last purchase price)",
+    "grandTotal": "Grand Total"
   },
   "transactions": {
     "noItems": "No items added yet. Click \"Add Item\" to begin."
@@ -227,7 +247,9 @@
     "lowStock": "Low Stock",
     "overstock": "Overstock",
     "normalStock": "Normal Stock",
-    "noData": "No inventory data found"
+    "noData": "No inventory data found",
+    "value": "Value",
+    "totalInventoryValue": "Total Inventory Value"
   },
   "pages": {
     "categories": {
@@ -268,6 +290,12 @@
       "itemCard": "Item Details",
       "itemDetails": "Item Details",
       "currentBalance": "Current Balance",
+      "itemType": "Type",
+      "consumable": "Consumable",
+      "durable": "Durable",
+      "expiryAlertDays": "Expiry Alert (Days)",
+      "sapMaterialNumber": "SAP Material No.",
+      "glAccount": "GL Account",
       "lastVouchers": "Last Vouchers",
       "lastReceiving": "Last Receiving",
       "lastIssuing": "Last Issuing",
@@ -307,6 +335,113 @@
       "subtitle": "Manage system users",
       "create": "Create User",
       "edit": "Edit User"
+    },
+    "settings": {
+      "title": "Settings",
+      "subtitle": "System configuration",
+      "accountingAccounts": "Accounting Accounts",
+      "inventoryAccount": "Inventory Account",
+      "supplierAccount": "Supplier Account",
+      "expenseAccountPrefix": "Expense Account Prefix",
+      "valuationMethod": "Valuation Method",
+      "lastPurchase": "Last Purchase Price",
+      "average": "Average Cost",
+      "fifo": "FIFO",
+      "saveSuccess": "Settings saved successfully",
+      "save": "Save Settings"
+    },
+    "projects": {
+      "title": "Projects",
+      "subtitle": "Manage graduation and research projects",
+      "create": "Create Project",
+      "edit": "Edit Project",
+      "projectNo": "Project No.",
+      "name": "Project Name",
+      "department": "Department",
+      "supervisor": "Supervisor",
+      "status": "Status",
+      "open": "Open",
+      "closed": "Closed",
+      "close": "Close Project",
+      "closeConfirm": "Are you sure you want to close this project?",
+      "closeCustodyWarning": "This project has {{count}} active custody record(s). They must be returned before the project can be closed.",
+      "requests": "Requests",
+      "notes": "Notes",
+      "selectDepartment": "Select department",
+      "selectSupervisor": "Select supervisor",
+      "deleteConfirm": "Are you sure you want to delete this project?"
+    },
+    "custodies": {
+      "title": "Custodies",
+      "subtitle": "Track durable items assigned to staff",
+      "item": "Item",
+      "assignedTo": "Assigned To",
+      "project": "Project",
+      "request": "Request",
+      "quantity": "Quantity",
+      "status": "Status",
+      "active": "Active",
+      "returned": "Returned",
+      "issuedOn": "Issued On",
+      "returnedOn": "Returned On",
+      "issueVoucher": "Issue Voucher",
+      "returnVoucher": "Return Voucher",
+      "return": "Return Item",
+      "returnConfirm": "Are you sure you want to record the return of this item? This will create and approve an RTI transaction.",
+      "returnNotes": "Return notes (optional)",
+      "noData": "No custodies found"
+    },
+    "materialRequests": {
+      "title": "Material Requests",
+      "subtitle": "Manage material issue requests",
+      "create": "New Request",
+      "detail": "Request Details",
+      "requestNo": "Request No.",
+      "requestType": "Request Type",
+      "types": {
+        "experiment": "Experiment",
+        "semester": "Semester",
+        "project": "Project"
+      },
+      "statuses": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "issued": "Issued",
+        "cancelled": "Cancelled"
+      },
+      "priority": "Priority",
+      "priorities": {
+        "low": "Low",
+        "normal": "Normal",
+        "high": "High",
+        "urgent": "Urgent"
+      },
+      "project": "Project",
+      "neededBy": "Needed By",
+      "selectType": "Select request type",
+      "selectProject": "Select project (required for project requests)",
+      "approve": "Approve",
+      "approveConfirm": "Approve this request?",
+      "reject": "Reject",
+      "rejectReason": "Rejection reason",
+      "issue": "Issue",
+      "issueConfirm": "Issue this request? Durable items will be tracked as custodies.",
+      "cancel": "Cancel",
+      "cancelConfirm": "Cancel this request?",
+      "requestedBy": "Requested By",
+      "department": "Department",
+      "warehouse": "Warehouse",
+      "requestedAt": "Requested At",
+      "approvedAt": "Approved At",
+      "issuedAt": "Issued At",
+      "lineItems": "Items",
+      "addItem": "Add Item",
+      "removeItem": "Remove",
+      "item": "Item",
+      "quantity": "Quantity",
+      "unit": "Unit",
+      "noDetails": "No items in this request"
     }
   },
   "toast": {

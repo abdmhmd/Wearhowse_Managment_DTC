@@ -25,7 +25,7 @@ describe('Environment Variable Requirements', () => {
   });
 
   test('JWT generateToken and verifyToken work end-to-end', () => {
-    process.env.JWT_SECRET = 'test-secret-key-for-testing';
+    process.env.JWT_SECRET = 'test-secret-key-for-testing-0123456789';
     const { generateToken, verifyToken } = require('../src/utils/jwt');
     const payload = { userId: 1, username: 'test', role: 'system_admin' };
     const token = generateToken(payload);
@@ -38,7 +38,7 @@ describe('Environment Variable Requirements', () => {
   });
 
   test('JWT rejects tampered token', () => {
-    process.env.JWT_SECRET = 'test-secret-key-for-testing';
+    process.env.JWT_SECRET = 'test-secret-key-for-testing-0123456789';
     const { generateToken, verifyToken } = require('../src/utils/jwt');
     const token = generateToken({ userId: 1, username: 'test', role: 'system_admin' });
     const tampered = token.slice(0, -5) + 'XXXXX';
@@ -46,11 +46,10 @@ describe('Environment Variable Requirements', () => {
     expect(decoded).toBeNull();
   });
 
-  test('DATABASE_URL is required for database module', () => {
+  test('database module requires DATABASE_URL', () => {
     process.env.JWT_SECRET = 'test-secret';
     delete process.env.DATABASE_URL;
-    const { pool } = require('../src/config/database');
-    expect(pool).toBeDefined();
+    expect(() => require('../src/config/database')).toThrow(/DATABASE_URL/);
   });
 
   test('validateEnv throws if DATABASE_URL is missing', () => {

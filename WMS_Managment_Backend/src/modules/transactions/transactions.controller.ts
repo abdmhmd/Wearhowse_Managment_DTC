@@ -19,8 +19,10 @@ export class TransactionsController {
 
   async getById(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await transactionsService.getById(Number(req.params.id));
-      if (!data) throw new NotFoundError('Transaction', 'TRANSACTION_NOT_FOUND', { id: req.params.id });
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid transaction ID');
+      const data = await transactionsService.getById(id);
+      if (!data) throw new NotFoundError('Transaction', 'TRANSACTION_NOT_FOUND');
       sendSuccess(res, data);
     } catch (e) { next(e); }
   }
@@ -44,7 +46,9 @@ export class TransactionsController {
   async approve(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       if (!req.user) throw new AuthError('Authentication required', 'AUTH_UNAUTHORIZED');
-      const result = await transactionsService.approveTransaction(Number(req.params.id), req.user.userId);
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid transaction ID');
+      const result = await transactionsService.approveTransaction(id, req.user.userId);
       sendSuccess(res, result);
     } catch (error: any) {
       next(error);

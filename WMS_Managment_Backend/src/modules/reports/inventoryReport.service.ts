@@ -17,12 +17,15 @@ export class InventoryReportService {
     let query = `
       SELECT
         i.id, i.item_code, i.name_ar, i.description,
-        i.current_balance, i.min_stock_level, i.max_stock_level,
+        i.warehouse_id, i.category_code,
+        COALESCE(iws.current_balance, i.current_balance) AS current_balance, 
+        iws.min_stock_level, iws.max_stock_level,
         i.location, i.is_active,
         c.name_ar AS category_name,
         u.name_ar AS unit_name,
         w.name_ar AS warehouse_name, w.code AS warehouse_code
       FROM items i
+      LEFT JOIN item_warehouse_stock iws ON iws.item_id = i.id AND (iws.warehouse_id = i.warehouse_id)
       LEFT JOIN categories c ON c.code = i.category_code
       LEFT JOIN units u ON u.code = i.unit_code
       LEFT JOIN warehouses w ON w.id = i.warehouse_id
@@ -48,11 +51,11 @@ export class InventoryReportService {
     }
 
     if (filters.low_stock) {
-      query += ` AND i.current_balance <= i.min_stock_level`;
+      query += ` AND COALESCE(iws.current_balance, i.current_balance) <= iws.min_stock_level`;
     }
 
     if (filters.overstock) {
-      query += ` AND i.current_balance >= i.max_stock_level`;
+      query += ` AND COALESCE(iws.current_balance, i.current_balance) >= iws.max_stock_level`;
     }
 
     if (filters.search) {
@@ -69,7 +72,7 @@ export class InventoryReportService {
       params.push(filters.limit, offset);
     }
 
-    let countQuery = `SELECT COUNT(*)::int AS total FROM items i LEFT JOIN categories c ON c.code = i.category_code LEFT JOIN units u ON u.code = i.unit_code LEFT JOIN warehouses w ON w.id = i.warehouse_id WHERE 1=1`;
+    let countQuery = `SELECT COUNT(*)::int AS total FROM items i LEFT JOIN item_warehouse_stock iws ON iws.item_id = i.id AND (iws.warehouse_id = i.warehouse_id) LEFT JOIN categories c ON c.code = i.category_code LEFT JOIN units u ON u.code = i.unit_code LEFT JOIN warehouses w ON w.id = i.warehouse_id WHERE 1=1`;
     const countParams: any[] = [];
     let countIdx = 1;
 
@@ -86,10 +89,10 @@ export class InventoryReportService {
       countParams.push(filters.is_active);
     }
     if (filters.low_stock) {
-      countQuery += ` AND i.current_balance <= i.min_stock_level`;
+      countQuery += ` AND COALESCE(iws.current_balance, i.current_balance) <= iws.min_stock_level`;
     }
     if (filters.overstock) {
-      countQuery += ` AND i.current_balance >= i.max_stock_level`;
+      countQuery += ` AND COALESCE(iws.current_balance, i.current_balance) >= iws.max_stock_level`;
     }
     if (filters.search) {
       countQuery += ` AND (i.item_code ILIKE $${countIdx} OR i.name_ar ILIKE $${countIdx})`;

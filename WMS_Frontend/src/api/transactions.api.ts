@@ -14,6 +14,8 @@ export interface TransactionDetailInput {
   quantity: number;
   unit_code: string;
   unit_price?: number;
+  unit_cost?: number;
+  total_value?: number;
 }
 
 export const transactionsApi = {

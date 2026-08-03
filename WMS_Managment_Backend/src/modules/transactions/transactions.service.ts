@@ -1,13 +1,16 @@
-import { pool } from '../../config/database';
+import { pool, runInTransaction } from '../../config/database';
+import { PoolClient } from 'pg';
 import { transactionsRepository, TransactionDetail } from './transactions.repository';
 import { itemsRepository } from '../items/items.repository';
 import { stockMovementsRepository } from '../stock-movements/stock-movements.repository';
+import { batchesRepository } from '../batches/batches.repository';
 import { PaginationMeta } from '../../utils/response';
 import { AppError, NotFoundError, ValidationError } from '../../utils/AppError';
 
 export class TransactionsService {
-  async generateTransactionNo(type: string): Promise<string> {
-    const res = await pool.query("SELECT nextval('transaction_no_seq') AS seq");
+  async generateTransactionNo(type: string, client?: PoolClient): Promise<string> {
+    const q = client ?? pool;
+    const res = await q.query("SELECT nextval('transaction_no_seq') AS seq");
     const seq = res.rows[0].seq;
     const year = new Date().getFullYear();
     return `${type}-${year}-${String(seq).padStart(6, '0')}`;
@@ -31,7 +34,7 @@ export class TransactionsService {
 
     const [itemsRes, countRes] = await Promise.all([
       pool.query(
-        `SELECT id, transaction_no, type, status, transaction_date, supplier_id, department_id, warehouse_id, created_by, approved_by, notes, created_at, updated_at
+        `SELECT id, transaction_no, type, status, transaction_date, supplier_id, department_id, warehouse_id, to_warehouse_id, created_by, approved_by, notes, created_at, updated_at
          FROM transactions${where} ORDER BY transaction_date DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
         [...params, limit, offset]
       ),
@@ -41,41 +44,42 @@ export class TransactionsService {
   }
 
   async createDraft(
-    header: { transaction_no?: string; type: string; supplier_id?: number | null; department_id?: number | null; warehouse_id: number; notes?: string | null; created_by: number },
-    details: Omit<TransactionDetail, 'id' | 'transaction_id' | 'total_price'>[]
+    header: { transaction_no?: string; type: string; supplier_id?: number | null; department_id?: number | null; warehouse_id: number; to_warehouse_id?: number | null; notes?: string | null; created_by: number },
+    details: Omit<TransactionDetail, 'id' | 'transaction_id' | 'total_price'>[],
+    client?: PoolClient
   ) {
     if (header.type === 'LN' && (header.department_id === undefined || header.department_id === null)) {
       throw new AppError('Department is required for Issuing (LN) transactions', 400, 'DEPARTMENT_REQUIRED', { type: header.type });
     }
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+    if (header.type === 'TRF') {
+      if (!header.to_warehouse_id) {
+        throw new AppError('Destination warehouse is required for Transfer (TRF) transactions', 400, 'TO_WAREHOUSE_REQUIRED');
+      }
+      if (header.to_warehouse_id === header.warehouse_id) {
+        throw new AppError('Source and destination warehouses must be different', 400, 'SAME_WAREHOUSE');
+      }
+    }
 
-      const transaction_no = header.transaction_no || await this.generateTransactionNo(header.type);
-      const newHeader = await transactionsRepository.createHeader(client, { ...header, transaction_no, status: 'draft' } as any);
+    const execute = async (c: PoolClient) => {
+      const transaction_no = header.transaction_no || await this.generateTransactionNo(header.type, c);
+      const newHeader = await transactionsRepository.createHeader(c, { ...header, transaction_no, status: 'draft' } as any);
 
       const newDetails = [];
       for (const detail of details) {
-        const newDetail = await transactionsRepository.createDetail(client, { ...detail, transaction_id: newHeader.id! });
+        const newDetail = await transactionsRepository.createDetail(c, { ...detail, transaction_id: newHeader.id! });
         newDetails.push(newDetail);
       }
 
-      await client.query('COMMIT');
       return { ...newHeader, details: newDetails };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    };
+
+    if (client) return execute(client);
+    return runInTransaction(execute);
   }
 
-  async approveTransaction(transactionId: number, approvedBy: number) {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const headerRes = await client.query(
+  async approveTransaction(transactionId: number, approvedBy: number, client?: PoolClient) {
+    const execute = async (c: PoolClient) => {
+      const headerRes = await c.query(
         'SELECT * FROM transactions WHERE id = $1 FOR UPDATE', [transactionId]
       );
       const header = headerRes.rows[0];
@@ -83,56 +87,219 @@ export class TransactionsService {
       if (!header) throw new NotFoundError('Transaction', 'TRANSACTION_NOT_FOUND', { id: transactionId });
       if (header.status === 'approved') throw new ValidationError('Transaction is already approved', { transaction_no: header.transaction_no });
 
-      const detailsRes = await client.query(
+      const detailsRes = await c.query(
         'SELECT * FROM transaction_details WHERE transaction_id = $1', [transactionId]
       );
       const details = detailsRes.rows;
 
+      let totalAmount = 0;
+      const isInbound = ['RV', 'RTI'].includes(header.type);
+      const isOutbound = ['LN', 'RTV'].includes(header.type);
+      const isTransfer = header.type === 'TRF';
+      const isAdjustment = header.type === 'ADJ';
+
       for (const detail of details) {
-        const item = await itemsRepository.findByIdForUpdate(client, detail.item_id);
-        if (!item) throw new ValidationError(`Item ID ${detail.item_id} not found`, { item_id: detail.item_id });
+        const parsedQuantity = parseFloat(detail.quantity) || 0;
 
-        let quantityChange = 0;
-        let movementType: 'IN' | 'OUT' = 'IN';
-        const parsedQuantity = parseFloat(detail.quantity);
+        if (isTransfer) {
+          // TRF: deduct from source warehouse, add to destination warehouse
+          const sourceItem = await itemsRepository.findByIdForUpdate(c, detail.item_id);
+          if (!sourceItem) throw new ValidationError(`Item ID ${detail.item_id} not found`, { item_id: detail.item_id });
 
-        switch (header.type) {
-          case 'RV': case 'RTI':
-            quantityChange = parsedQuantity; movementType = 'IN'; break;
-          case 'LN': case 'RTV':
-            quantityChange = -parsedQuantity; movementType = 'OUT'; break;
-          case 'ADJ': case 'TRF':
-            quantityChange = parsedQuantity; movementType = parsedQuantity >= 0 ? 'IN' : 'OUT'; break;
-          default:
-            throw new ValidationError(`Unknown transaction type: ${header.type}`, { type: header.type });
-        }
+          const sourceBalance = parseFloat(sourceItem.warehouse_balance ?? sourceItem.current_balance) || 0;
+          if (sourceBalance < parsedQuantity) {
+            throw new ValidationError(
+              `Insufficient balance for item ${sourceItem.item_code} in source warehouse. Available: ${sourceBalance}, Required: ${parsedQuantity}`,
+              { item_code: sourceItem.item_code, balance: sourceBalance, required: parsedQuantity }
+            );
+          }
 
-        const quantityBefore = parseFloat(item.current_balance);
-        const newBalance = quantityBefore + quantityChange;
+          // Deduct from source
+          const newSourceBalance = parseFloat((sourceBalance - parsedQuantity).toFixed(4));
+          await itemsRepository.updateBalance(c, detail.item_id, newSourceBalance, header.warehouse_id);
+          await stockMovementsRepository.logMovement(c, {
+            item_id: detail.item_id, transaction_id: header.id, movement_type: 'OUT',
+            quantity_before: sourceBalance, quantity_change: -parsedQuantity,
+            quantity_after: newSourceBalance, user_id: approvedBy,
+          });
 
-        if (newBalance < 0) {
-          throw new ValidationError(
-            `Insufficient balance for item ${item.item_code}. Available: ${quantityBefore}, Required: ${Math.abs(quantityChange)}`,
-            { item_code: item.item_code, balance: quantityBefore, required: Math.abs(quantityChange) }
+          // Add to destination warehouse
+          let destBalance = 0;
+          const destStock = await itemsRepository.getWarehouseStock(c, detail.item_id, header.to_warehouse_id);
+          if (destStock) {
+            destBalance = parseFloat(destStock.current_balance) || 0;
+          }
+          const newDestBalance = parseFloat((destBalance + parsedQuantity).toFixed(4));
+          await itemsRepository.updateBalance(c, detail.item_id, newDestBalance, header.to_warehouse_id);
+          await stockMovementsRepository.logMovement(c, {
+            item_id: detail.item_id, transaction_id: header.id, movement_type: 'IN',
+            quantity_before: destBalance, quantity_change: parsedQuantity,
+            quantity_after: newDestBalance, user_id: approvedBy,
+          });
+
+          // Update detail cost
+          const unitCost = parseFloat(sourceItem.last_purchase_price) || 0;
+          const totalValue = parseFloat((parsedQuantity * unitCost).toFixed(4));
+          totalAmount = parseFloat((totalAmount + totalValue).toFixed(4));
+          await c.query(
+            'UPDATE transaction_details SET unit_cost = $1, total_value = $2 WHERE id = $3',
+            [unitCost, totalValue, detail.id]
           );
-        }
 
-        await itemsRepository.updateBalance(client, item.id, newBalance);
-        await stockMovementsRepository.logMovement(client, {
-          item_id: item.id, transaction_id: header.id, movement_type: movementType,
-          quantity_before: quantityBefore, quantity_change: quantityChange,
-          quantity_after: newBalance, user_id: approvedBy,
-        });
+          // Batch processing for TRF
+          if (detail.batch_number) {
+            const deducted = await batchesRepository.deductQuantity(
+              c, detail.item_id, header.warehouse_id, detail.batch_number, parsedQuantity
+            );
+            if (!deducted) {
+              throw new ValidationError(
+                `Insufficient quantity in batch ${detail.batch_number} for item ${sourceItem.item_code}`,
+                { item_code: sourceItem.item_code, batch_number: detail.batch_number, required: parsedQuantity }
+              );
+            }
+            await batchesRepository.create(c, {
+              item_id: detail.item_id,
+              warehouse_id: header.to_warehouse_id,
+              batch_number: detail.batch_number,
+              quantity: parsedQuantity,
+              unit_code: detail.unit_code,
+              transaction_id: header.id,
+            });
+          }
+        } else {
+          // Standard IN/OUT transaction (RV, LN, RTV, RTI, ADJ)
+          const item = await itemsRepository.findByIdForUpdate(c, detail.item_id);
+          if (!item) throw new ValidationError(`Item ID ${detail.item_id} not found`, { item_id: detail.item_id });
+
+          let quantityChange = 0;
+          let movementType: 'IN' | 'OUT' = 'IN';
+
+          if (isInbound || (isAdjustment && parsedQuantity >= 0)) {
+            quantityChange = parsedQuantity;
+            movementType = 'IN';
+          } else if (isOutbound || (isAdjustment && parsedQuantity < 0)) {
+            quantityChange = -parsedQuantity;
+            movementType = 'OUT';
+          }
+
+          const quantityBefore = parseFloat(item.warehouse_balance ?? item.current_balance) || 0;
+          // For ADJ the signed quantity is the balance delta directly; for other
+          // types quantityChange already carries the correct sign.
+          const balanceDelta = isAdjustment ? parsedQuantity : quantityChange;
+          const newBalance = parseFloat((quantityBefore + balanceDelta).toFixed(4));
+
+          if (newBalance < 0) {
+            throw new ValidationError(
+              `Insufficient balance for item ${item.item_code}. Available: ${quantityBefore}, Required: ${Math.abs(quantityChange)}`,
+              { item_code: item.item_code, balance: quantityBefore, required: Math.abs(quantityChange) }
+            );
+          }
+
+          let unitCost = 0;
+          let totalValue = 0;
+
+          if (isInbound) {
+            unitCost = parseFloat(detail.unit_price) || 0;
+            totalValue = parseFloat((parsedQuantity * unitCost).toFixed(4));
+            await itemsRepository.updateLastPurchasePrice(c, item.id, unitCost);
+          } else {
+            unitCost = parseFloat(item.last_purchase_price) || 0;
+            totalValue = parseFloat((parsedQuantity * unitCost).toFixed(4));
+          }
+
+          totalAmount = parseFloat((totalAmount + totalValue).toFixed(4));
+
+          await c.query(
+            'UPDATE transaction_details SET unit_cost = $1, total_value = $2 WHERE id = $3',
+            [unitCost, totalValue, detail.id]
+          );
+
+          await itemsRepository.updateBalance(c, item.id, newBalance, header.warehouse_id);
+          await stockMovementsRepository.logMovement(c, {
+            item_id: item.id, transaction_id: header.id, movement_type: movementType,
+            quantity_before: quantityBefore, quantity_change: quantityChange,
+            quantity_after: newBalance, user_id: approvedBy,
+          });
+
+          // Batch processing
+          if (detail.batch_number) {
+            if (movementType === 'IN') {
+              await batchesRepository.create(c, {
+                item_id: item.id,
+                warehouse_id: header.warehouse_id,
+                batch_number: detail.batch_number,
+                quantity: parsedQuantity,
+                unit_code: detail.unit_code,
+                supplier_id: header.supplier_id,
+                transaction_id: header.id,
+              });
+            } else if (movementType === 'OUT') {
+              const deducted = await batchesRepository.deductQuantity(
+                c, item.id, header.warehouse_id, detail.batch_number, parsedQuantity
+              );
+              if (!deducted) {
+                throw new ValidationError(
+                  `Insufficient quantity in batch ${detail.batch_number} for item ${item.item_code}`,
+                  { item_code: item.item_code, batch_number: detail.batch_number, required: parsedQuantity }
+                );
+              }
+            }
+          }
+        }
       }
 
-      await transactionsRepository.updateStatus(client, header.id, 'approved', approvedBy);
-      await client.query('COMMIT');
+      await transactionsRepository.updateStatus(c, header.id, 'approved', approvedBy);
+
+      if (totalAmount > 0) {
+        await this.createJournalEntry(c, header, totalAmount, approvedBy);
+      }
+
       return { message: 'Transaction approved successfully' };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+    };
+
+    if (client) return execute(client);
+    return runInTransaction(execute);
+  }
+
+  private async createJournalEntry(client: any, header: any, totalAmount: number, userId: number): Promise<void> {
+    const inventoryAccount = await transactionsRepository.getSetting('inventory_account') || 'Inventory';
+    const supplierAccount = await transactionsRepository.getSetting('supplier_account') || 'Suppliers';
+    const expensePrefix = await transactionsRepository.getSetting('expense_account_prefix') || 'Expense_';
+
+    const isInbound = ['RV', 'RTI'].includes(header.type);
+
+    if (isInbound) {
+      await transactionsRepository.createJournalEntry(client, {
+        transaction_id: header.id,
+        account_debit: inventoryAccount,
+        account_credit: supplierAccount,
+        amount: totalAmount,
+        description: `${header.type} ${header.transaction_no} - Inventory receipt`,
+        created_by: userId,
+      });
+    } else if (header.type === 'TRF') {
+      await transactionsRepository.createJournalEntry(client, {
+        transaction_id: header.id,
+        account_debit: `${inventoryAccount}_Transfer`,
+        account_credit: inventoryAccount,
+        amount: totalAmount,
+        description: `TRF ${header.transaction_no} - Warehouse transfer`,
+        created_by: userId,
+      });
+    } else {
+      let deptName = 'General';
+      if (header.department_id) {
+        const deptRes = await client.query('SELECT name_ar, name_en FROM departments WHERE id = $1', [header.department_id]);
+        deptName = deptRes.rows[0]?.name_en || deptRes.rows[0]?.name_ar || 'General';
+      }
+      await transactionsRepository.createJournalEntry(client, {
+        transaction_id: header.id,
+        account_debit: `${expensePrefix}${deptName}`,
+        account_credit: inventoryAccount,
+        amount: totalAmount,
+        description: `${header.type} ${header.transaction_no} - Issued to ${deptName}`,
+        created_by: userId,
+      });
     }
   }
 }

@@ -25,6 +25,27 @@ export function useItem(id: number) {
   });
 }
 
+export function useAllItems() {
+  return useQuery({
+    queryKey: ['items', 'all'],
+    queryFn: async () => {
+      const res = await itemsApi.getAll(1, 500);
+      return res.data;
+    },
+  });
+}
+
+export function useGenerateItemCode(categoryCode: string) {
+  return useQuery({
+    queryKey: ['items', 'generate-code', categoryCode],
+    queryFn: async () => {
+      const res = await itemsApi.generateCode(categoryCode);
+      return res.data?.data?.item_code || '';
+    },
+    enabled: !!categoryCode,
+  });
+}
+
 export function useItemCard(id: number) {
   return useQuery({
     queryKey: ['items', id, 'card'],

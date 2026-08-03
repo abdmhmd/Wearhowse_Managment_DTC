@@ -42,9 +42,10 @@ export default function TransactionDetailPage() {
     const colors: Record<TransactionType, string> = {
       RV: 'bg-green-100 text-green-800',
       LN: 'bg-red-100 text-red-800',
-      RTV: 'bg-yellow-100 text-yellow-800',
+      RTV: 'bg-orange-100 text-orange-800',
       RTI: 'bg-blue-100 text-blue-800',
       ADJ: 'bg-purple-100 text-purple-800',
+      TRF: 'bg-indigo-100 text-indigo-800',
     };
     return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colors[type]}`}>{t('transaction.types.' + type)}</span>;
   };

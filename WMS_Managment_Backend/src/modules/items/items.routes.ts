@@ -6,6 +6,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', itemsController.getAll);
+router.get('/generate-code/:categoryCode', itemsController.generateCode);
 router.get('/:id', itemsController.getById);
 router.post('/', authorize(['storekeeper', 'warehouse_manager', 'system_admin']), itemsController.create);
 router.put('/:id', authorize(['warehouse_manager', 'system_admin']), itemsController.update);

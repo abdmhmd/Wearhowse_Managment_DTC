@@ -6,7 +6,7 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/inventory', authorize(['warehouse_manager', 'system_admin']), reportsController.getInventoryReport);
-router.get('/item-card/:id', authorize(['warehouse_manager', 'system_admin']), reportsController.getItemCard);
+router.get('/inventory', authorize(['system_admin', 'warehouse_manager', 'accountant']), reportsController.getInventoryReport);
+router.get('/item-card/:id', authorize(['system_admin', 'warehouse_manager', 'accountant']), reportsController.getItemCard);
 
 export default router;

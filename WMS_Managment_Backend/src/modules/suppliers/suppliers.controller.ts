@@ -15,7 +15,9 @@ export class SuppliersController {
   }
   async getById(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await suppliersService.getById(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid supplier ID');
+      const data = await suppliersService.getById(id);
       if (!data) throw new NotFoundError('Supplier', 'SUPPLIER_NOT_FOUND', { id: req.params.id });
       sendSuccess(res, data);
     } catch (e) { next(e); }
@@ -30,16 +32,20 @@ export class SuppliersController {
   }
   async update(req: Request, res: Response, next: NextFunction) {
     try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid supplier ID');
       const parsed = updateSupplierSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
-      const data = await suppliersService.update(Number(req.params.id), parsed.data);
+      const data = await suppliersService.update(id, parsed.data);
       if (!data) throw new NotFoundError('Supplier', 'SUPPLIER_NOT_FOUND', { id: req.params.id });
       sendSuccess(res, data);
     } catch (e) { next(e); }
   }
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await suppliersService.delete(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid supplier ID');
+      const data = await suppliersService.delete(id);
       if (!data) throw new NotFoundError('Supplier', 'SUPPLIER_NOT_FOUND', { id: req.params.id });
       sendSuccess(res, data);
     } catch (e) { next(e); }

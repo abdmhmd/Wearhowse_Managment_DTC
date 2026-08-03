@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getLocalizedName } from '@/i18n/helpers';
+import { getLocalizedName, getLocalizedRoleLabel } from '@/i18n/helpers';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/useUsers';
+import { useDepartments } from '@/hooks/useDepartments';
 import { createUserSchema, updateUserSchema, type CreateUserFormData, type UpdateUserFormData } from '@/schemas/users.schema';
 import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog } from '@/components/ui';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
-import { ROLE_LABELS, type UserRole } from '@/types';
+import { type UserRole } from '@/types';
 import type { User } from '@/types';
 
 export default function UsersPage() {
@@ -19,6 +20,7 @@ export default function UsersPage() {
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
 
   const { data } = useUsers(page);
+  const { data: departmentsData } = useDepartments();
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
   const deleteMutation = useDeleteUser();
@@ -26,8 +28,10 @@ export default function UsersPage() {
   const createForm = useForm<CreateUserFormData>({ resolver: zodResolver(createUserSchema) });
   const updateForm = useForm<UpdateUserFormData>({ resolver: zodResolver(updateUserSchema) });
 
+  const departmentOptions = (departmentsData?.data || []).map((d: any) => ({ value: d.id, label: getLocalizedName(d) }));
+
   const handleCreate = async (formData: CreateUserFormData) => {
-    await createMutation.mutateAsync(formData);
+    await createMutation.mutateAsync(formData as any);
     setIsCreateOpen(false);
     createForm.reset();
   };
@@ -36,6 +40,7 @@ export default function UsersPage() {
     if (!editingUser) return;
     const data: any = { ...formData };
     if (!data.password) delete data.password;
+    if (!data.department_id) delete data.department_id;
     await updateMutation.mutateAsync({ id: editingUser.id, data });
     setEditingUser(null);
     updateForm.reset();
@@ -47,7 +52,7 @@ export default function UsersPage() {
     setDeletingUser(null);
   };
 
-  const roleOptions = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
+  const roleOptions = (['system_admin', 'warehouse_manager', 'storekeeper', 'accountant', 'department_manager', 'viewer'] as UserRole[]).map((value) => ({ value, label: getLocalizedRoleLabel(value) }));
 
   const columns = [
     { key: 'id', header: t('table.id') },
@@ -61,8 +66,10 @@ export default function UsersPage() {
           warehouse_manager: 'bg-blue-100 text-blue-800',
           storekeeper: 'bg-green-100 text-green-800',
           accountant: 'bg-purple-100 text-purple-800',
+          department_manager: 'bg-amber-100 text-amber-800',
+          viewer: 'bg-gray-100 text-gray-700',
         };
-        return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colors[item.role]}`}>{ROLE_LABELS[item.role]}</span>;
+        return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colors[item.role] || 'bg-gray-100 text-gray-700'}`}>{getLocalizedRoleLabel(item.role)}</span>;
       },
     },
     {
@@ -77,7 +84,7 @@ export default function UsersPage() {
           <Button variant="ghost" size="sm" onClick={(e) => {
             e.stopPropagation();
             setEditingUser(item);
-            updateForm.reset({ username: item.username, full_name: item.full_name, role: item.role, is_active: item.is_active });
+            updateForm.reset({ username: item.username, full_name: item.full_name, role: item.role, is_active: item.is_active, department_id: (item as any).department_id ?? undefined });
           }}>
             <PencilIcon className="h-4 w-4" />
           </Button>
@@ -96,6 +103,9 @@ export default function UsersPage() {
       {isEdit && <Input label={t('form.newPassword')} type="password" {...form.register('password')} />}
       <Input label={t('form.fullName')} {...form.register('full_name')} error={form.formState.errors.full_name?.message} />
       <Select label={t('form.role')} {...form.register('role')} error={form.formState.errors.role?.message} options={roleOptions} placeholder={t('form.selectRole')} />
+      {form.watch('role') === 'department_manager' && (
+        <Select label={t('form.department')} {...form.register('department_id')} error={form.formState.errors.department_id?.message} options={departmentOptions} placeholder={t('form.selectDepartment')} />
+      )}
       {isEdit && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" {...form.register('is_active')} className="rounded border-gray-300" />

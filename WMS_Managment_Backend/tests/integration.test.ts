@@ -51,7 +51,7 @@ describe('API Integration Tests', () => {
       const res = await request(app).get('/health');
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.status).toBe('ok');
+      expect(res.body.data.status).toBe('healthy');
     });
   });
 
@@ -252,7 +252,7 @@ describe('API Integration Tests', () => {
       const res = await request(app)
         .post('/api/transactions/999999999/approve')
         .set('Authorization', `Bearer ${token}`);
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(404);
     });
   });
 
@@ -327,11 +327,11 @@ describe('API Integration Tests', () => {
     });
 
     test('accountant can view reports (if permitted)', async () => {
-      // Reports require warehouse_manager or system_admin
+      // Reports permit warehouse_manager, system_admin, and accountant
       const res = await request(app)
         .get('/api/reports/inventory')
         .set('Authorization', `Bearer ${accountantToken}`);
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
     });
   });
 });

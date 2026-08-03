@@ -1,15 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
-import { randomUUID } from 'crypto';
+import { logger } from '../utils/logger';
 
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
-  const requestId = randomUUID();
-  (req as any).requestId = requestId;
   const start = Date.now();
+  const requestId = Math.random().toString(36).substring(2, 10);
+
+  res.setHeader('X-Request-Id', requestId);
 
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(
-      `[${requestId.slice(0, 8)}] ${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`
+    const level = res.statusCode >= 400 ? 'warn' : 'info';
+    logger[level](
+      `${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`,
+      'HTTP',
+      { requestId, method: req.method, path: req.originalUrl, statusCode: res.statusCode, duration }
     );
   });
 

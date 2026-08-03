@@ -15,7 +15,19 @@
     "transactions": "العمليات",
     "stockMovements": "حركات المخزون",
     "reports": "التقارير",
-    "users": "المستخدمون"
+    "users": "المستخدمون",
+    "settings": "الإعدادات",
+    "projects": "المشاريع",
+    "custodies": "العهد",
+    "materialRequests": "طلبات الصرف"
+  },
+  "roles": {
+    "system_admin": "مدير النظام",
+    "warehouse_manager": "مدير المستودع",
+    "storekeeper": "أمين المخزن",
+    "accountant": "المحاسب",
+    "department_manager": "مدير القسم / الأستاذ",
+    "viewer": "مشاهد"
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -103,7 +115,10 @@
     "toUnit": "إلى وحدة",
     "statusBadge": "الحالة",
     "approvedBy": "اعتمد بواسطة",
-    "noResults": "لا توجد نتائج"
+    "noResults": "لا توجد نتائج",
+    "unitCost": "تكلفة الوحدة",
+    "totalValue": "القيمة الإجمالية",
+    "lastPurchasePrice": "آخر سعر شراء"
   },
   "form": {
     "code": "الرمز",
@@ -150,7 +165,9 @@
     "addItem": "إضافة صنف",
     "removeItem": "إزالة",
     "lineItems": "أصناف السطر",
-    "addLineItem": "إضافة سطر"
+    "addLineItem": "إضافة سطر",
+    "openingPrice": "سعر الافتتاح",
+    "prefix": "البادئة"
   },
   "transaction": {
     "types": {
@@ -179,7 +196,10 @@
     "supplierId": "رقم المورد",
     "departmentId": "رقم القسم",
     "approvedBy": "اعتمد بواسطة",
-    "user": "المستخدم"
+    "user": "المستخدم",
+    "unitPriceRequired": "سعر الوحدة مطلوب للاستلام",
+    "unitCostAuto": "تكلفة الوحدة (تلقائي من آخر سعر شراء)",
+    "grandTotal": "الإجمالي الكلي"
   },
   "transactions": {
     "noItems": "لم تتم إضافة أي أصناف بعد. انقر على \"إضافة صنف\" للبدء."
@@ -227,7 +247,9 @@
     "lowStock": "مخزون منخفض",
     "overstock": "مخزون زائد",
     "normalStock": "مخزون طبيعي",
-    "noData": "لا توجد بيانات مخزون"
+    "noData": "لا توجد بيانات مخزون",
+    "value": "القيمة",
+    "totalInventoryValue": "القيمة الإجمالية للمخزون"
   },
   "pages": {
     "categories": {
@@ -268,6 +290,12 @@
       "itemCard": "تفاصيل الصنف",
       "itemDetails": "تفاصيل الصنف",
       "currentBalance": "الرصيد الحالي",
+      "itemType": "النوع",
+      "consumable": "مستهلك",
+      "durable": "دائم",
+      "expiryAlertDays": "تنبيه انتهاء الصلاحية (أيام)",
+      "sapMaterialNumber": "رقم المادة SAP",
+      "glAccount": "الحساب العام (GL)",
       "lastVouchers": "آخر القسائم",
       "lastReceiving": "آخر قسيمة استلام",
       "lastIssuing": "آخر قسيمة صرف",
@@ -307,6 +335,113 @@
       "subtitle": "إدارة مستخدمي النظام",
       "create": "إنشاء مستخدم",
       "edit": "تعديل المستخدم"
+    },
+    "settings": {
+      "title": "الإعدادات",
+      "subtitle": "إعدادات النظام",
+      "accountingAccounts": "الحسابات المحاسبية",
+      "inventoryAccount": "حساب المخزون",
+      "supplierAccount": "حساب المورد",
+      "expenseAccountPrefix": "بادئة حساب المصروف",
+      "valuationMethod": "طريقة التقييم",
+      "lastPurchase": "آخر سعر شراء",
+      "average": "متوسط التكلفة",
+      "fifo": "الوارد أولاً",
+      "saveSuccess": "تم حفظ الإعدادات بنجاح",
+      "save": "حفظ الإعدادات"
+    },
+    "projects": {
+      "title": "المشاريع",
+      "subtitle": "إدارة مشاريع التخرج والبحث",
+      "create": "إنشاء مشروع",
+      "edit": "تعديل المشروع",
+      "projectNo": "رقم المشروع",
+      "name": "اسم المشروع",
+      "department": "القسم",
+      "supervisor": "المشرف",
+      "status": "الحالة",
+      "open": "مفتوح",
+      "closed": "مغلق",
+      "close": "إغلاق المشروع",
+      "closeConfirm": "هل أنت متأكد من رغبتك في إغلاق هذا المشروع؟",
+      "closeCustodyWarning": "يوجد {{count}} سجل عهدة نشط لهذا المشروع. يجب إرجاعها قبل إغلاق المشروع.",
+      "requests": "الطلبات",
+      "notes": "ملاحظات",
+      "selectDepartment": "اختر القسم",
+      "selectSupervisor": "اختر المشرف",
+      "deleteConfirm": "هل أنت متأكد من حذف هذا المشروع؟"
+    },
+    "custodies": {
+      "title": "العهد",
+      "subtitle": "متابعة الأغراض المستهلكة الصالحة والمسندة للموظفين",
+      "item": "الغرض",
+      "assignedTo": "مسندة إلى",
+      "project": "المشروع",
+      "request": "الطلب",
+      "quantity": "الكمية",
+      "status": "الحالة",
+      "active": "قائمة",
+      "returned": "مُرجع",
+      "issuedOn": "تاريخ الصرف",
+      "returnedOn": "تاريخ الإرجاع",
+      "issueVoucher": "إذن الصرف",
+      "returnVoucher": "إذن الإرجاع",
+      "return": "تسجيل إرجاع",
+      "returnConfirm": "هل أنت متأكد من تسجيل إرجاع هذا الغرض؟ سيتم إنشاء واعتماد إذن إرجاع للمخزون (RTI).",
+      "returnNotes": "ملاحظات الإرجاع (اختياري)",
+      "noData": "لا توجد عهد مسجلة"
+    },
+    "materialRequests": {
+      "title": "طلبات الصرف",
+      "subtitle": "إدارة طلبات صرف المواد",
+      "create": "طلب جديد",
+      "detail": "تفاصيل الطلب",
+      "requestNo": "رقم الطلب",
+      "requestType": "نوع الطلب",
+      "types": {
+        "experiment": "تجربة",
+        "semester": "فصل دراسي",
+        "project": "مشروع"
+      },
+      "statuses": {
+        "pending": "قيد الانتظار",
+        "approved": "مقبول",
+        "rejected": "مرفوض",
+        "issued": "تم الصرف",
+        "cancelled": "ملغى"
+      },
+      "priority": "الأولوية",
+      "priorities": {
+        "low": "منخفضة",
+        "normal": "عادية",
+        "high": "عالية",
+        "urgent": "عاجلة"
+      },
+      "project": "المشروع",
+      "neededBy": "مطلوب بحلول",
+      "selectType": "اختر نوع الطلب",
+      "selectProject": "اختر المشروع (مطلوب لطلبات المشاريع)",
+      "approve": "اعتماد",
+      "approveConfirm": "هل تريد اعتماد هذا الطلب؟",
+      "reject": "رفض",
+      "rejectReason": "سبب الرفض",
+      "issue": "صرف",
+      "issueConfirm": "هل تريد صرف هذا الطلب؟ سيتم تتبع الأغراض الدائمة كعهد.",
+      "cancel": "إلغاء",
+      "cancelConfirm": "هل تريد إلغاء هذا الطلب؟",
+      "requestedBy": "مقدم الطلب",
+      "department": "القسم",
+      "warehouse": "المستودع",
+      "requestedAt": "تاريخ الطلب",
+      "approvedAt": "تاريخ الاعتماد",
+      "issuedAt": "تاريخ الصرف",
+      "lineItems": "الأصناف",
+      "addItem": "إضافة صنف",
+      "removeItem": "حذف",
+      "item": "الغرض",
+      "quantity": "الكمية",
+      "unit": "الوحدة",
+      "noDetails": "لا توجد أصناف في هذا الطلب"
     }
   },
   "toast": {

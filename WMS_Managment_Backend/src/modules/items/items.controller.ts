@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { itemsService } from './items.service';
 import { sendSuccess } from '../../utils/response';
 import { createItemSchema, updateItemSchema } from './items.validator';
-import { ValidationError } from '../../utils/AppError';
+import { NotFoundError, ValidationError } from '../../utils/AppError';
 
 export class ItemsController {
   async getAll(req: Request, res: Response, next: NextFunction) {
@@ -20,6 +20,13 @@ export class ItemsController {
     } catch (e) { next(e); }
   }
 
+  async generateCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const code = await itemsService.generateItemCode(req.params.categoryCode);
+      sendSuccess(res, { item_code: code });
+    } catch (e) { next(e); }
+  }
+
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = createItemSchema.safeParse(req.body);
@@ -31,23 +38,30 @@ export class ItemsController {
 
   async getById(req: Request, res: Response, next: NextFunction) {
     try {
-      const item = await itemsService.getItemCard(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid item ID');
+      const item = await itemsService.getItemCard(id);
+      if (!item) throw new NotFoundError('Item', 'ITEM_NOT_FOUND', { id: req.params.id });
       sendSuccess(res, item);
     } catch (e) { next(e); }
   }
 
   async update(req: Request, res: Response, next: NextFunction) {
     try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid item ID');
       const parsed = updateItemSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
-      const item = await itemsService.updateItem(Number(req.params.id), parsed.data);
+      const item = await itemsService.updateItem(id, parsed.data);
       sendSuccess(res, item);
     } catch (e) { next(e); }
   }
 
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await itemsService.deleteItem(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid item ID');
+      const result = await itemsService.deleteItem(id);
       sendSuccess(res, result);
     } catch (e) { next(e); }
   }

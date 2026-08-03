@@ -7,14 +7,25 @@ import { PaginationMeta } from '../../utils/response';
 import { AppError, NotFoundError, ValidationError } from '../../utils/AppError';
 
 export class ItemsService {
-  private async generateItemCode(): Promise<string> {
+  async generateItemCode(categoryCode: string): Promise<string> {
+    const cat = await categoriesRepository.findByCode(categoryCode);
+    if (!cat) throw new ValidationError(`Category '${categoryCode}' not found`, { code: categoryCode });
+    const rawPrefix = cat.prefix || cat.code;
+    const safePrefix = rawPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const res = await pool.query(
-      `SELECT MAX(CAST(SUBSTRING(item_code, 2) AS INTEGER)) AS max_code FROM items WHERE item_code ~ '^P[0-9]+$'`
+      `SELECT item_code FROM items WHERE item_code ~ $1 ORDER BY id DESC LIMIT 1`,
+      [`^${safePrefix}-[0-9]+$`]
     );
-    const maxCode = res.rows[0].max_code;
-    const nextNum = (maxCode || 0) + 1;
-    return `P${String(nextNum).padStart(3, '0')}`;
+    let nextNum = 1;
+    if (res.rows.length > 0) {
+      const lastCode = res.rows[0].item_code;
+      const parts = lastCode.split('-');
+      const numPart = parseInt(parts[parts.length - 1], 10);
+      nextNum = (numPart || 0) + 1;
+    }
+    return `${rawPrefix}-${nextNum}`;
   }
+
   async getAll(page = 1, limit = 20, filter?: ItemsFilter): Promise<{ items: any[]; pagination: PaginationMeta }> {
     const offset = (page - 1) * limit;
     const [items, total] = await Promise.all([
@@ -25,7 +36,7 @@ export class ItemsService {
   }
 
   private async validateItemData(data: Record<string, any>, isUpdate = false): Promise<void> {
-    const required = ['item_code', 'name_ar', 'category_code', 'unit_code', 'warehouse_id'];
+    const required = ['name_ar', 'category_code', 'unit_code', 'warehouse_id'];
     for (const field of required) {
       if (!isUpdate || data[field] !== undefined) {
         if (!data[field] && data[field] !== 0) {
@@ -55,16 +66,37 @@ export class ItemsService {
   }
 
   async createItem(data: {
-    item_code?: string; name_ar: string; description?: string;
+    name_ar: string; description?: string;
+    item_code?: string;
     category_code: string; unit_code: string; warehouse_id: number;
     min_stock_level?: number; max_stock_level?: number;
-    current_balance?: number; location?: string;
+    current_balance?: number; opening_price?: number; location?: string;
+    is_consumable?: boolean;
+    expiry_alert_days?: number;
+    sap_material_number?: string | null;
+    gl_account?: string | null;
   }) {
-    if (!data.item_code) {
-      data.item_code = await this.generateItemCode();
+    const item_code = data.item_code || await this.generateItemCode(data.category_code);
+    const openingPrice = data.opening_price || 0;
+    await this.validateItemData({ ...data, item_code });
+    const item = await itemsRepository.createItem({ ...data, item_code, last_purchase_price: openingPrice, opening_price: openingPrice } as any);
+    
+    // Initialize stock for the primary warehouse
+    const client = await pool.connect();
+    try {
+      await itemsRepository.initWarehouseStock(
+        client,
+        item.id,
+        data.warehouse_id,
+        data.current_balance || 0,
+        data.min_stock_level || 0,
+        data.max_stock_level || 999999
+      );
+    } finally {
+      client.release();
     }
-    await this.validateItemData(data);
-    return itemsRepository.createItem(data as any);
+
+    return item;
   }
 
   async updateItem(id: number, data: Partial<any>) {
@@ -98,10 +130,13 @@ export class ItemsService {
     );
     if (item.rows.length === 0) throw new NotFoundError('Item', 'ITEM_NOT_FOUND', { id: item_id });
 
-    const [movements, summary, lastReceiving, lastIssuing] = await Promise.all([
+    const [movements, summary, lastReceiving, lastIssuing, warehouseStock] = await Promise.all([
       pool.query(
-        `SELECT sm.*, t.transaction_no, t.type AS transaction_type, t.transaction_date
-         FROM stock_movements sm JOIN transactions t ON t.id = sm.transaction_id
+        `SELECT sm.*, t.transaction_no, t.type AS transaction_type, t.transaction_date,
+                td.unit_cost, td.total_value
+         FROM stock_movements sm
+         JOIN transactions t ON t.id = sm.transaction_id
+         LEFT JOIN transaction_details td ON td.transaction_id = sm.transaction_id AND td.item_id = sm.item_id
          WHERE sm.item_id = $1 ORDER BY sm.movement_date DESC LIMIT 20`, [item_id]
       ),
       pool.query(
@@ -120,10 +155,12 @@ export class ItemsService {
          FROM transactions t JOIN transaction_details td ON td.transaction_id = t.id LEFT JOIN departments d ON d.id = t.department_id
          WHERE td.item_id = $1 AND t.type = 'LN' ORDER BY t.transaction_date DESC LIMIT 1`, [item_id]
       ),
+      itemsRepository.getStockByWarehouse(item_id),
     ]);
 
     return {
       item: item.rows[0],
+      warehouse_stock: warehouseStock,
       recent_movements: movements.rows,
       summary: summary.rows[0],
       last_receiving_voucher: lastReceiving.rows[0] || null,

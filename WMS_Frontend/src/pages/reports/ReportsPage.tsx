@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useInventoryReport } from '@/hooks/useReports';
@@ -18,6 +18,12 @@ export default function ReportsPage() {
 
   const warehouses = warehousesData?.data || [];
   const categories = categoriesData?.data || [];
+  const reportData = (data?.data || []) as InventoryReportItem[];
+
+  const grandTotal = useMemo(
+    () => reportData.reduce((sum, item) => sum + ((item.current_balance || 0) * (item.last_purchase_price || 0)), 0),
+    [reportData]
+  );
 
   const columns = [
     { key: 'item_code', header: t('reports.itemCode') },
@@ -27,7 +33,6 @@ export default function ReportsPage() {
     },
     { key: 'category_name', header: t('reports.category') },
     { key: 'unit_name', header: t('reports.unit') },
-    { key: 'warehouse_name', header: t('reports.warehouse') },
     {
       key: 'current_balance', header: t('reports.balance'),
       render: (item: InventoryReportItem) => {
@@ -40,8 +45,13 @@ export default function ReportsPage() {
         );
       },
     },
-    { key: 'min_stock_level', header: t('reports.minStock'), render: (item: InventoryReportItem) => formatNumber(item.min_stock_level) },
-    { key: 'max_stock_level', header: t('reports.maxStock'), render: (item: InventoryReportItem) => formatNumber(item.max_stock_level) },
+    {
+      key: 'inventory_value', header: t('reports.value'),
+      render: (item: InventoryReportItem) => {
+        const value = (item.current_balance || 0) * (item.last_purchase_price || 0);
+        return <span className="text-sm">{formatNumber(value, 2)}</span>;
+      },
+    },
     {
       key: 'stock_status', header: t('reports.status'),
       render: (item: InventoryReportItem) => {
@@ -49,14 +59,6 @@ export default function ReportsPage() {
         if (item.current_balance >= item.max_stock_level) return <Badge variant="warning">{t('reports.overstock')}</Badge>;
         return <Badge variant="success">{t('reports.normalStock')}</Badge>;
       },
-    },
-    {
-      key: 'stock_summary', header: t('reports.movements'),
-      render: (item: InventoryReportItem) => (
-        <span className="text-xs text-gray-500">
-          {item.stock_summary?.total_movements || 0} ({item.stock_summary?.total_in || 0} IN / {item.stock_summary?.total_out || 0} OUT)
-        </span>
-      ),
     },
   ];
 
@@ -114,10 +116,19 @@ export default function ReportsPage() {
 
       <DataTable
         columns={columns}
-        data={(data?.data || []) as any[]}
+        data={reportData as any[]}
         pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined}
         emptyMessage={t('reports.noData')}
       />
+
+      {reportData.length > 0 && (
+        <div className="mt-4 bg-white rounded-xl shadow p-4">
+          <div className="flex justify-end items-center gap-4">
+            <span className="text-lg font-semibold">{t('reports.totalInventoryValue')}</span>
+            <span className="text-2xl font-bold text-primary-600">{formatNumber(grandTotal, 2)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

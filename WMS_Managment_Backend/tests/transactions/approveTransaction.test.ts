@@ -71,13 +71,14 @@ async function seedItem(
 async function seedDraftTransaction(
   type: 'RV' | 'LN' | 'ADJ' | 'TRF' | 'RTV' | 'RTI',
   warehouseId: number,
-  userId: number
+  userId: number,
+  toWarehouseId?: number
 ): Promise<number> {
   const txNo = `${TEST_PREFIX}tx_${shortId()}`;
   const res = await pool.query(
-    `INSERT INTO transactions (transaction_no, type, status, warehouse_id, created_by)
-     VALUES ($1, $2, 'draft', $3, $4) RETURNING id`,
-    [txNo, type, warehouseId, userId]
+    `INSERT INTO transactions (transaction_no, type, status, warehouse_id, to_warehouse_id, created_by)
+     VALUES ($1, $2, 'draft', $3, $4, $5) RETURNING id`,
+    [txNo, type, warehouseId, toWarehouseId ?? null, userId]
   );
   createdIds.transactions.push(res.rows[0].id);
   return res.rows[0].id;
@@ -237,32 +238,24 @@ describe('approveTransaction', () => {
     expect(movements.rows[0].movement_type).toBe('OUT');
   });
 
-  test('approving TRF with positive quantity is IN movement', async () => {
+  test('approving TRF deducts source and adds to destination warehouse', async () => {
     const itemId = await seedItem(catCode, unitCode, whId, 200);
-    const txId = await seedDraftTransaction('TRF', whId, userId);
+    const destWhId = await seedWarehouse();
+    const txId = await seedDraftTransaction('TRF', whId, userId, destWhId);
     await seedTransactionDetail(txId, itemId, unitCode, 50);
 
     await transactionsService.approveTransaction(txId, userId);
 
     const movements = await pool.query(
-      'SELECT movement_type FROM stock_movements WHERE transaction_id = $1 AND item_id = $2',
+      `SELECT movement_type, quantity_change FROM stock_movements
+       WHERE transaction_id = $1 AND item_id = $2 ORDER BY id`,
       [txId, itemId]
     );
-    expect(movements.rows[0].movement_type).toBe('IN');
-  });
-
-  test('approving TRF with negative quantity is OUT movement', async () => {
-    const itemId = await seedItem(catCode, unitCode, whId, 200);
-    const txId = await seedDraftTransaction('TRF', whId, userId);
-    await seedTransactionDetail(txId, itemId, unitCode, -30);
-
-    await transactionsService.approveTransaction(txId, userId);
-
-    const movements = await pool.query(
-      'SELECT movement_type FROM stock_movements WHERE transaction_id = $1 AND item_id = $2',
-      [txId, itemId]
-    );
+    expect(movements.rows).toHaveLength(2);
     expect(movements.rows[0].movement_type).toBe('OUT');
+    expect(parseFloat(movements.rows[0].quantity_change)).toBe(-50);
+    expect(movements.rows[1].movement_type).toBe('IN');
+    expect(parseFloat(movements.rows[1].quantity_change)).toBe(50);
   });
 
   test('approving RTI is IN movement', async () => {

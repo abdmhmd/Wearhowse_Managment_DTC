@@ -15,12 +15,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { createDraftTransactionFormSchema, type CreateDraftTransactionFormFormData } from '@/schemas/transactions.schema';
 import { formatNumber } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
-import { showSuccess, showError, showWarning } from '@/utils/toast';
+import { showError } from '@/utils/toast';
 
 interface LineItem {
   item_id: number;
   quantity: number;
   unit_code: string;
+  unit_price?: number;
+  unit_cost?: number;
+  total_value?: number;
 }
 
 export default function CreateTransactionPage() {
@@ -51,13 +54,26 @@ export default function CreateTransactionPage() {
   });
 
   const transactionType = watch('header.type');
+  const isRV = transactionType === 'RV';
 
   const addLineItem = () => {
     if (!currentLine.item_id || !currentLine.quantity || !currentLine.unit_code) {
       showError(t('transaction.fillRequired'));
       return;
     }
-    setLineItems([...lineItems, currentLine as LineItem]);
+    const item = items.find((i: any) => i.id === currentLine.item_id);
+    const unitPrice = isRV ? (currentLine.unit_price || 0) : (item?.last_purchase_price || 0);
+    const quantity = Number(currentLine.quantity);
+    const totalValue = quantity * unitPrice;
+    const lineItem: LineItem = {
+      item_id: currentLine.item_id,
+      quantity,
+      unit_code: currentLine.unit_code,
+      unit_price: isRV ? unitPrice : 0,
+      unit_cost: isRV ? unitPrice : unitPrice,
+      total_value: totalValue,
+    };
+    setLineItems([...lineItems, lineItem]);
     setCurrentLine({});
     setShowItemPicker(false);
   };
@@ -67,21 +83,21 @@ export default function CreateTransactionPage() {
   };
 
   const onSubmit = async (data: CreateDraftTransactionFormFormData) => {
-    console.log('Form data:', data);
     if (lineItems.length === 0) {
       showError(t('transaction.addAtLeastOne'));
       return;
     }
-
+    if (isRV && lineItems.some(l => !l.unit_price || l.unit_price <= 0)) {
+      showError(t('transaction.unitPriceRequired'));
+      return;
+    }
     const response = await createMutation.mutateAsync({
       header: data.header,
       details: lineItems,
     });
-    console.log('API response:', response);
   };
 
   const onError = (formErrors: any) => {
-    console.error('Form validation errors:', formErrors);
     const firstError = Object.values(formErrors).flatMap((v: any) =>
       typeof v === 'object' && v?.message ? v.message : Object.values(v || {}).map((e: any) => e?.message).filter(Boolean)
     )[0];
@@ -167,6 +183,8 @@ export default function CreateTransactionPage() {
                     <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.item')}</th>
                     <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.unit')}</th>
                     <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.quantity')}</th>
+                    <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.unitPrice')}</th>
+                    <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.totalValue')}</th>
                     <th className="px-4 py-3 text-end text-xs font-semibold text-gray-600 uppercase">{t('table.action')}</th>
                   </tr>
                 </thead>
@@ -183,6 +201,8 @@ export default function CreateTransactionPage() {
                             {transactionType === 'LN' ? '-' : '+'}{formatNumber(line.quantity)}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-sm">{line.unit_cost ? formatNumber(line.unit_cost, 2) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-medium">{line.total_value ? formatNumber(line.total_value, 2) : '-'}</td>
                         <td className="px-4 py-3 text-end">
                           <Button type="button" variant="ghost" size="sm" onClick={() => removeLineItem(idx)}>
                             <TrashIcon className="h-4 w-4 text-red-500" />
@@ -194,7 +214,10 @@ export default function CreateTransactionPage() {
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={3}></td>
+                    <td colSpan={4}></td>
+                    <td className="px-4 py-2 text-sm font-semibold">{t('table.total')}</td>
+                    <td className="px-4 py-2 text-sm font-bold">{formatNumber(lineItems.reduce((s, l) => s + (l.total_value || 0), 0), 2)}</td>
+                    <td></td>
                   </tr>
                 </tfoot>
               </table>
@@ -215,7 +238,15 @@ export default function CreateTransactionPage() {
           <Select
             label={`${t('table.item')} *`}
             value={currentLine.item_id || ''}
-            onChange={(e) => setCurrentLine({ ...currentLine, item_id: Number(e.target.value) })}
+            onChange={(e) => {
+              const item = items.find((i: any) => i.id === Number(e.target.value));
+              setCurrentLine({
+                ...currentLine,
+                item_id: Number(e.target.value),
+                unit_code: item?.unit_code || '',
+                unit_price: isRV ? undefined : (item?.last_purchase_price || 0),
+              });
+            }}
             placeholder={t('form.selectItem')}
             options={items.map((i: any) => ({ value: i.id, label: `${i.item_code} - ${getLocalizedName(i)} (${t('table.balance')}: ${i.current_balance})` }))}
           />
@@ -235,6 +266,30 @@ export default function CreateTransactionPage() {
               options={units.map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }))}
             />
           </div>
+          {isRV ? (
+            <Input
+              label={`${t('table.unitPrice')} *`}
+              type="number"
+              step="0.01"
+              value={currentLine.unit_price || ''}
+              onChange={(e) => setCurrentLine({ ...currentLine, unit_price: Number(e.target.value) })}
+            />
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('table.unitCost')}</label>
+              <input
+                value={currentLine.unit_price !== undefined ? formatNumber(currentLine.unit_price, 2) : ''}
+                disabled
+                className="block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
+              />
+            </div>
+          )}
+          {currentLine.quantity && currentLine.unit_price !== undefined && (
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">{t('table.totalValue')}: </span>
+              <span className="font-bold">{formatNumber(Number(currentLine.quantity) * Number(currentLine.unit_price || 0), 2)}</span>
+            </div>
+          )}
           <div className="flex justify-end gap-3">
             <Button variant="secondary" type="button" onClick={() => { setShowItemPicker(false); setCurrentLine({}); }}>{t('common.cancel')}</Button>
             <Button type="button" onClick={addLineItem}>{t('common.add')}</Button>

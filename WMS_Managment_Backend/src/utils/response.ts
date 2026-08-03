@@ -7,9 +7,31 @@ export interface PaginationMeta {
   totalPages: number;
 }
 
-export function sendSuccess(res: Response, data: any, statusCode = 200, pagination?: PaginationMeta) {
+export function sendSuccess(
+  res: Response,
+  data: any,
+  messageOrStatusCode?: string | number,
+  statusCodeOrPagination?: number | PaginationMeta,
+  pagination?: PaginationMeta
+) {
   const body: Record<string, any> = { success: true, data };
-  if (pagination) body.pagination = pagination;
+  let statusCode = 200;
+
+  if (typeof messageOrStatusCode === 'string') {
+    body.message = messageOrStatusCode;
+    if (typeof statusCodeOrPagination === 'number') {
+      statusCode = statusCodeOrPagination;
+    } else if (typeof statusCodeOrPagination === 'object') {
+      body.pagination = statusCodeOrPagination;
+    }
+    if (pagination) body.pagination = pagination;
+  } else if (typeof messageOrStatusCode === 'number') {
+    statusCode = messageOrStatusCode;
+    if (typeof statusCodeOrPagination === 'object') {
+      body.pagination = statusCodeOrPagination;
+    }
+  }
+
   return res.status(statusCode).json(body);
 }
 

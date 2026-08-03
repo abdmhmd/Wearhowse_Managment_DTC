@@ -16,7 +16,9 @@ export class UsersController {
   }
   async getById(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await usersService.getById(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid user ID');
+      const data = await usersService.getById(id);
       if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id: req.params.id });
       sendSuccess(res, data);
     } catch (e) { next(e); }
@@ -35,11 +37,15 @@ export class UsersController {
       const parsed = updateUserSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
       const id = Number(req.params.id);
-      const updateData: any = { ...parsed.data };
-      if (updateData.password) {
-        updateData.password_hash = await hashPassword(updateData.password);
-        delete updateData.password;
+      if (isNaN(id)) throw new ValidationError('Invalid user ID');
+
+      // Build updateData safely — never spread raw password into the object
+      const { password, ...restData } = parsed.data;
+      const updateData: any = { ...restData };
+      if (password) {
+        updateData.password_hash = await hashPassword(password);
       }
+
       const data = await usersService.update(id, updateData);
       if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id });
       sendSuccess(res, data);
@@ -47,7 +53,9 @@ export class UsersController {
   }
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await usersService.delete(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid user ID');
+      const data = await usersService.delete(id);
       if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id: req.params.id });
       sendSuccess(res, data);
     } catch (e) { next(e); }

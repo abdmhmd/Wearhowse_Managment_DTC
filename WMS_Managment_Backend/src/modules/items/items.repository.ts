@@ -13,6 +13,8 @@ export class ItemsRepository {
     let query = `SELECT i.id, i.item_code, i.name_ar, i.name_en, i.description,
       i.category_code, i.unit_code, i.warehouse_id,
       i.min_stock_level, i.max_stock_level, i.current_balance, i.location, i.is_active,
+      i.is_consumable, i.expiry_alert_days, i.sap_material_number, i.gl_account,
+      i.last_purchase_price, i.opening_price,
       c.name_ar AS category_name_ar, c.name_en AS category_name_en,
       u.name_ar AS unit_name_ar, u.name_en AS unit_name_en,
       w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en
@@ -83,13 +85,77 @@ export class ItemsRepository {
   }
 
   async findByIdForUpdate(client: PoolClient, id: number) {
-    const res = await client.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, location, is_active FROM items WHERE id = $1 FOR UPDATE', [id]);
+    const res = await client.query(
+      `SELECT i.id, i.item_code, i.name_ar, i.name_en, i.description,
+              i.category_code, i.unit_code, i.warehouse_id,
+              i.current_balance, i.last_purchase_price, i.location, i.is_active,
+              COALESCE(iws.current_balance, i.current_balance) AS warehouse_balance,
+              iws.min_stock_level, iws.max_stock_level
+       FROM items i
+       LEFT JOIN item_warehouse_stock iws ON iws.item_id = i.id AND iws.warehouse_id = i.warehouse_id
+       WHERE i.id = $1 FOR UPDATE OF i`,
+      [id]
+    );
     if (res.rows.length === 0) return null;
     return res.rows[0];
   }
 
-  async updateBalance(client: PoolClient, id: number, newBalance: number) {
+  async updateLastPurchasePrice(client: PoolClient, id: number, price: number) {
+    await client.query('UPDATE items SET last_purchase_price = $1 WHERE id = $2', [price, id]);
+  }
+
+  /** Update balance in both items (legacy) and item_warehouse_stock (new source of truth) */
+  async updateBalance(client: PoolClient, id: number, newBalance: number, warehouseId?: number) {
     await client.query('UPDATE items SET current_balance = $1 WHERE id = $2', [newBalance, id]);
+    if (warehouseId) {
+      await client.query(
+        `INSERT INTO item_warehouse_stock (item_id, warehouse_id, current_balance)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (item_id, warehouse_id)
+         DO UPDATE SET current_balance = EXCLUDED.current_balance`,
+        [id, warehouseId, newBalance]
+      );
+    }
+  }
+
+  /** Get stock balance for a specific item in a specific warehouse */
+  async getWarehouseStock(client: PoolClient | null, itemId: number, warehouseId: number) {
+    const q = client ?? pool;
+    const res = await (q as any).query(
+      'SELECT * FROM item_warehouse_stock WHERE item_id = $1 AND warehouse_id = $2 FOR UPDATE',
+      [itemId, warehouseId]
+    );
+    return res.rows[0] || null;
+  }
+
+  /** Get stock balances across all warehouses for an item */
+  async getStockByWarehouse(itemId: number) {
+    const res = await pool.query(
+      `SELECT iws.*, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en
+       FROM item_warehouse_stock iws
+       JOIN warehouses w ON w.id = iws.warehouse_id
+       WHERE iws.item_id = $1
+       ORDER BY w.code`,
+      [itemId]
+    );
+    return res.rows;
+  }
+
+  /** Initialize stock record for new item in its primary warehouse */
+  async initWarehouseStock(
+    client: PoolClient,
+    itemId: number,
+    warehouseId: number,
+    initialBalance: number,
+    minLevel: number,
+    maxLevel: number
+  ) {
+    await client.query(
+      `INSERT INTO item_warehouse_stock (item_id, warehouse_id, current_balance, min_stock_level, max_stock_level)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (item_id, warehouse_id) DO NOTHING`,
+      [itemId, warehouseId, initialBalance, minLevel, maxLevel]
+    );
   }
 
   async createItem(data: {
@@ -103,11 +169,17 @@ export class ItemsRepository {
     min_stock_level?: number;
     max_stock_level?: number;
     current_balance?: number;
+    last_purchase_price?: number;
+    opening_price?: number;
     location?: string;
+    is_consumable?: boolean;
+    expiry_alert_days?: number;
+    sap_material_number?: string | null;
+    gl_account?: string | null;
   }) {
     const res = await pool.query(
-      `INSERT INTO items (item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, location)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO items (item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, last_purchase_price, opening_price, location, is_consumable, expiry_alert_days, sap_material_number, gl_account)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *`,
       [
         data.item_code,
@@ -120,14 +192,20 @@ export class ItemsRepository {
         data.min_stock_level ?? 0,
         data.max_stock_level ?? 999999.9999,
         data.current_balance ?? 0,
+        data.last_purchase_price ?? 0,
+        data.opening_price ?? 0,
         data.location ?? null,
+        data.is_consumable ?? true,
+        data.expiry_alert_days ?? 30,
+        data.sap_material_number ?? null,
+        data.gl_account ?? null,
       ]
     );
     return res.rows[0];
   }
 
   async getItemById(id: number) {
-    const res = await pool.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, location, is_active FROM items WHERE id = $1', [id]);
+    const res = await pool.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, last_purchase_price, opening_price, location, is_active, is_consumable, expiry_alert_days, sap_material_number, gl_account FROM items WHERE id = $1', [id]);
     if (res.rows.length === 0) return null;
     return res.rows[0];
   }
@@ -146,6 +224,10 @@ export class ItemsRepository {
       current_balance: number;
       location: string;
       is_active: boolean;
+      is_consumable: boolean;
+      expiry_alert_days: number;
+      sap_material_number: string | null;
+      gl_account: string | null;
     }>
   ) {
     const keys = Object.keys(data);
@@ -172,13 +254,13 @@ export class ItemsRepository {
   }
 
   async findByItemCode(item_code: string) {
-    const res = await pool.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, location, is_active FROM items WHERE item_code = $1', [item_code]);
+    const res = await pool.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, last_purchase_price, opening_price, location, is_active, is_consumable, expiry_alert_days, sap_material_number, gl_account FROM items WHERE item_code = $1', [item_code]);
     if (res.rows.length === 0) return null;
     return res.rows[0];
   }
 
   async getItemsByCategory(category_code: string) {
-    const res = await pool.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, location, is_active FROM items WHERE category_code = $1', [category_code]);
+    const res = await pool.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, location, is_active, is_consumable, expiry_alert_days, sap_material_number, gl_account FROM items WHERE category_code = $1', [category_code]);
     return res.rows;
   }
 }

@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { usersRepository } from '../users/users.repository';
+import { pool } from '../../config/database';
 import { verifyPassword } from '../../utils/crypto';
-import { generateToken } from '../../utils/jwt';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken, hashToken } from '../../utils/jwt';
 import { sendSuccess } from '../../utils/response';
 import { loginSchema } from './auth.validator';
 import { AuthError, ValidationError } from '../../utils/AppError';
+import { logger } from '../../utils/logger';
 
 export class AuthController {
   async login(req: Request, _res: Response, next: NextFunction) {
@@ -13,17 +15,90 @@ export class AuthController {
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
 
       const { username, password } = parsed.data;
+      logger.debug(`Login attempt for username "${username}"`, 'Auth');
+
       const user = await usersRepository.findByUsername(username);
-      if (!user || !user.is_active) throw new AuthError('Invalid credentials or inactive account', 'AUTH_INVALID_CREDENTIALS');
+      if (!user) {
+        logger.debug(`Login rejected: no user found for username "${username}"`, 'Auth');
+        throw new AuthError('Invalid credentials', 'AUTH_INVALID_CREDENTIALS');
+      }
+      if (!user.is_active) {
+        logger.debug(`Login rejected: account "${username}" is inactive`, 'Auth');
+        throw new AuthError('Account is disabled. Contact an administrator.', 'AUTH_ACCOUNT_DISABLED');
+      }
 
       const isPasswordValid = await verifyPassword(password, user.password_hash);
+      logger.debug(`Login password verification for "${username}": ${isPasswordValid}`, 'Auth');
       if (!isPasswordValid) throw new AuthError('Invalid credentials', 'AUTH_INVALID_CREDENTIALS');
 
-      const token = generateToken({ userId: user.id, username: user.username, role: user.role });
+      const payload = { userId: user.id, username: user.username, role: user.role };
+      const accessToken = generateAccessToken(payload);
+      const refreshToken = generateRefreshToken(payload);
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      await pool.query(
+        'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+        [user.id, hashToken(refreshToken), expiresAt]
+      );
+
       sendSuccess(_res, {
-        token,
+        token: accessToken,
+        refreshToken,
         user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async refresh(req: Request, _res: Response, next: NextFunction) {
+    try {
+      const { refreshToken } = req.body;
+      if (!refreshToken) throw new AuthError('Refresh token required', 'AUTH_TOKEN_INVALID');
+
+      const payload = verifyRefreshToken(refreshToken);
+      if (!payload) throw new AuthError('Invalid or expired refresh token', 'AUTH_TOKEN_INVALID');
+
+      const tokenHash = hashToken(refreshToken);
+      const result = await pool.query(
+        'SELECT id, revoked_at FROM refresh_tokens WHERE token_hash = $1 AND user_id = $2',
+        [tokenHash, payload.userId]
+      );
+
+      if (result.rows.length === 0 || result.rows[0].revoked_at) {
+        throw new AuthError('Refresh token has been revoked', 'AUTH_TOKEN_INVALID');
+      }
+
+      await pool.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1', [tokenHash]);
+
+      const newAccessToken = generateAccessToken(payload);
+      const newRefreshToken = generateRefreshToken(payload);
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      await pool.query(
+        'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+        [payload.userId, hashToken(newRefreshToken), expiresAt]
+      );
+
+      sendSuccess(_res, {
+        token: newAccessToken,
+        refreshToken: newRefreshToken,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async logout(req: Request, _res: Response, next: NextFunction) {
+    try {
+      const { refreshToken } = req.body;
+      if (refreshToken) {
+        const tokenHash = hashToken(refreshToken);
+        await pool.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1', [tokenHash]);
+      }
+      sendSuccess(_res, { message: 'Logged out successfully' });
     } catch (error) {
       next(error);
     }

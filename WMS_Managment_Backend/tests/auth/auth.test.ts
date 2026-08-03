@@ -53,9 +53,9 @@ describe('Auth Login', () => {
     const next = jest.fn();
     await controller.login(req as Request, res as Response, next);
 
-    expect(res.status).toHaveBeenCalledWith(401);
-    const jsonResponse = (res.json as jest.Mock).mock.calls[0][0];
-    expect(jsonResponse.success).toBe(false);
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err.status).toBe(401);
   });
 
   test('should reject missing fields', async () => {
@@ -64,9 +64,9 @@ describe('Auth Login', () => {
     const next = jest.fn();
     await controller.login(req as Request, res as Response, next);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    const jsonResponse = (res.json as jest.Mock).mock.calls[0][0];
-    expect(jsonResponse.success).toBe(false);
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err.status).toBe(400);
   });
 
   test('should reject unknown username', async () => {
@@ -75,9 +75,9 @@ describe('Auth Login', () => {
     const next = jest.fn();
     await controller.login(req as Request, res as Response, next);
 
-    expect(res.status).toHaveBeenCalledWith(401);
-    const jsonResponse = (res.json as jest.Mock).mock.calls[0][0];
-    expect(jsonResponse.success).toBe(false);
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err.status).toBe(401);
   });
 
   test('should reject inactive account', async () => {
@@ -94,9 +94,9 @@ describe('Auth Login', () => {
     const next = jest.fn();
     await controller.login(req as Request, res as Response, next);
 
-    expect(res.status).toHaveBeenCalledWith(401);
-    const jsonResponse = (res.json as jest.Mock).mock.calls[0][0];
-    expect(jsonResponse.success).toBe(false);
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err.status).toBe(401);
   });
 });
 
@@ -117,10 +117,10 @@ describe('Auth Middleware', () => {
     const next = jest.fn();
     authenticate(req as any, res as Response, next);
 
-    expect(res.status).toHaveBeenCalledWith(401);
-    const jsonResponse = (res.json as jest.Mock).mock.calls[0][0];
-    expect(jsonResponse.success).toBe(false);
-    expect(jsonResponse.error.message).toBe('Authorization token required');
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err.status).toBe(401);
+    expect(err.message).toBe('Authentication required');
   });
 
   test('should reject request with malformed token', () => {
@@ -128,10 +128,10 @@ describe('Auth Middleware', () => {
     const next = jest.fn();
     authenticate(req as any, res as Response, next);
 
-    expect(res.status).toHaveBeenCalledWith(401);
-    const jsonResponse = (res.json as jest.Mock).mock.calls[0][0];
-    expect(jsonResponse.success).toBe(false);
-    expect(jsonResponse.error.message).toBe('Invalid or expired token');
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err.status).toBe(401);
+    expect(err.message).toBe('Invalid or expired token');
   });
 
   test('should accept request with valid token', () => {

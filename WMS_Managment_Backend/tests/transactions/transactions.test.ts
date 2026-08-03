@@ -1,6 +1,6 @@
 import { pool } from '../../src/config/database';
 import { transactionsService } from '../../src/modules/transactions/transactions.service';
-import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedUser, seedItem, cleanup } from '../helpers';
+import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedUser, seedItem, seedDepartment, cleanup } from '../helpers';
 
 const prefix = `${TEST_PREFIX}tx_test_`;
 
@@ -9,6 +9,7 @@ let unitCode: string;
 let whId: number;
 let userId: number;
 let itemId: number;
+let deptId: number;
 
 beforeAll(async () => {
   catCode = await seedCategory();
@@ -16,6 +17,7 @@ beforeAll(async () => {
   whId = await seedWarehouse();
   userId = await seedUser();
   itemId = await seedItem(catCode, unitCode, whId, 500);
+  deptId = await seedDepartment();
 });
 afterAll(async () => { await cleanup(prefix); });
 
@@ -40,7 +42,7 @@ describe('transactions CRUD', () => {
   test('createDraft (LN)', async () => {
     const txNo = `${prefix}${shortId()}`;
     const result = await transactionsService.createDraft(
-      { transaction_no: txNo, type: 'LN', warehouse_id: whId, created_by: userId },
+      { transaction_no: txNo, type: 'LN', warehouse_id: whId, department_id: deptId, created_by: userId },
       [{ item_id: itemId, quantity: 5, unit_code: unitCode, unit_price: 10 }]
     );
     expect(result.status).toBe('draft');

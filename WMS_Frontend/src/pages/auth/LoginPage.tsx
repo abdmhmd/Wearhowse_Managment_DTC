@@ -23,8 +23,8 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const response = await authApi.login(data);
-      const { token, user } = response.data.data;
-      login(token, user);
+      const { token, refreshToken, user } = response.data.data;
+      login(token, refreshToken, user);
       showSuccess(t('auth.welcomeBack', { name: user.full_name }));
       navigate('/');
     } catch (error: any) {

@@ -19,6 +19,12 @@ import TransactionDetailPage from '@/pages/transactions/TransactionDetailPage';
 import StockMovementsPage from '@/pages/stock-movements/StockMovementsPage';
 import ReportsPage from '@/pages/reports/ReportsPage';
 import UsersPage from '@/pages/users/UsersPage';
+import SettingsPage from '@/pages/settings/SettingsPage';
+import ProjectsPage from '@/pages/projects/ProjectsPage';
+import CustodiesPage from '@/pages/custodies/CustodiesPage';
+import MaterialRequestsListPage from '@/pages/material-requests/MaterialRequestsListPage';
+import CreateMaterialRequestPage from '@/pages/material-requests/CreateMaterialRequestPage';
+import MaterialRequestDetailPage from '@/pages/material-requests/MaterialRequestDetailPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,12 +80,24 @@ export default function App() {
 
               <Route path="/stock-movements" element={<StockMovementsPage />} />
 
+              <Route element={<ProtectedRoute allowedRoles={['system_admin', 'warehouse_manager', 'storekeeper', 'department_manager', 'accountant', 'viewer']} />}>
+                <Route path="/projects" element={<ProjectsPage />} />
+                <Route path="/custodies" element={<CustodiesPage />} />
+                <Route path="/requests" element={<MaterialRequestsListPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedRoles={['system_admin', 'warehouse_manager', 'storekeeper', 'department_manager']} />}>
+                <Route path="/requests/new" element={<CreateMaterialRequestPage />} />
+                <Route path="/requests/:id" element={<MaterialRequestDetailPage />} />
+              </Route>
+
               <Route element={<ProtectedRoute allowedRoles={['system_admin', 'warehouse_manager', 'accountant']} />}>
                 <Route path="/reports" element={<ReportsPage />} />
               </Route>
 
               <Route element={<ProtectedRoute allowedRoles={['system_admin']} />}>
                 <Route path="/users" element={<UsersPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
               </Route>
             </Route>
           </Route>

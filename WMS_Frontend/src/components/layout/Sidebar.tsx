@@ -15,6 +15,10 @@ import {
   ArrowLeftOnRectangleIcon,
   XMarkIcon,
   UserIcon,
+  Cog6ToothIcon,
+  FolderIcon,
+  ShieldCheckIcon,
+  ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';
 import { cn } from '@/utils';
 
@@ -36,7 +40,11 @@ const navItems: NavItem[] = [
   { labelKey: 'nav.unitConversions', path: '/unit-conversions', icon: ArrowsRightLeftIcon, roles: ['system_admin', 'warehouse_manager'] },
   { labelKey: 'nav.transactions', path: '/transactions', icon: DocumentTextIcon },
   { labelKey: 'nav.stockMovements', path: '/stock-movements', icon: ClipboardDocumentListIcon },
+  { labelKey: 'nav.materialRequests', path: '/requests', icon: ClipboardDocumentCheckIcon },
+  { labelKey: 'nav.projects', path: '/projects', icon: FolderIcon },
+  { labelKey: 'nav.custodies', path: '/custodies', icon: ShieldCheckIcon },
   { labelKey: 'nav.users', path: '/users', icon: UserGroupIcon, roles: ['system_admin'] },
+  { labelKey: 'nav.settings', path: '/settings', icon: Cog6ToothIcon, roles: ['system_admin'] },
 ];
 
 interface SidebarProps {

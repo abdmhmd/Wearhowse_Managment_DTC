@@ -6,13 +6,28 @@ export interface AuthenticatedRequest extends Request {
   user?: TokenPayload;
 }
 
+/** Convenience role groupings for use in route-level authorize() calls */
+export const ROLES = {
+  ALL_STAFF: ['system_admin', 'warehouse_manager', 'storekeeper', 'accountant', 'department_manager', 'viewer'],
+  WAREHOUSE_OPS: ['system_admin', 'warehouse_manager', 'storekeeper'],
+  MANAGEMENT: ['system_admin', 'warehouse_manager'],
+  ADMINS_ONLY: ['system_admin'],
+  CAN_REQUEST: ['system_admin', 'warehouse_manager', 'department_manager'],
+  READ_ONLY: ['system_admin', 'warehouse_manager', 'storekeeper', 'accountant', 'department_manager', 'viewer'],
+  CAN_VIEW_REPORTS: ['system_admin', 'warehouse_manager', 'accountant'],
+} as const;
+
 export function authenticate(req: AuthenticatedRequest, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return next(new AuthError('Authentication required', 'AUTH_UNAUTHORIZED'));
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.substring(7).trim();
+  if (!token) {
+    return next(new AuthError('Invalid authorization token format', 'AUTH_TOKEN_INVALID'));
+  }
+
   const decoded = verifyToken(token);
 
   if (!decoded) {

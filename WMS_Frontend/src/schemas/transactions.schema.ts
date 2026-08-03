@@ -23,6 +23,8 @@ export const transactionDetailSchema = z.object({
   quantity: z.coerce.number().positive('Quantity must be positive'),
   unit_code: z.string().min(1, 'Unit is required'),
   unit_price: z.coerce.number().nonnegative().optional().default(0),
+  unit_cost: z.coerce.number().nonnegative().optional(),
+  total_value: z.coerce.number().nonnegative().optional(),
 });
 
 export const createDraftTransactionSchema = z.object({

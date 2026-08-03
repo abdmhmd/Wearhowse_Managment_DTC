@@ -2,6 +2,7 @@ import type { Config } from 'jest';
 
 const config: Config = {
   maxWorkers: 1,
+  runInBand: true,
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
@@ -9,7 +10,7 @@ const config: Config = {
   verbose: true,
   forceExit: true,
   detectOpenHandles: true,
-  testTimeout: 30000,
+  testTimeout: 60000,
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 };
 

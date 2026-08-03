@@ -46,13 +46,29 @@ export async function seedWarehouse(): Promise<number> {
 }
 
 export async function seedItem(
-  categoryCode: string, unitCode: string, warehouseId: number, balance = 0
+  categoryCode: string, unitCode: string, warehouseId: number, balance = 0,
+  options: { is_consumable?: boolean; expiry_alert_days?: number; sap_material_number?: string | null; gl_account?: string | null } = {}
 ): Promise<number> {
   const itemCode = `${TEST_PREFIX}item_${shortId()}`;
   const res = await pool.query(
-    `INSERT INTO items (item_code, name_ar, category_code, unit_code, warehouse_id, current_balance, min_stock_level, max_stock_level)
-     VALUES ($1, $2, $3, $4, $5, $6, 0, 999999) RETURNING id`,
-    [itemCode, itemCode, categoryCode, unitCode, warehouseId, balance]
+    `INSERT INTO items (item_code, name_ar, category_code, unit_code, warehouse_id, current_balance, min_stock_level, max_stock_level, is_consumable, expiry_alert_days, sap_material_number, gl_account)
+     VALUES ($1, $2, $3, $4, $5, $6, 0, 999999, $7, $8, $9, $10) RETURNING id`,
+    [
+      itemCode, itemCode, categoryCode, unitCode, warehouseId, balance,
+      options.is_consumable ?? true,
+      options.expiry_alert_days ?? 30,
+      options.sap_material_number ?? null,
+      options.gl_account ?? null,
+    ]
+  );
+  return res.rows[0].id;
+}
+
+export async function seedDepartment(): Promise<number> {
+  const code = `${TEST_PREFIX}dept_${shortId()}`;
+  const res = await pool.query(
+    `INSERT INTO departments (code, name_ar, name_en) VALUES ($1, $2, $2) RETURNING id`,
+    [code, code]
   );
   return res.rows[0].id;
 }

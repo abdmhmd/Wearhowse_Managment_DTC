@@ -55,6 +55,11 @@ export default function ItemCardPage() {
             <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('form.location')}</dt><dd className="text-sm font-medium">{item.location || '-'}</dd></div>
             <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('form.minStockLevel')}</dt><dd className="text-sm font-medium">{formatNumber(item.min_stock_level)}</dd></div>
             <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('form.maxStockLevel')}</dt><dd className="text-sm font-medium">{formatNumber(item.max_stock_level)}</dd></div>
+            <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('table.lastPurchasePrice')}</dt><dd className="text-sm font-medium">{item.last_purchase_price ? formatNumber(item.last_purchase_price, 2) : '-'}</dd></div>
+            <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('pages.items.itemType')}</dt><dd className="text-sm font-medium">{item.is_consumable === false ? <Badge variant="warning">{t('pages.items.durable')}</Badge> : <Badge variant="info">{t('pages.items.consumable')}</Badge>}</dd></div>
+            <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('pages.items.expiryAlertDays')}</dt><dd className="text-sm font-medium">{item.is_consumable === false ? formatNumber(item.expiry_alert_days) : '-'}</dd></div>
+            <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('pages.items.sapMaterialNumber')}</dt><dd className="text-sm font-medium">{item.sap_material_number || '-'}</dd></div>
+            <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('pages.items.glAccount')}</dt><dd className="text-sm font-medium">{item.gl_account || '-'}</dd></div>
           </dl>
         </div>
 
@@ -106,11 +111,13 @@ export default function ItemCardPage() {
                 <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.before')}</th>
                 <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.after')}</th>
                 <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.transaction')}</th>
+                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.unitCost')}</th>
+                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.totalValue')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {recent_movements?.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">{t('pages.items.noMovements')}</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">{t('pages.items.noMovements')}</td></tr>
               ) : (
                 recent_movements?.map((mov: any) => (
                   <tr key={mov.id} className="hover:bg-gray-50">
@@ -124,6 +131,8 @@ export default function ItemCardPage() {
                     <td className="px-4 py-3 text-sm text-gray-500">{formatNumber(mov.quantity_before)}</td>
                     <td className="px-4 py-3 text-sm">{formatNumber(mov.quantity_after)}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{mov.transaction_no || `#${mov.transaction_id}`}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{mov.unit_cost ? formatNumber(mov.unit_cost, 2) : '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{mov.total_value ? formatNumber(mov.total_value, 2) : '-'}</td>
                   </tr>
                 ))
               )}

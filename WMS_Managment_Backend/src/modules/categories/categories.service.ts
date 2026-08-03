@@ -15,11 +15,11 @@ export class CategoriesService {
     return categoriesRepository.findByCode(code);
   }
 
-  async createCategory(category: { code: string; name_ar: string; description?: string }) {
+  async createCategory(category: { code: string; name_ar: string; prefix?: string; description?: string }) {
     return categoriesRepository.create(category);
   }
 
-  async updateCategory(code: string, category: { name_ar?: string; description?: string }) {
+  async updateCategory(code: string, category: { name_ar?: string; prefix?: string; description?: string }) {
     return categoriesRepository.update(code, category);
   }
 
