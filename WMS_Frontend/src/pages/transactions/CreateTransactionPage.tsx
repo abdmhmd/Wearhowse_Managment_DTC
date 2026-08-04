@@ -62,7 +62,7 @@ export default function CreateTransactionPage() {
       return;
     }
     const item = items.find((i: any) => i.id === currentLine.item_id);
-    const unitPrice = isRV ? (currentLine.unit_price || 0) : (item?.last_purchase_price || 0);
+    const unitPrice = Number(isRV ? (currentLine.unit_price || 0) : (item?.last_purchase_price || 0));
     const quantity = Number(currentLine.quantity);
     const totalValue = quantity * unitPrice;
     const lineItem: LineItem = {
@@ -70,7 +70,7 @@ export default function CreateTransactionPage() {
       quantity,
       unit_code: currentLine.unit_code,
       unit_price: isRV ? unitPrice : 0,
-      unit_cost: isRV ? unitPrice : unitPrice,
+      unit_cost: unitPrice,
       total_value: totalValue,
     };
     setLineItems([...lineItems, lineItem]);
@@ -244,7 +244,7 @@ export default function CreateTransactionPage() {
                 ...currentLine,
                 item_id: Number(e.target.value),
                 unit_code: item?.unit_code || '',
-                unit_price: isRV ? undefined : (item?.last_purchase_price || 0),
+                unit_price: isRV ? undefined : Number(item?.last_purchase_price || 0),
               });
             }}
             placeholder={t('form.selectItem')}
