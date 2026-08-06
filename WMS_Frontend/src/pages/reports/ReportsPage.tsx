@@ -16,9 +16,9 @@ export default function ReportsPage() {
   const { data: warehousesData } = useAllWarehouses();
   const { data: categoriesData } = useCategories(1, 200);
 
-  const warehouses = warehousesData?.data || [];
-  const categories = categoriesData?.data || [];
-  const reportData = (data?.data || []) as InventoryReportItem[];
+  const warehouses = warehousesData?.items || [];
+  const categories = categoriesData?.items || [];
+  const reportData = (data?.items || []) as InventoryReportItem[];
 
   const grandTotal = useMemo(
     () => reportData.reduce((sum, item) => sum + ((item.current_balance || 0) * (item.last_purchase_price || 0)), 0),

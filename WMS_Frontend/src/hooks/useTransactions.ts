@@ -9,7 +9,7 @@ export function useTransactions(page = 1, limit = 20, type?: string, status?: st
     queryKey: ['transactions', page, limit, type, status],
     queryFn: async () => {
       const res = await transactionsApi.getAll(page, limit, type, status);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -19,7 +19,7 @@ export function useTransaction(id: number) {
     queryKey: ['transactions', id],
     queryFn: async () => {
       const res = await transactionsApi.getById(id);
-      return res.data;
+      return res.data.data;
     },
     enabled: !!id,
   });

@@ -118,7 +118,9 @@
     "noResults": "لا توجد نتائج",
     "unitCost": "تكلفة الوحدة",
     "totalValue": "القيمة الإجمالية",
-    "lastPurchasePrice": "آخر سعر شراء"
+    "lastPurchasePrice": "آخر سعر شراء",
+    "subcategory": "الفئة الفرعية",
+    "parentCategory": "الفئة الرئيسية"
   },
   "form": {
     "code": "الرمز",
@@ -167,7 +169,13 @@
     "lineItems": "أصناف السطر",
     "addLineItem": "إضافة سطر",
     "openingPrice": "سعر الافتتاح",
-    "prefix": "البادئة"
+    "prefix": "البادئة",
+    "subcategory": "الفئة الفرعية",
+    "selectSubcategory": "اختر الفئة الفرعية",
+    "selectCategoryFirst": "اختر الفئة أولاً",
+    "selectItemFirst": "اختر الصنف أولاً",
+    "parentCategory": "الفئة الرئيسية",
+    "selectParentCategory": "اختر الفئة الرئيسية"
   },
   "transaction": {
     "types": {
@@ -199,7 +207,11 @@
     "user": "المستخدم",
     "unitPriceRequired": "سعر الوحدة مطلوب للاستلام",
     "unitCostAuto": "تكلفة الوحدة (تلقائي من آخر سعر شراء)",
-    "grandTotal": "الإجمالي الكلي"
+    "grandTotal": "الإجمالي الكلي",
+    "expiryTracking": "تتبع انتهاء الصلاحية",
+    "productionDate": "تاريخ الإنتاج",
+    "expiryDate": "تاريخ انتهاء الصلاحية",
+    "expiryDateRequired": "تاريخ انتهاء الصلاحية مطلوب عند تفعيل تتبع انتهاء الصلاحية"
   },
   "transactions": {
     "noItems": "لم تتم إضافة أي أصناف بعد. انقر على \"إضافة صنف\" للبدء."
@@ -256,7 +268,12 @@
       "title": "الأصناف",
       "subtitle": "إدارة فئات الأغراض",
       "create": "إنشاء صنف",
-      "edit": "تعديل الصنف"
+      "edit": "تعديل الصنف",
+      "subcategories": "الفئات الفرعية",
+      "manageSubcategories": "إدارة الفئات الفرعية",
+      "addSubcategory": "إضافة فئة فرعية",
+      "editSubcategory": "تعديل الفئة الفرعية",
+      "noSubcategories": "لا توجد فئات فرعية بعد"
     },
     "units": {
       "title": "الوحدات",

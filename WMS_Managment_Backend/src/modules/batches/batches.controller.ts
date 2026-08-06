@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
 import { batchesRepository } from './batches.repository';
-import { sendSuccess } from '../../utils/response';
+import { sendPaginated } from '../../utils/response';
 
 export class BatchesController {
   
@@ -21,9 +21,11 @@ export class BatchesController {
         offset: (pageNum - 1) * limitNum,
       });
 
-      sendSuccess(res, {
-        items: result.items,
-        pagination: { page: pageNum, limit: limitNum, total: result.total, totalPages: Math.ceil(result.total / limitNum) }
+      sendPaginated(res, result.items, {
+        page: pageNum,
+        limit: limitNum,
+        total: result.total,
+        totalPages: Math.ceil(result.total / limitNum)
       });
     } catch (err) {
       next(err);

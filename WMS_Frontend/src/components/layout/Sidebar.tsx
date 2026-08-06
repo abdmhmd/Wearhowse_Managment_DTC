@@ -44,7 +44,6 @@ const navItems: NavItem[] = [
   { labelKey: 'nav.projects', path: '/projects', icon: FolderIcon },
   { labelKey: 'nav.custodies', path: '/custodies', icon: ShieldCheckIcon },
   { labelKey: 'nav.users', path: '/users', icon: UserGroupIcon, roles: ['system_admin'] },
-  { labelKey: 'nav.settings', path: '/settings', icon: Cog6ToothIcon, roles: ['system_admin'] },
 ];
 
 interface SidebarProps {

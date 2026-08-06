@@ -118,7 +118,9 @@
     "noResults": "No results found",
     "unitCost": "Unit Cost",
     "totalValue": "Total Value",
-    "lastPurchasePrice": "Last Purchase Price"
+    "lastPurchasePrice": "Last Purchase Price",
+    "subcategory": "Subcategory",
+    "parentCategory": "Parent Category"
   },
   "form": {
     "code": "Code",
@@ -167,7 +169,13 @@
     "lineItems": "Line Items",
     "addLineItem": "Add Line Item",
     "openingPrice": "Opening Price",
-    "prefix": "Prefix"
+    "prefix": "Prefix",
+    "subcategory": "Subcategory",
+    "selectSubcategory": "Select subcategory",
+    "selectCategoryFirst": "Select a category first",
+    "selectItemFirst": "Select an item first",
+    "parentCategory": "Parent Category",
+    "selectParentCategory": "Select parent category"
   },
   "transaction": {
     "types": {
@@ -199,7 +207,11 @@
     "user": "User",
     "unitPriceRequired": "Unit price is required for receiving",
     "unitCostAuto": "Unit cost (auto from last purchase price)",
-    "grandTotal": "Grand Total"
+    "grandTotal": "Grand Total",
+    "expiryTracking": "Expiry tracking",
+    "productionDate": "Production Date",
+    "expiryDate": "Expiry Date",
+    "expiryDateRequired": "Expiry date is required when expiry tracking is enabled"
   },
   "transactions": {
     "noItems": "No items added yet. Click \"Add Item\" to begin."
@@ -256,7 +268,12 @@
       "title": "Categories",
       "subtitle": "Manage item categories",
       "create": "Create Category",
-      "edit": "Edit Category"
+      "edit": "Edit Category",
+      "subcategories": "Subcategories",
+      "manageSubcategories": "Manage subcategories",
+      "addSubcategory": "Add Subcategory",
+      "editSubcategory": "Edit Subcategory",
+      "noSubcategories": "No subcategories yet"
     },
     "units": {
       "title": "Units",

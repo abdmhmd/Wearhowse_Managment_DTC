@@ -22,72 +22,18 @@ function processQueue(error: any, token: string | null = null) {
   failedQueue = [];
 }
 
-function getMountedComponents(): string[] {
-  const names: string[] = [];
-  try {
-    const hook = (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__;
-    if (!hook || !hook.getFiberRoots) return names;
-    const renderers = hook.renderers;
-    if (!renderers) return names;
-    (renderers as Map<number, unknown>).forEach((_r, id) => {
-      let roots: any[] = [];
-      try {
-        roots = hook.getFiberRoots(id);
-      } catch {}
-      for (const root of roots) {
-        const seen = new Set<any>();
-        const walk = (fiber: any) => {
-          if (!fiber || seen.has(fiber)) return;
-          seen.add(fiber);
-          const type = fiber.elementType ?? fiber.type;
-          let name: string | null = null;
-          if (typeof type === 'string') name = type;
-          else if (type) name = type.displayName ?? type.name ?? null;
-          if (name && !names.includes(name)) names.push(name);
-          walk(fiber.child);
-          walk(fiber.sibling);
-        };
-        if (root.current) walk(root.current);
-      }
-    });
-  } catch {}
-  return names;
-}
-
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('wms_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  if (config.url === '/settings') {
-    const stack = new Error().stack;
-    const origin = (config as any).origin ?? 'unknown';
-    const route = window.location.pathname + window.location.search;
-    const components = getMountedComponents();
-    console.debug(
-      `[WMS-TRACE] /settings dispatch @ ${new Date().toISOString()}` +
-        `\n  origin: ${origin}` +
-        `\n  route: ${route}` +
-        `\n  mounted components: ${components.join(', ') || '(none)'}` +
-        `\n  stack:\n${stack}`
-    );
-  }
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => {
-    if (response.config?.url === '/settings') {
-      console.debug(`[WMS-TRACE] /settings resolved @ ${new Date().toISOString()} status=${response.status}`);
-    }
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
-
-    if (error.config?.url === '/settings') {
-      console.debug(`[WMS-TRACE] /settings failed @ ${new Date().toISOString()} status=${error.response?.status ?? 'no-resp'} ${error.message}`);
-    }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {

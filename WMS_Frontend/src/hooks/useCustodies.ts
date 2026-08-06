@@ -8,7 +8,7 @@ export function useCustodies(page = 1, limit = 20, filter?: CustodiesFilter) {
     queryKey: ['custodies', page, limit, filter],
     queryFn: async () => {
       const res = await custodiesApi.getAll(page, limit, filter);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -21,7 +21,7 @@ export function useReturnCustody() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['custodies'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      const txnNo = (data as any)?.data?.transaction_no;
+      const txnNo = data.data?.data?.transaction_no;
       showSuccess(txnNo ? `Item returned successfully - RTI #${txnNo}` : 'Item returned successfully');
     },
     onError: (error: Error) => {

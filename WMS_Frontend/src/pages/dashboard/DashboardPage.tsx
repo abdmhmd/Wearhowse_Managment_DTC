@@ -16,7 +16,7 @@ export default function DashboardPage() {
     queryKey: ['items', 'dashboard'],
     queryFn: async () => {
       const res = await itemsApi.getAll(1, 100);
-      return res.data;
+      return res.data.data;
     },
   });
 
@@ -24,7 +24,7 @@ export default function DashboardPage() {
     queryKey: ['transactions', 'dashboard'],
     queryFn: async () => {
       const res = await transactionsApi.getAll(1, 100);
-      return res.data;
+      return res.data.data;
     },
   });
 
@@ -32,7 +32,7 @@ export default function DashboardPage() {
     queryKey: ['stock-movements', 'dashboard'],
     queryFn: async () => {
       const res = await stockMovementsApi.getAll(1, 10);
-      return res.data;
+      return res.data.data;
     },
   });
 
@@ -46,9 +46,9 @@ export default function DashboardPage() {
     );
   }
 
-  const items = itemsData?.data || [];
-  const transactions = transactionsData?.data || [];
-  const movements = movementsData?.data || [];
+  const items = itemsData?.items || [];
+  const transactions = transactionsData?.items || [];
+  const movements = movementsData?.items || [];
 
   const totalItems = itemsData?.pagination?.total || items.length;
   const lowStockItems = items.filter((item: any) => item.current_balance <= item.min_stock_level).length;

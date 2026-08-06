@@ -42,7 +42,7 @@ export default function StockMovementsPage() {
       <PageHeader title={t('nav.stockMovements')} subtitle={t('stockMovements.subtitle')} />
       <DataTable
         columns={columns}
-        data={(data?.data || []) as any[]}
+        data={(data?.items || []) as any[]}
         pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined}
         emptyMessage={t('stockMovements.noMovements')}
       />

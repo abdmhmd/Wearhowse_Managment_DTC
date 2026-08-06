@@ -28,7 +28,7 @@ export default function UsersPage() {
   const createForm = useForm<CreateUserFormData>({ resolver: zodResolver(createUserSchema) });
   const updateForm = useForm<UpdateUserFormData>({ resolver: zodResolver(updateUserSchema) });
 
-  const departmentOptions = (departmentsData?.data || []).map((d: any) => ({ value: d.id, label: getLocalizedName(d) }));
+  const departmentOptions = (departmentsData?.items || []).map((d: any) => ({ value: d.id, label: getLocalizedName(d) }));
 
   const handleCreate = async (formData: CreateUserFormData) => {
     await createMutation.mutateAsync(formData as any);
@@ -122,7 +122,7 @@ export default function UsersPage() {
   return (
     <div>
       <PageHeader title={t('pages.users.title')} subtitle={t('pages.users.subtitle')} actions={<Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.users.create')}</Button>} />
-      <DataTable columns={columns} data={(data?.data || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
+      <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
       <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(); }} title={t('pages.users.create')}>
         {renderForm(createForm, handleCreate, createMutation.isPending)}

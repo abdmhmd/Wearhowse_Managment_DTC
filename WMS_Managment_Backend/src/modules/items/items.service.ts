@@ -1,5 +1,6 @@
 import { itemsRepository, ItemsFilter } from './items.repository';
 import { categoriesRepository } from '../categories/categories.repository';
+import { subcategoriesRepository } from '../categories/subcategories.repository';
 import { unitsRepository } from '../units/units.repository';
 import { warehousesRepository } from '../warehouses/warehouses.repository';
 import { pool } from '../../config/database';
@@ -35,7 +36,7 @@ export class ItemsService {
     return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
-  private async validateItemData(data: Record<string, any>, isUpdate = false): Promise<void> {
+  private async validateItemData(data: Record<string, any>, isUpdate = false, existing: Record<string, any> | null = null): Promise<void> {
     const required = ['name_ar', 'category_code', 'unit_code', 'warehouse_id'];
     for (const field of required) {
       if (!isUpdate || data[field] !== undefined) {
@@ -48,6 +49,19 @@ export class ItemsService {
     if (data.category_code) {
       const cat = await categoriesRepository.findByCode(data.category_code);
       if (!cat) throw new ValidationError(`Category '${data.category_code}' not found`, { code: data.category_code });
+    }
+    if (data.subcategory_id != null) {
+      const sub = await subcategoriesRepository.findById(data.subcategory_id);
+      if (!sub) {
+        throw new ValidationError(`Subcategory #${data.subcategory_id} not found`, { subcategory_id: data.subcategory_id });
+      }
+      const effectiveCategory = data.category_code ?? existing?.category_code;
+      if (effectiveCategory && sub.category_code !== effectiveCategory) {
+        throw new ValidationError(
+          `Subcategory '${sub.code}' does not belong to category '${effectiveCategory}'`,
+          { subcategory_id: data.subcategory_id, category_code: effectiveCategory }
+        );
+      }
     }
     if (data.unit_code) {
       const u = await unitsRepository.findByCode(data.unit_code);
@@ -68,7 +82,8 @@ export class ItemsService {
   async createItem(data: {
     name_ar: string; description?: string;
     item_code?: string;
-    category_code: string; unit_code: string; warehouse_id: number;
+    category_code: string; subcategory_id?: number | null;
+    unit_code: string; warehouse_id: number;
     min_stock_level?: number; max_stock_level?: number;
     current_balance?: number; opening_price?: number; location?: string;
     is_consumable?: boolean;
@@ -102,7 +117,7 @@ export class ItemsService {
   async updateItem(id: number, data: Partial<any>) {
     const existing = await itemsRepository.getItemById(id);
     if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND', { id });
-    await this.validateItemData({ ...data, id }, true);
+    await this.validateItemData({ ...data, id }, true, existing);
     return itemsRepository.updateItem(id, data);
   }
 
@@ -121,9 +136,13 @@ export class ItemsService {
 
   async getItemCard(item_id: number) {
     const item = await pool.query(
-      `SELECT i.*, c.name_ar AS category_name_ar, c.name_en AS category_name_en, u.name_ar AS unit_name_ar, u.name_en AS unit_name_en, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en
+      `SELECT i.*, c.name_ar AS category_name_ar, c.name_en AS category_name_en,
+              sc.name_ar AS subcategory_name_ar, sc.name_en AS subcategory_name_en,
+              u.name_ar AS unit_name_ar, u.name_en AS unit_name_en,
+              w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en
        FROM items i
        LEFT JOIN categories c ON c.code = i.category_code
+       LEFT JOIN subcategories sc ON sc.id = i.subcategory_id
        LEFT JOIN units u ON u.code = i.unit_code
        LEFT JOIN warehouses w ON w.id = i.warehouse_id
        WHERE i.id = $1`, [item_id]

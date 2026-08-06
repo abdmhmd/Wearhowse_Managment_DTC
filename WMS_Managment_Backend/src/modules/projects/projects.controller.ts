@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
 import { projectsService } from './projects.service';
-import { sendSuccess } from '../../utils/response';
+import { sendData, sendPaginated } from '../../utils/response';
 import { ValidationError } from '../../utils/AppError';
 import { createProjectSchema, updateProjectSchema } from './projects.validator';
 
@@ -12,7 +12,7 @@ export class ProjectsController {
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
 
       const result = await projectsService.create(req.user!.id, parsed.data);
-      sendSuccess(res, result, 'تم إنشاء المشروع بنجاح', 201);
+      sendData(res, result, { statusCode: 201, message: 'تم إنشاء المشروع بنجاح' });
     } catch (err) {
       next(err);
     }
@@ -30,7 +30,7 @@ export class ProjectsController {
         limit: limit ? Number(limit) : 20,
       });
 
-      sendSuccess(res, result);
+      sendPaginated(res, result.items, result.pagination);
     } catch (err) {
       next(err);
     }
@@ -41,7 +41,7 @@ export class ProjectsController {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid project ID');
       const result = await projectsService.getById(id);
-      sendSuccess(res, result);
+      sendData(res, result);
     } catch (err) {
       next(err);
     }
@@ -54,7 +54,7 @@ export class ProjectsController {
       const parsed = updateProjectSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
       const result = await projectsService.update(id, parsed.data);
-      sendSuccess(res, result, 'تم تحديث المشروع بنجاح');
+      sendData(res, result, { message: 'تم تحديث المشروع بنجاح' });
     } catch (err) {
       next(err);
     }
@@ -65,7 +65,7 @@ export class ProjectsController {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid project ID');
       const result = await projectsService.close(id, req.user!.id);
-      sendSuccess(res, result, 'تم إغلاق المشروع بنجاح');
+      sendData(res, result, { message: 'تم إغلاق المشروع بنجاح' });
     } catch (err) {
       next(err);
     }
@@ -76,7 +76,7 @@ export class ProjectsController {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid project ID');
       const result = await projectsService.remove(id);
-      sendSuccess(res, result, 'تم حذف المشروع');
+      sendData(res, result, { message: 'تم حذف المشروع' });
     } catch (err) {
       next(err);
     }

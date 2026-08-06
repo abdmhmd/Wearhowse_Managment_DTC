@@ -9,7 +9,7 @@ export function useWarehouses(page = 1, limit = 20) {
     queryKey: ['warehouses', page, limit],
     queryFn: async () => {
       const res = await warehousesApi.getAll(page, limit);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -19,7 +19,7 @@ export function useAllWarehouses() {
     queryKey: ['warehouses', 'all'],
     queryFn: async () => {
       const res = await warehousesApi.getAll(1, 200);
-      return res.data;
+      return res.data.data;
     },
   });
 }

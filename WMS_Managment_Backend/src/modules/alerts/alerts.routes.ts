@@ -3,7 +3,7 @@ import { Response, NextFunction } from 'express';
 import { authenticate, authorize, ROLES } from '../../middlewares/auth.middleware';
 import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
 import { alertsRepository } from './alerts.repository';
-import { sendSuccess } from '../../utils/response';
+import { sendData, sendPaginated } from '../../utils/response';
 
 const router = Router();
 router.use(authenticate);
@@ -21,7 +21,7 @@ router.get('/', authorize([...ROLES.ALL_STAFF]), async (req: AuthenticatedReques
       limit: limitNum,
       offset: (pageNum - 1) * limitNum,
     });
-    sendSuccess(res, { ...result, pagination: { page: pageNum, limit: limitNum, total: result.total, totalPages: Math.ceil(result.total / limitNum) } });
+    sendPaginated(res, result.items, { page: pageNum, limit: limitNum, total: result.total, totalPages: Math.ceil(result.total / limitNum) });
   } catch (err) { next(err); }
 });
 
@@ -29,7 +29,7 @@ router.get('/', authorize([...ROLES.ALL_STAFF]), async (req: AuthenticatedReques
 router.get('/summary', authorize([...ROLES.ALL_STAFF]), async (_req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const result = await alertsRepository.findSummary();
-    sendSuccess(res, result);
+    sendData(res, result);
   } catch (err) { next(err); }
 });
 
@@ -37,7 +37,7 @@ router.get('/summary', authorize([...ROLES.ALL_STAFF]), async (_req: Authenticat
 router.patch('/:id/acknowledge', authorize([...ROLES.WAREHOUSE_OPS, 'department_manager']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const result = await alertsRepository.acknowledge(Number(req.params.id), req.user!.id);
-    sendSuccess(res, result, 'تم تأكيد الاطلاع على التنبيه');
+    sendData(res, result, { message: 'تم تأكيد الاطلاع على التنبيه' });
   } catch (err) { next(err); }
 });
 

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { itemsService } from './items.service';
-import { sendSuccess } from '../../utils/response';
+import { sendData, sendPaginated } from '../../utils/response';
 import { createItemSchema, updateItemSchema } from './items.validator';
 import { NotFoundError, ValidationError } from '../../utils/AppError';
 
@@ -16,14 +16,14 @@ export class ItemsController {
         is_active: req.query.is_active !== undefined ? req.query.is_active === 'true' : undefined,
       };
       const { items, pagination } = await itemsService.getAll(page, limit, filter);
-      sendSuccess(res, items, 200, pagination);
+      sendPaginated(res, items, pagination);
     } catch (e) { next(e); }
   }
 
   async generateCode(req: Request, res: Response, next: NextFunction) {
     try {
       const code = await itemsService.generateItemCode(req.params.categoryCode);
-      sendSuccess(res, { item_code: code });
+      sendData(res, { item_code: code });
     } catch (e) { next(e); }
   }
 
@@ -32,7 +32,7 @@ export class ItemsController {
       const parsed = createItemSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
       const item = await itemsService.createItem(parsed.data);
-      sendSuccess(res, item, 201);
+      sendData(res, item, { statusCode: 201 });
     } catch (e) { next(e); }
   }
 
@@ -42,7 +42,7 @@ export class ItemsController {
       if (isNaN(id)) throw new ValidationError('Invalid item ID');
       const item = await itemsService.getItemCard(id);
       if (!item) throw new NotFoundError('Item', 'ITEM_NOT_FOUND', { id: req.params.id });
-      sendSuccess(res, item);
+      sendData(res, item);
     } catch (e) { next(e); }
   }
 
@@ -53,7 +53,7 @@ export class ItemsController {
       const parsed = updateItemSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
       const item = await itemsService.updateItem(id, parsed.data);
-      sendSuccess(res, item);
+      sendData(res, item);
     } catch (e) { next(e); }
   }
 
@@ -62,7 +62,7 @@ export class ItemsController {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid item ID');
       const result = await itemsService.deleteItem(id);
-      sendSuccess(res, result);
+      sendData(res, result);
     } catch (e) { next(e); }
   }
 }

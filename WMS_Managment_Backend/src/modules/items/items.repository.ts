@@ -3,6 +3,7 @@ import { pool } from '../../config/database';
 
 export interface ItemsFilter {
   category_code?: string;
+  subcategory_id?: number;
   warehouse_id?: number;
   search?: string;
   is_active?: boolean;
@@ -11,15 +12,17 @@ export interface ItemsFilter {
 export class ItemsRepository {
   async findAll(limit?: number, offset?: number, filter?: ItemsFilter) {
     let query = `SELECT i.id, i.item_code, i.name_ar, i.name_en, i.description,
-      i.category_code, i.unit_code, i.warehouse_id,
+      i.category_code, i.subcategory_id, i.unit_code, i.warehouse_id,
       i.min_stock_level, i.max_stock_level, i.current_balance, i.location, i.is_active,
       i.is_consumable, i.expiry_alert_days, i.sap_material_number, i.gl_account,
       i.last_purchase_price, i.opening_price,
       c.name_ar AS category_name_ar, c.name_en AS category_name_en,
+      sc.name_ar AS subcategory_name_ar, sc.name_en AS subcategory_name_en,
       u.name_ar AS unit_name_ar, u.name_en AS unit_name_en,
       w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en
     FROM items i
     LEFT JOIN categories c ON c.code = i.category_code
+    LEFT JOIN subcategories sc ON sc.id = i.subcategory_id
     LEFT JOIN units u ON u.code = i.unit_code
     LEFT JOIN warehouses w ON w.id = i.warehouse_id
     WHERE 1=1`;
@@ -29,6 +32,10 @@ export class ItemsRepository {
     if (filter?.category_code) {
       query += ` AND i.category_code = $${paramIndex++}`;
       params.push(filter.category_code);
+    }
+    if (filter?.subcategory_id) {
+      query += ` AND i.subcategory_id = $${paramIndex++}`;
+      params.push(filter.subcategory_id);
     }
     if (filter?.warehouse_id) {
       query += ` AND i.warehouse_id = $${paramIndex++}`;
@@ -41,7 +48,7 @@ export class ItemsRepository {
       query += ' AND i.is_active = true';
     }
     if (filter?.search) {
-      query += ` AND (i.item_code ILIKE $${paramIndex} OR i.name_ar ILIKE $${paramIndex})`;
+      query += ` AND (i.item_code ILIKE $${paramIndex} OR i.name_ar ILIKE $${paramIndex} OR i.name_en ILIKE $${paramIndex})`;
       params.push(`%${filter.search}%`);
       paramIndex++;
     }
@@ -63,6 +70,10 @@ export class ItemsRepository {
     if (filter?.category_code) {
       query += ` AND category_code = $${paramIndex++}`;
       params.push(filter.category_code);
+    }
+    if (filter?.subcategory_id) {
+      query += ` AND subcategory_id = $${paramIndex++}`;
+      params.push(filter.subcategory_id);
     }
     if (filter?.warehouse_id) {
       query += ` AND warehouse_id = $${paramIndex++}`;
@@ -164,6 +175,7 @@ export class ItemsRepository {
     name_en?: string;
     description?: string;
     category_code: string;
+    subcategory_id?: number | null;
     unit_code: string;
     warehouse_id: number;
     min_stock_level?: number;
@@ -178,8 +190,8 @@ export class ItemsRepository {
     gl_account?: string | null;
   }) {
     const res = await pool.query(
-      `INSERT INTO items (item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, last_purchase_price, opening_price, location, is_consumable, expiry_alert_days, sap_material_number, gl_account)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      `INSERT INTO items (item_code, name_ar, name_en, description, category_code, subcategory_id, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, last_purchase_price, opening_price, location, is_consumable, expiry_alert_days, sap_material_number, gl_account)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        RETURNING *`,
       [
         data.item_code,
@@ -187,6 +199,7 @@ export class ItemsRepository {
         data.name_en ?? null,
         data.description ?? null,
         data.category_code,
+        data.subcategory_id ?? null,
         data.unit_code,
         data.warehouse_id,
         data.min_stock_level ?? 0,
@@ -205,7 +218,19 @@ export class ItemsRepository {
   }
 
   async getItemById(id: number) {
-    const res = await pool.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, last_purchase_price, opening_price, location, is_active, is_consumable, expiry_alert_days, sap_material_number, gl_account FROM items WHERE id = $1', [id]);
+    const res = await pool.query(
+      `SELECT i.id, i.item_code, i.name_ar, i.name_en, i.description, i.category_code, i.subcategory_id, i.unit_code, i.warehouse_id, i.min_stock_level, i.max_stock_level, i.current_balance, i.last_purchase_price, i.opening_price, i.location, i.is_active, i.is_consumable, i.expiry_alert_days, i.sap_material_number, i.gl_account,
+              c.name_ar AS category_name_ar, c.name_en AS category_name_en,
+              sc.name_ar AS subcategory_name_ar, sc.name_en AS subcategory_name_en,
+              u.name_ar AS unit_name_ar, u.name_en AS unit_name_en,
+              w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en
+       FROM items i
+       LEFT JOIN categories c ON c.code = i.category_code
+       LEFT JOIN subcategories sc ON sc.id = i.subcategory_id
+       LEFT JOIN units u ON u.code = i.unit_code
+       LEFT JOIN warehouses w ON w.id = i.warehouse_id
+       WHERE i.id = $1`, [id]
+    );
     if (res.rows.length === 0) return null;
     return res.rows[0];
   }
@@ -217,6 +242,7 @@ export class ItemsRepository {
       name_ar: string;
       description: string;
       category_code: string;
+      subcategory_id: number | null;
       unit_code: string;
       warehouse_id: number;
       min_stock_level: number;
@@ -254,13 +280,19 @@ export class ItemsRepository {
   }
 
   async findByItemCode(item_code: string) {
-    const res = await pool.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, last_purchase_price, opening_price, location, is_active, is_consumable, expiry_alert_days, sap_material_number, gl_account FROM items WHERE item_code = $1', [item_code]);
+    const res = await pool.query(
+      `SELECT i.id, i.item_code, i.name_ar, i.name_en, i.description, i.category_code, i.subcategory_id, i.unit_code, i.warehouse_id, i.min_stock_level, i.max_stock_level, i.current_balance, i.last_purchase_price, i.opening_price, i.location, i.is_active, i.is_consumable, i.expiry_alert_days, i.sap_material_number, i.gl_account
+       FROM items i WHERE i.item_code = $1`, [item_code]
+    );
     if (res.rows.length === 0) return null;
     return res.rows[0];
   }
 
   async getItemsByCategory(category_code: string) {
-    const res = await pool.query('SELECT id, item_code, name_ar, name_en, description, category_code, unit_code, warehouse_id, min_stock_level, max_stock_level, current_balance, location, is_active, is_consumable, expiry_alert_days, sap_material_number, gl_account FROM items WHERE category_code = $1', [category_code]);
+    const res = await pool.query(
+      `SELECT i.id, i.item_code, i.name_ar, i.name_en, i.description, i.category_code, i.subcategory_id, i.unit_code, i.warehouse_id, i.min_stock_level, i.max_stock_level, i.current_balance, i.location, i.is_active, i.is_consumable, i.expiry_alert_days, i.sap_material_number, i.gl_account
+       FROM items i WHERE i.category_code = $1`, [category_code]
+    );
     return res.rows;
   }
 }

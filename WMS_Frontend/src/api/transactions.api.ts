@@ -1,5 +1,5 @@
 import api from './client';
-import type { ApiResponse, Transaction, TransactionDetail, PaginationMeta } from '@/types';
+import type { ApiResponse, PaginatedResponse, Transaction, TransactionDetail } from '@/types';
 
 export interface TransactionHeaderInput {
   type: string;
@@ -16,11 +16,15 @@ export interface TransactionDetailInput {
   unit_price?: number;
   unit_cost?: number;
   total_value?: number;
+  batch_number?: string | null;
+  expiry_tracking_enabled?: boolean;
+  production_date?: string | null;
+  expiry_date?: string | null;
 }
 
 export const transactionsApi = {
   getAll: (page = 1, limit = 20, type?: string, status?: string) =>
-    api.get<ApiResponse<Transaction[]>>('/transactions', { params: { page, limit, type, status } }),
+    api.get<PaginatedResponse<Transaction>>('/transactions', { params: { page, limit, type, status } }),
 
   getById: (id: number) =>
     api.get<ApiResponse<Transaction>>(`/transactions/${id}`),
@@ -29,5 +33,5 @@ export const transactionsApi = {
     api.post<ApiResponse<Transaction>>('/transactions', { header, details }),
 
   approve: (id: number) =>
-    api.post<ApiResponse<{ message: string }>>(`/transactions/${id}/approve`),
+    api.post<ApiResponse<Transaction>>(`/transactions/${id}/approve`),
 };

@@ -9,7 +9,7 @@ export function useUnitConversions(page = 1, limit = 20) {
     queryKey: ['unit-conversions', page, limit],
     queryFn: async () => {
       const res = await unitConversionsApi.getAll(page, limit);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -19,7 +19,7 @@ export function useUnitConversionsByItem(itemId: number) {
     queryKey: ['unit-conversions', 'item', itemId],
     queryFn: async () => {
       const res = await unitConversionsApi.getByItemId(itemId);
-      return res.data;
+      return res.data.data;
     },
     enabled: !!itemId,
   });

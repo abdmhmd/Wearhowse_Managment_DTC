@@ -1,5 +1,5 @@
 import api from './client';
-import type { ApiResponse, MaterialRequest, PaginationMeta, RequestStatus, RequestType } from '@/types';
+import type { ApiResponse, MaterialRequest, PaginatedResponse, RequestStatus, RequestType } from '@/types';
 
 export interface MaterialRequestsFilter {
   status?: RequestStatus;
@@ -21,7 +21,7 @@ export interface CreateMaterialRequestPayload {
 
 export const materialRequestsApi = {
   getAll: (page = 1, limit = 20, filter?: MaterialRequestsFilter) =>
-    api.get<ApiResponse<MaterialRequest[]>>('/requests', { params: { page, limit, ...filter } }),
+    api.get<PaginatedResponse<MaterialRequest>>('/requests', { params: { page, limit, ...filter } }),
 
   getById: (id: number) =>
     api.get<ApiResponse<MaterialRequest>>(`/requests/${id}`),

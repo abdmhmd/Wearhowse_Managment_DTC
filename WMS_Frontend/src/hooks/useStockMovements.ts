@@ -6,7 +6,7 @@ export function useStockMovements(page = 1, limit = 20) {
     queryKey: ['stock-movements', page, limit],
     queryFn: async () => {
       const res = await stockMovementsApi.getAll(page, limit);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -16,7 +16,7 @@ export function useStockMovementsByItem(itemId: number, page = 1, limit = 20) {
     queryKey: ['stock-movements', 'item', itemId, page, limit],
     queryFn: async () => {
       const res = await stockMovementsApi.getByItemId(itemId, page, limit);
-      return res.data;
+      return res.data.data;
     },
     enabled: !!itemId,
   });
@@ -27,7 +27,7 @@ export function useStockMovementsByTransaction(transactionId: number, page = 1, 
     queryKey: ['stock-movements', 'transaction', transactionId, page, limit],
     queryFn: async () => {
       const res = await stockMovementsApi.getByTransactionId(transactionId, page, limit);
-      return res.data;
+      return res.data.data;
     },
     enabled: !!transactionId,
   });

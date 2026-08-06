@@ -3,7 +3,7 @@ import { usersRepository } from '../users/users.repository';
 import { pool } from '../../config/database';
 import { verifyPassword } from '../../utils/crypto';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken, hashToken } from '../../utils/jwt';
-import { sendSuccess } from '../../utils/response';
+import { sendData } from '../../utils/response';
 import { loginSchema } from './auth.validator';
 import { AuthError, ValidationError } from '../../utils/AppError';
 import { logger } from '../../utils/logger';
@@ -42,7 +42,7 @@ export class AuthController {
         [user.id, hashToken(refreshToken), expiresAt]
       );
 
-      sendSuccess(_res, {
+      sendData(_res, {
         token: accessToken,
         refreshToken,
         user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role },
@@ -82,9 +82,9 @@ export class AuthController {
         [payload.userId, hashToken(newRefreshToken), expiresAt]
       );
 
-      sendSuccess(_res, {
+      sendData(_res, {
         token: newAccessToken,
-        refreshToken: newRefreshToken,
+        refreshToken,
       });
     } catch (error) {
       next(error);
@@ -98,7 +98,7 @@ export class AuthController {
         const tokenHash = hashToken(refreshToken);
         await pool.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1', [tokenHash]);
       }
-      sendSuccess(_res, { message: 'Logged out successfully' });
+      sendData(_res, null, { message: 'Logged out successfully' });
     } catch (error) {
       next(error);
     }

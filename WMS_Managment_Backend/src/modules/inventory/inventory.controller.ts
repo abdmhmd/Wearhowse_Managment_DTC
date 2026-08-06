@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
 import { inventoryService } from './inventory.service';
-import { sendSuccess } from '../../utils/response';
+import { sendData } from '../../utils/response';
 import { openSessionSchema, recordCountSchema } from './inventory.validator';
 import { ValidationError } from '../../utils/AppError';
 
@@ -13,7 +13,7 @@ export class InventoryController {
         throw new ValidationError(parsed.error.issues[0].message);
       }
       const result = await inventoryService.openSession(parsed.data.warehouse_id, req.user!.id, parsed.data.notes);
-      sendSuccess(res, result, 'تم فتح جلسة الجرد بنجاح', 201);
+      sendData(res, result, { statusCode: 201, message: 'تم فتح جلسة الجرد بنجاح' });
     } catch (err) {
       next(err);
     }
@@ -26,7 +26,7 @@ export class InventoryController {
         throw new ValidationError('Invalid session ID');
       }
       const result = await inventoryService.getSession(sessionId);
-      sendSuccess(res, result);
+      sendData(res, result);
     } catch (err) {
       next(err);
     }
@@ -49,7 +49,7 @@ export class InventoryController {
         req.user!.id,
         parsed.data.notes
       );
-      sendSuccess(res, result, 'تم تسجيل العدّ بنجاح');
+      sendData(res, result, { message: 'تم تسجيل العدّ بنجاح' });
     } catch (err) {
       next(err);
     }
@@ -62,7 +62,7 @@ export class InventoryController {
         throw new ValidationError('Invalid session ID');
       }
       const result = await inventoryService.closeSession(sessionId, req.user!.id);
-      sendSuccess(res, result, 'تم إغلاق جلسة الجرد وتطبيق الفروقات');
+      sendData(res, result, { message: 'تم إغلاق جلسة الجرد وتطبيق الفروقات' });
     } catch (err) {
       next(err);
     }

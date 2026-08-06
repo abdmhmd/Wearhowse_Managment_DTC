@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
 import { materialRequestsService } from './material-requests.service';
-import { sendSuccess } from '../../utils/response';
+import { sendData, sendPaginated } from '../../utils/response';
 import { ValidationError } from '../../utils/AppError';
 import { createMaterialRequestSchema, rejectRequestSchema } from './material-requests.validator';
 
@@ -13,7 +13,7 @@ export class MaterialRequestsController {
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
 
       const result = await materialRequestsService.createRequest(req.user!.id, parsed.data);
-      sendSuccess(res, result, 'تم إنشاء طلب الصرف بنجاح', 201);
+      sendData(res, result, { statusCode: 201, message: 'تم إنشاء طلب الصرف بنجاح' });
     } catch (err) {
       next(err);
     }
@@ -39,7 +39,7 @@ export class MaterialRequestsController {
         limit: limit ? Number(limit) : 20,
       });
 
-      sendSuccess(res, result);
+      sendPaginated(res, result.items, result.pagination);
     } catch (err) {
       next(err);
     }
@@ -50,7 +50,7 @@ export class MaterialRequestsController {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid request ID');
       const result = await materialRequestsService.getById(id);
-      sendSuccess(res, result);
+      sendData(res, result);
     } catch (err) {
       next(err);
     }
@@ -61,7 +61,7 @@ export class MaterialRequestsController {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid request ID');
       const result = await materialRequestsService.approveRequest(id, req.user!.id);
-      sendSuccess(res, result, 'تم قبول الطلب بنجاح');
+      sendData(res, result, { message: 'تم قبول الطلب بنجاح' });
     } catch (err) {
       next(err);
     }
@@ -74,7 +74,7 @@ export class MaterialRequestsController {
       const parsed = rejectRequestSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
       const result = await materialRequestsService.rejectRequest(id, req.user!.id, parsed.data.reason);
-      sendSuccess(res, result, 'تم رفض الطلب');
+      sendData(res, result, { message: 'تم رفض الطلب' });
     } catch (err) {
       next(err);
     }
@@ -85,7 +85,7 @@ export class MaterialRequestsController {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid request ID');
       const result = await materialRequestsService.issueRequest(id, req.user!.id);
-      sendSuccess(res, result, 'تم إصدار إذن الصرف بنجاح');
+      sendData(res, result, { message: 'تم إصدار إذن الصرف بنجاح' });
     } catch (err) {
       next(err);
     }
@@ -100,7 +100,7 @@ export class MaterialRequestsController {
         req.user!.id,
         req.user!.role
       );
-      sendSuccess(res, result, 'تم إلغاء الطلب');
+      sendData(res, result, { message: 'تم إلغاء الطلب' });
     } catch (err) {
       next(err);
     }

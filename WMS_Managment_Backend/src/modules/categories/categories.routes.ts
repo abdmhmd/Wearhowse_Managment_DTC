@@ -12,4 +12,10 @@ router.post('/', authorize(['warehouse_manager', 'system_admin']), categoriesCon
 router.put('/:code', authorize(['warehouse_manager', 'system_admin']), categoriesController.update);
 router.delete('/:code', authorize(['system_admin']), categoriesController.delete);
 
+// Subcategories (registered before any conflicting single-segment route)
+router.get('/:code/subcategories', categoriesController.getSubcategories);
+router.post('/:code/subcategories', authorize(['warehouse_manager', 'system_admin']), categoriesController.createSubcategory);
+router.put('/subcategories/:id', authorize(['warehouse_manager', 'system_admin']), categoriesController.updateSubcategory);
+router.delete('/subcategories/:id', authorize(['warehouse_manager', 'system_admin']), categoriesController.deleteSubcategory);
+
 export default router;

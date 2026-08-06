@@ -9,7 +9,7 @@ export function useItems(page = 1, limit = 20, filter?: ItemsFilter) {
     queryKey: ['items', page, limit, filter],
     queryFn: async () => {
       const res = await itemsApi.getAll(page, limit, filter);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -19,7 +19,7 @@ export function useItem(id: number) {
     queryKey: ['items', id],
     queryFn: async () => {
       const res = await itemsApi.getById(id);
-      return res.data;
+      return res.data.data;
     },
     enabled: !!id,
   });
@@ -30,7 +30,7 @@ export function useAllItems() {
     queryKey: ['items', 'all'],
     queryFn: async () => {
       const res = await itemsApi.getAll(1, 500);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -51,7 +51,7 @@ export function useItemCard(id: number) {
     queryKey: ['items', id, 'card'],
     queryFn: async () => {
       const res = await itemsApi.getCard(id);
-      return res.data;
+      return res.data.data;
     },
     enabled: !!id,
   });

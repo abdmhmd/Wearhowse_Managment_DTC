@@ -7,32 +7,30 @@ export interface PaginationMeta {
   totalPages: number;
 }
 
-export function sendSuccess(
-  res: Response,
-  data: any,
-  messageOrStatusCode?: string | number,
-  statusCodeOrPagination?: number | PaginationMeta,
-  pagination?: PaginationMeta
-) {
+export interface PaginatedData<T> {
+  items: T[];
+  pagination: PaginationMeta;
+}
+
+export interface ResponseOptions {
+  statusCode?: number;
+  message?: string;
+}
+
+export function sendData<T>(res: Response, data: T | null, options?: ResponseOptions): Response {
   const body: Record<string, any> = { success: true, data };
-  let statusCode = 200;
+  if (options?.message) body.message = options.message;
+  return res.status(options?.statusCode ?? 200).json(body);
+}
 
-  if (typeof messageOrStatusCode === 'string') {
-    body.message = messageOrStatusCode;
-    if (typeof statusCodeOrPagination === 'number') {
-      statusCode = statusCodeOrPagination;
-    } else if (typeof statusCodeOrPagination === 'object') {
-      body.pagination = statusCodeOrPagination;
-    }
-    if (pagination) body.pagination = pagination;
-  } else if (typeof messageOrStatusCode === 'number') {
-    statusCode = messageOrStatusCode;
-    if (typeof statusCodeOrPagination === 'object') {
-      body.pagination = statusCodeOrPagination;
-    }
-  }
-
-  return res.status(statusCode).json(body);
+export function sendPaginated<T>(
+  res: Response,
+  items: T[],
+  pagination: PaginationMeta,
+  options?: ResponseOptions
+): Response {
+  const data: PaginatedData<T> = { items, pagination };
+  return sendData(res, data, options);
 }
 
 export function sendError(res: Response, message: string, statusCode = 500, code?: string, details?: Record<string, any>) {

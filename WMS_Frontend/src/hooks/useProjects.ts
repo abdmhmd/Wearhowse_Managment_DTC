@@ -8,7 +8,7 @@ export function useProjects(page = 1, limit = 20, filter?: ProjectsFilter) {
     queryKey: ['projects', page, limit, filter],
     queryFn: async () => {
       const res = await projectsApi.getAll(page, limit, filter);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -18,7 +18,7 @@ export function useAllProjects() {
     queryKey: ['projects', 'all'],
     queryFn: async () => {
       const res = await projectsApi.getAll(1, 200);
-      return res.data;
+      return res.data.data;
     },
   });
 }

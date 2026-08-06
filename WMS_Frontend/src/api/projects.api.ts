@@ -1,5 +1,5 @@
 import api from './client';
-import type { ApiResponse, Project, ProjectStatus } from '@/types';
+import type { ApiResponse, PaginatedResponse, Project, ProjectStatus } from '@/types';
 
 export interface ProjectsFilter {
   status?: ProjectStatus;
@@ -16,7 +16,7 @@ export interface CreateProjectPayload {
 
 export const projectsApi = {
   getAll: (page = 1, limit = 20, filter?: ProjectsFilter) =>
-    api.get<ApiResponse<Project[]>>('/projects', { params: { page, limit, ...filter } }),
+    api.get<PaginatedResponse<Project>>('/projects', { params: { page, limit, ...filter } }),
 
   getById: (id: number) =>
     api.get<ApiResponse<Project>>(`/projects/${id}`),

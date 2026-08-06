@@ -9,7 +9,7 @@ export function useSuppliers(page = 1, limit = 20) {
     queryKey: ['suppliers', page, limit],
     queryFn: async () => {
       const res = await suppliersApi.getAll(page, limit);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -19,7 +19,7 @@ export function useAllSuppliers() {
     queryKey: ['suppliers', 'all'],
     queryFn: async () => {
       const res = await suppliersApi.getAll(1, 200);
-      return res.data;
+      return res.data.data;
     },
   });
 }

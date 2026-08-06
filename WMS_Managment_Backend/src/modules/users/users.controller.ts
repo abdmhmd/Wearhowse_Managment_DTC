@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { usersService } from './users.service';
-import { sendSuccess } from '../../utils/response';
+import { sendData, sendPaginated } from '../../utils/response';
 import { hashPassword } from '../../utils/crypto';
 import { createUserSchema, updateUserSchema } from './users.validator';
 import { NotFoundError, ValidationError } from '../../utils/AppError';
@@ -11,7 +11,7 @@ export class UsersController {
       const page = Math.max(1, Number(req.query.page) || 1);
       const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
       const { items, pagination } = await usersService.getAll(page, limit);
-      sendSuccess(res, items, 200, pagination);
+      sendPaginated(res, items, pagination);
     } catch (e) { next(e); }
   }
   async getById(req: Request, res: Response, next: NextFunction) {
@@ -20,7 +20,7 @@ export class UsersController {
       if (isNaN(id)) throw new ValidationError('Invalid user ID');
       const data = await usersService.getById(id);
       if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id: req.params.id });
-      sendSuccess(res, data);
+      sendData(res, data);
     } catch (e) { next(e); }
   }
   async create(req: Request, res: Response, next: NextFunction) {
@@ -29,7 +29,7 @@ export class UsersController {
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
       const password_hash = await hashPassword(parsed.data.password);
       const data = await usersService.create({ ...parsed.data, password_hash });
-      sendSuccess(res, data, 201);
+      sendData(res, data, { statusCode: 201 });
     } catch (e) { next(e); }
   }
   async update(req: Request, res: Response, next: NextFunction) {
@@ -48,7 +48,7 @@ export class UsersController {
 
       const data = await usersService.update(id, updateData);
       if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id });
-      sendSuccess(res, data);
+      sendData(res, data);
     } catch (e) { next(e); }
   }
   async delete(req: Request, res: Response, next: NextFunction) {
@@ -57,7 +57,7 @@ export class UsersController {
       if (isNaN(id)) throw new ValidationError('Invalid user ID');
       const data = await usersService.delete(id);
       if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id: req.params.id });
-      sendSuccess(res, data);
+      sendData(res, data);
     } catch (e) { next(e); }
   }
 }

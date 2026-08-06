@@ -17,13 +17,14 @@ export default function ItemCardPage() {
     return <div className="flex items-center justify-center h-64"><LoadingSpinner size="lg" /></div>;
   }
 
-  if (!data?.data) {
+  if (!data) {
     return <div className="text-center py-12 text-gray-500">{t('common.notFound')}</div>;
   }
 
-  const { item, recent_movements, summary, last_receiving_voucher, last_issuing_voucher } = data.data as any;
+  const { item, recent_movements, summary, last_receiving_voucher, last_issuing_voucher } = data;
 
   const category = { name_ar: item.category_name_ar, name_en: item.category_name_en };
+  const subcategory = { name_ar: item.subcategory_name_ar, name_en: item.subcategory_name_en };
   const unit = { name_ar: item.unit_name_ar, name_en: item.unit_name_en };
   const warehouse = { name_ar: item.warehouse_name_ar, name_en: item.warehouse_name_en };
 
@@ -50,6 +51,7 @@ export default function ItemCardPage() {
           <dl className="space-y-2">
             <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('table.itemCode')}</dt><dd className="text-sm font-medium">{item.item_code}</dd></div>
             <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('table.category')}</dt><dd className="text-sm font-medium">{getLocalizedName(category)}</dd></div>
+            {item.subcategory_id && <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('table.subcategory')}</dt><dd className="text-sm font-medium">{getLocalizedName(subcategory)}</dd></div>}
             <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('table.unit')}</dt><dd className="text-sm font-medium">{getLocalizedName(unit)}</dd></div>
             <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('table.warehouse')}</dt><dd className="text-sm font-medium">{getLocalizedName(warehouse)}</dd></div>
             <div className="flex justify-between"><dt className="text-sm text-gray-500">{t('form.location')}</dt><dd className="text-sm font-medium">{item.location || '-'}</dd></div>

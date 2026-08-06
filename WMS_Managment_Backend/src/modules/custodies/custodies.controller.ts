@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
 import { custodiesService } from './custodies.service';
-import { sendSuccess } from '../../utils/response';
+import { sendData, sendPaginated } from '../../utils/response';
 import { ValidationError } from '../../utils/AppError';
 
 export class CustodiesController {
@@ -18,7 +18,7 @@ export class CustodiesController {
         limit: limit ? Number(limit) : 20,
       });
 
-      sendSuccess(res, result);
+      sendPaginated(res, result.items, result.pagination);
     } catch (err) {
       next(err);
     }
@@ -29,7 +29,7 @@ export class CustodiesController {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid custody ID');
       const result = await custodiesService.getById(id);
-      sendSuccess(res, result);
+      sendData(res, result);
     } catch (err) {
       next(err);
     }
@@ -41,7 +41,7 @@ export class CustodiesController {
       if (isNaN(id)) throw new ValidationError('Invalid custody ID');
       const notes = typeof req.body?.notes === 'string' ? req.body.notes : undefined;
       const result = await custodiesService.returnItem(id, req.user!.id, notes);
-      sendSuccess(res, result, 'تم تسجيل إرجاع العهدة بنجاح');
+      sendData(res, result, { message: 'تم تسجيل إرجاع العهدة بنجاح' });
     } catch (err) {
       next(err);
     }

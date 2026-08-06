@@ -1,7 +1,9 @@
 import { pool, runInTransaction } from '../../config/database';
 import { PoolClient } from 'pg';
+import { randomBytes } from 'crypto';
 import { transactionsRepository, TransactionDetail } from './transactions.repository';
 import { itemsRepository } from '../items/items.repository';
+import { unitConversionsRepository } from '../unit-conversions/unit-conversions.repository';
 import { stockMovementsRepository } from '../stock-movements/stock-movements.repository';
 import { batchesRepository } from '../batches/batches.repository';
 import { PaginationMeta } from '../../utils/response';
@@ -66,6 +68,16 @@ export class TransactionsService {
 
       const newDetails = [];
       for (const detail of details) {
+        const item = await itemsRepository.getItemById(detail.item_id);
+        if (!item) throw new ValidationError(`Item #${detail.item_id} not found`, { item_id: detail.item_id });
+
+        if (!(await this.isUnitValidForItem(item.id, item.unit_code, detail.unit_code))) {
+          throw new ValidationError(
+            `Unit '${detail.unit_code}' is not valid for item '${item.item_code}'. Default unit is '${item.unit_code}'.`,
+            { item_code: item.item_code, unit_code: detail.unit_code, default_unit: item.unit_code }
+          );
+        }
+
         const newDetail = await transactionsRepository.createDetail(c, { ...detail, transaction_id: newHeader.id! });
         newDetails.push(newDetail);
       }
@@ -75,6 +87,35 @@ export class TransactionsService {
 
     if (client) return execute(client);
     return runInTransaction(execute);
+  }
+
+  /** An item can be transacted in its default unit or in a unit convertible from it */
+  private async isUnitValidForItem(itemId: number, defaultUnit: string, unitCode: string): Promise<boolean> {
+    if (!unitCode) return false;
+    if (unitCode === defaultUnit) return true;
+    const conversions = await unitConversionsRepository.findByItemId(itemId);
+    return conversions.some(c => c.from_unit_code === defaultUnit && c.to_unit_code === unitCode);
+  }
+
+  private validateDetailExpiry(detail: any): void {
+    if (detail.expiry_tracking_enabled && !detail.expiry_date) {
+      throw new ValidationError(
+        `Expiry date is required for item line (${detail.batch_number ? `batch ${detail.batch_number}` : 'no batch'}) when expiry tracking is enabled`,
+        { item_id: detail.item_id }
+      );
+    }
+    if (!detail.expiry_tracking_enabled && detail.expiry_date) {
+      throw new ValidationError('Expiry date must be cleared when expiry tracking is disabled', { item_id: detail.item_id });
+    }
+    if (detail.production_date && detail.expiry_date && new Date(detail.production_date) > new Date(detail.expiry_date)) {
+      throw new ValidationError('Production date must not be later than expiry date', { item_id: detail.item_id });
+    }
+  }
+
+  private async generateBatchNumber(client: PoolClient): Promise<string> {
+    const suffix = randomBytes(4).toString('hex').toUpperCase();
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return `BAT-${date}-${suffix}`;
   }
 
   async approveTransaction(transactionId: number, approvedBy: number, client?: PoolClient) {
@@ -100,6 +141,8 @@ export class TransactionsService {
 
       for (const detail of details) {
         const parsedQuantity = parseFloat(detail.quantity) || 0;
+
+        this.validateDetailExpiry(detail);
 
         if (isTransfer) {
           // TRF: deduct from source warehouse, add to destination warehouse
@@ -163,6 +206,8 @@ export class TransactionsService {
               batch_number: detail.batch_number,
               quantity: parsedQuantity,
               unit_code: detail.unit_code,
+              production_date: detail.production_date ?? null,
+              expiry_date: detail.expiry_date ?? null,
               transaction_id: header.id,
             });
           }
@@ -222,18 +267,23 @@ export class TransactionsService {
           });
 
           // Batch processing
-          if (detail.batch_number) {
-            if (movementType === 'IN') {
+          if (movementType === 'IN') {
+            if (detail.batch_number || isInbound) {
+              const batchNumber = detail.batch_number || await this.generateBatchNumber(c);
               await batchesRepository.create(c, {
                 item_id: item.id,
                 warehouse_id: header.warehouse_id,
-                batch_number: detail.batch_number,
+                batch_number: batchNumber,
                 quantity: parsedQuantity,
                 unit_code: detail.unit_code,
+                production_date: detail.production_date ?? null,
+                expiry_date: detail.expiry_date ?? null,
                 supplier_id: header.supplier_id,
                 transaction_id: header.id,
               });
-            } else if (movementType === 'OUT') {
+            }
+          } else if (movementType === 'OUT') {
+            if (detail.batch_number) {
               const deducted = await batchesRepository.deductQuantity(
                 c, item.id, header.warehouse_id, detail.batch_number, parsedQuantity
               );

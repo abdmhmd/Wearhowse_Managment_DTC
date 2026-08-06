@@ -7,6 +7,7 @@ export interface CategoryRow {
   prefix?: string;
   description?: string;
   parent_code?: string | null;
+  is_active?: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -15,9 +16,13 @@ export interface CategoryTreeNode extends CategoryRow {
   children: CategoryTreeNode[];
 }
 
-const CATEGORY_SELECT = 'code, name_ar, name_en, prefix, description, parent_code, created_at, updated_at';
+const CATEGORY_SELECT = 'code, name_ar, name_en, prefix, description, parent_code, is_active, created_at, updated_at';
 
 export class CategoriesRepository {
+  exists(code: string) {
+    return pool.query('SELECT 1 FROM categories WHERE code = $1', [code])
+      .then(r => r.rows.length > 0);
+  }
   findAll(limit?: number, offset?: number) {
     let query = `SELECT ${CATEGORY_SELECT} FROM categories WHERE is_active = true ORDER BY COALESCE(parent_code, code), code`;
     const params: any[] = [];
@@ -105,6 +110,12 @@ export class CategoriesRepository {
     // Prevent circular reference: a category cannot be its own parent or ancestor
     if (category.parent_code === code) {
       throw new Error('A category cannot be its own parent');
+    }
+    if (category.parent_code) {
+      const descendants = await this.findDescendants(code);
+      if (descendants.some(d => d.code === category.parent_code)) {
+        throw new Error('A category cannot be moved under one of its descendants');
+      }
     }
 
     const setClauses = safeKeys.map((key, i) => `${key} = $${i + 2}`);

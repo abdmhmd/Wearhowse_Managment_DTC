@@ -69,7 +69,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     validationPromise = (async () => {
       set({ isLoading: true });
       try {
-        await api.get('/settings', { origin: 'validateToken' } as any);
+        await api.get('/settings');
         set({ isAuthenticated: true, hasValidated: true, isLoading: false });
         return true;
       } catch {

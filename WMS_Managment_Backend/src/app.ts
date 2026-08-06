@@ -2,7 +2,7 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { sendSuccess, sendError } from './utils/response';
+import { sendData, sendError } from './utils/response';
 import { AppError } from './utils/AppError';
 import { env } from './utils/env';
 import { logger } from './utils/logger';
@@ -74,7 +74,7 @@ app.get('/health', async (_req: Request, res: Response) => {
   if (!isDbHealthy) {
     return sendError(res, 'Database connection error', 503, 'SERVICE_UNAVAILABLE');
   }
-  sendSuccess(res, { status: 'healthy', database: 'connected', timestamp: new Date() });
+  sendData(res, { status: 'healthy', database: 'connected', timestamp: new Date() });
 });
 
 app.use('/api', swaggerRoutes);

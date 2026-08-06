@@ -30,11 +30,11 @@ export default function MaterialRequestDetailPage() {
     return <div className="flex items-center justify-center h-64"><LoadingSpinner size="lg" /></div>;
   }
 
-  if (!data?.data) {
+  if (!data) {
     return <div className="text-center py-12 text-gray-500">{t('common.notFound')}</div>;
   }
 
-  const req = data.data as any;
+  const req = data;
 
   const handleApprove = async () => {
     await approveMutation.mutateAsync(req.id);

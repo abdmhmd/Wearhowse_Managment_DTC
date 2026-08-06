@@ -9,7 +9,7 @@ export function useUsers(page = 1, limit = 20) {
     queryKey: ['users', page, limit],
     queryFn: async () => {
       const res = await usersApi.getAll(page, limit);
-      return res.data;
+      return res.data.data;
     },
   });
 }

@@ -37,6 +37,7 @@ afterAll(async () => {
   await pool.query('DELETE FROM stock_movements USING transactions WHERE stock_movements.transaction_id = transactions.id AND transactions.transaction_no LIKE $1', [`${prefix}%`]);
   await pool.query('DELETE FROM transaction_details USING transactions WHERE transaction_details.transaction_id = transactions.id AND transactions.transaction_no LIKE $1', [`${prefix}%`]);
   await pool.query('DELETE FROM transactions WHERE transaction_no LIKE $1', [`${prefix}%`]);
+  await pool.query('DELETE FROM batches WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)', [`${prefix}%`]);
   await pool.query('DELETE FROM items WHERE item_code LIKE $1', [`${prefix}%`]);
   await pool.query('DELETE FROM warehouses WHERE code LIKE $1', [`${prefix}%`]);
   await pool.query('DELETE FROM categories WHERE code LIKE $1', [`${prefix}%`]);
@@ -137,7 +138,7 @@ describe('API Integration Tests', () => {
         .set('Authorization', `Bearer ${token}`);
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
     });
 
     test('GET /api/categories/:code returns single category', async () => {
@@ -198,7 +199,7 @@ describe('API Integration Tests', () => {
         .get('/api/transactions')
         .set('Authorization', `Bearer ${token}`);
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
     });
 
     test('POST /api/transactions/:id/approve approves the draft', async () => {
@@ -213,7 +214,7 @@ describe('API Integration Tests', () => {
         .get('/api/transactions')
         .set('Authorization', `Bearer ${token}`);
       
-      const tx = allRes.body.data.find((t: any) => t.transaction_no === draftTxNo);
+      const tx = allRes.body.data.items.find((t: any) => t.transaction_no === draftTxNo);
       expect(tx).toBeDefined();
 
       const res = await request(app)
@@ -263,7 +264,7 @@ describe('API Integration Tests', () => {
         .get('/api/stock-movements')
         .set('Authorization', `Bearer ${token}`);
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
     });
 
     test('GET /api/stock-movements/item/:itemId returns movements by item', async () => {
@@ -281,7 +282,7 @@ describe('API Integration Tests', () => {
         .get('/api/reports/inventory')
         .set('Authorization', `Bearer ${token}`);
       expect(res.status).toBe(200);
-      expect(res.body.pagination).toBeDefined();
+      expect(res.body.data.pagination).toBeDefined();
     });
 
     test('GET /api/reports/item-card/:id returns item card', async () => {

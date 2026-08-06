@@ -1,9 +1,9 @@
 import api from './client';
-import type { ApiResponse, Department, PaginationMeta } from '@/types';
+import type { ApiResponse, Department, PaginatedResponse } from '@/types';
 
 export const departmentsApi = {
   getAll: (page = 1, limit = 20) =>
-    api.get<ApiResponse<Department[]>>('/departments', { params: { page, limit } }),
+    api.get<PaginatedResponse<Department>>('/departments', { params: { page, limit } }),
 
   getByCode: (code: string) =>
     api.get<ApiResponse<Department>>(`/departments/${code}`),

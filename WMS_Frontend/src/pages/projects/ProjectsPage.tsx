@@ -29,8 +29,8 @@ export default function ProjectsPage() {
   const closeMutation = useCloseProject();
   const deleteMutation = useDeleteProject();
 
-  const departments = departmentsData?.data || [];
-  const supervisors = (usersData?.data || []).filter((u: any) => u.role === 'department_manager');
+  const departments = departmentsData?.items || [];
+  const supervisors = (usersData?.items || []).filter((u: any) => u.role === 'department_manager');
 
   const createForm = useForm<CreateProjectFormData>({ resolver: zodResolver(createProjectSchema) });
   const updateForm = useForm<UpdateProjectFormData>({ resolver: zodResolver(updateProjectSchema) });
@@ -142,7 +142,7 @@ export default function ProjectsPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} data={((data as any)?.data?.items ?? []) as any[]} pagination={(data as any)?.data?.pagination ? { ...(data as any).data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
+      <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
       <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(); }} title={t('pages.projects.create')} size="lg">
         {renderForm(createForm, handleCreate, createMutation.isPending)}

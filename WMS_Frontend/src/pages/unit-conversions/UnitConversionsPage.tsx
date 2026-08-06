@@ -26,8 +26,8 @@ export default function UnitConversionsPage() {
   const updateMutation = useUpdateUnitConversion();
   const deleteMutation = useDeleteUnitConversion();
 
-  const items = itemsData?.data || [];
-  const units = unitsData?.data || [];
+  const items = itemsData?.items || [];
+  const units = unitsData?.items || [];
 
   const createForm = useForm<CreateUnitConversionFormData>({ resolver: zodResolver(createUnitConversionSchema) });
   const updateForm = useForm<UpdateUnitConversionFormData>({ resolver: zodResolver(updateUnitConversionSchema) });
@@ -107,7 +107,7 @@ export default function UnitConversionsPage() {
   return (
     <div>
       <PageHeader title={t('pages.unitConversions.title')} subtitle={t('pages.unitConversions.subtitle')} actions={<Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.unitConversions.addConversion')}</Button>} />
-      <DataTable columns={columns} data={(data?.data || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('pages.unitConversions.noConversions')} />
+      <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('pages.unitConversions.noConversions')} />
 
       <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(); }} title={t('pages.unitConversions.create')}>
         {renderForm(createForm, handleCreate, createMutation.isPending)}

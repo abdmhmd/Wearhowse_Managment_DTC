@@ -31,7 +31,21 @@ export interface Category {
   name_ar: string;
   name_en?: string;
   prefix?: string;
+  parent_code?: string | null;
   description: string | null;
+  is_active?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Subcategory {
+  id: number;
+  category_code: string;
+  code: string;
+  name_ar: string;
+  name_en?: string;
+  description?: string | null;
+  is_active?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -81,6 +95,7 @@ export interface Item {
   name_en?: string;
   description: string | null;
   category_code: string;
+  subcategory_id?: number | null;
   unit_code: string;
   warehouse_id: number;
   min_stock_level: number;
@@ -98,6 +113,8 @@ export interface Item {
   updated_at: string;
   category_name_ar?: string;
   category_name_en?: string;
+  subcategory_name_ar?: string;
+  subcategory_name_en?: string;
   unit_name_ar?: string;
   unit_name_en?: string;
   warehouse_name_ar?: string;
@@ -140,6 +157,9 @@ export interface TransactionDetail {
   unit_cost?: number;
   total_value?: number;
   batch_number?: string | null;
+  expiry_tracking_enabled?: boolean;
+  production_date?: string | null;
+  expiry_date?: string | null;
 }
 
 export interface Transaction extends TransactionHeader {
@@ -171,12 +191,25 @@ export interface PaginationMeta {
   totalPages: number;
 }
 
+export interface ApiError {
+  message: string;
+  code?: string;
+  details?: unknown;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
-  pagination?: PaginationMeta;
-  error?: { message: string };
+  message?: string;
+  error?: ApiError;
 }
+
+export interface PaginatedData<T> {
+  items: T[];
+  pagination: PaginationMeta;
+}
+
+export type PaginatedResponse<T> = ApiResponse<PaginatedData<T>>;
 
 export interface LoginPayload {
   username: string;

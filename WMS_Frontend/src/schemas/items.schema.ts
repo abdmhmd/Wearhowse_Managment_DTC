@@ -1,9 +1,15 @@
 import { z } from 'zod';
 
+const nullableId = z
+  .union([z.literal(''), z.null(), z.coerce.number().int().positive(), z.undefined()])
+  .transform((v) => (v === '' || v === null || v === undefined ? null : v));
+
 export const createItemSchema = z.object({
   name_ar: z.string().min(1, 'Name is required').max(255),
+  name_en: z.string().max(255).optional().or(z.literal('')),
   description: z.string().optional().or(z.literal('')),
   category_code: z.string().min(1, 'Category is required'),
+  subcategory_id: nullableId,
   unit_code: z.string().min(1, 'Unit is required'),
   warehouse_id: z.coerce.number().int().positive('Warehouse is required'),
   min_stock_level: z.coerce.number().nonnegative().optional().default(0),
@@ -18,8 +24,10 @@ export const createItemSchema = z.object({
 
 export const updateItemSchema = z.object({
   name_ar: z.string().min(1).max(255).optional(),
+  name_en: z.string().max(255).optional().or(z.literal('')),
   description: z.string().optional().or(z.literal('')),
   category_code: z.string().min(1).optional(),
+  subcategory_id: nullableId,
   unit_code: z.string().min(1).optional(),
   warehouse_id: z.coerce.number().int().positive().optional(),
   min_stock_level: z.coerce.number().nonnegative().optional(),

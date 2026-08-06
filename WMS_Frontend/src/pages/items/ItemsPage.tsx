@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useItems, useCreateItem, useUpdateItem, useDeleteItem, useGenerateItemCode } from '@/hooks/useItems';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useAllUnits } from '@/hooks/useUnits';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { createItemSchema, updateItemSchema, type CreateItemFormData, type UpdateItemFormData } from '@/schemas/items.schema';
@@ -35,9 +35,9 @@ export default function ItemsPage() {
   const deleteMutation = useDeleteItem();
   const { data: generatedCode } = useGenerateItemCode(selectedCategory);
 
-  const categories = categoriesData?.data || [];
-  const units = unitsData?.data || [];
-  const warehouses = warehousesData?.data || [];
+  const categories = categoriesData?.items || [];
+  const units = unitsData?.items || [];
+  const warehouses = warehousesData?.items || [];
 
   const createForm = useForm<CreateItemFormData>({
     resolver: zodResolver(createItemSchema),
@@ -69,6 +69,10 @@ export default function ItemsPage() {
     { key: 'item_code', header: t('table.itemCode') },
     { key: 'name_ar', header: t('table.name') },
     { key: 'category_name', header: t('table.category'), render: (item: any) => getLocalizedName({ name_ar: item.category_name_ar, name_en: item.category_name_en }) || item.category_code },
+    {
+      key: 'subcategory', header: t('table.subcategory'),
+      render: (item: any) => item.subcategory_id ? (getLocalizedName({ name_ar: item.subcategory_name_ar, name_en: item.subcategory_name_en }) || '-') : '-',
+    },
     { key: 'unit_name', header: t('table.unit'), render: (item: any) => getLocalizedName({ name_ar: item.unit_name_ar, name_en: item.unit_name_en }) || item.unit_code },
     { key: 'warehouse_name', header: t('table.warehouse'), render: (item: any) => getLocalizedName({ name_ar: item.warehouse_name_ar, name_en: item.warehouse_name_en }) || `WH#${item.warehouse_id}` },
     {
@@ -108,7 +112,8 @@ export default function ItemsPage() {
             setEditingItem(item);
             updateForm.reset({
               name_ar: item.name_ar, description: item.description || '',
-              category_code: item.category_code, unit_code: item.unit_code, warehouse_id: item.warehouse_id,
+              category_code: item.category_code, subcategory_id: item.subcategory_id ?? null,
+              unit_code: item.unit_code, warehouse_id: item.warehouse_id,
               min_stock_level: item.min_stock_level, max_stock_level: item.max_stock_level,
               opening_price: item.opening_price || 0,
               location: item.location || '',
@@ -130,10 +135,13 @@ export default function ItemsPage() {
 
   const CreateItemForm = ({ form, onSubmit, isLoading }: { form: any; onSubmit: any; isLoading: boolean }) => {
     const categoryValue = form.watch('category_code');
+    const { data: subcategoriesData } = useSubcategories(categoryValue || '');
+    const subcategories = subcategoriesData || [];
 
     useEffect(() => {
       setSelectedCategory(categoryValue || '');
-    }, [categoryValue]);
+      form.setValue('subcategory_id', null);
+    }, [categoryValue, form]);
 
     return (
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -158,12 +166,24 @@ export default function ItemsPage() {
             options={categories.map((c: any) => ({ value: c.code, label: getLocalizedName(c) }))}
           />
           <Select
+            label={t('form.subcategory')}
+            {...form.register('subcategory_id')}
+            error={form.formState.errors.subcategory_id?.message}
+            placeholder={categoryValue ? t('form.selectSubcategory') : t('form.selectCategoryFirst')}
+            disabled={!categoryValue}
+            options={subcategories
+              .filter((s: any) => s.is_active !== false)
+              .map((s: any) => ({ value: s.id, label: getLocalizedName(s) }))}
+          />
+          <Select
             label={t('form.unit')}
             {...form.register('unit_code')}
             error={form.formState.errors.unit_code?.message}
             placeholder={t('form.selectUnit')}
             options={units.map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }))}
           />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
           <Select
             label={t('form.warehouse')}
             {...form.register('warehouse_id')}
@@ -171,23 +191,18 @@ export default function ItemsPage() {
             placeholder={t('form.selectWarehouse')}
             options={warehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
           />
-        </div>
-        <div className="grid grid-cols-4 gap-4">
           <Input label={t('form.minStockLevel')} type="number" step="0.0001" {...form.register('min_stock_level')} />
           <Input label={t('form.maxStockLevel')} type="number" step="0.0001" {...form.register('max_stock_level')} />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
           <Input label={t('form.openingPrice')} type="number" step="0.01" {...form.register('opening_price')} />
           <Input label={t('form.location')} {...form.register('location')} />
-        </div>
-        <div className="grid grid-cols-4 gap-4">
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mt-5">
               <input type="checkbox" {...form.register('is_consumable')} className="rounded border-gray-300" />
               {t('pages.items.consumable')}
             </label>
           </div>
-          <Input label={t('pages.items.expiryAlertDays')} type="number" step="1" {...form.register('expiry_alert_days')} />
-          <Input label={t('pages.items.sapMaterialNumber')} {...form.register('sap_material_number')} />
-          <Input label={t('pages.items.glAccount')} {...form.register('gl_account')} />
         </div>
         <div className="flex justify-end gap-3">
           <Button variant="secondary" type="button" onClick={() => { setIsCreateOpen(false); setEditingItem(null); form.reset(); setSelectedCategory(''); }}>{t('common.cancel')}</Button>
@@ -197,58 +212,80 @@ export default function ItemsPage() {
     );
   };
 
-  const EditItemForm = ({ form, onSubmit, isLoading }: { form: any; onSubmit: any; isLoading: boolean }) => (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <Input label={t('form.nameAr')} {...form.register('name_ar')} error={form.formState.errors.name_ar?.message} />
-      </div>
-      <Input label={t('form.description')} {...form.register('description')} />
-      <div className="grid grid-cols-3 gap-4">
-        <Select
-          label={t('form.category')}
-          {...form.register('category_code')}
-          error={form.formState.errors.category_code?.message}
-          placeholder={t('form.selectCategory')}
-          options={categories.map((c: any) => ({ value: c.code, label: getLocalizedName(c) }))}
-        />
-        <Select
-          label={t('form.unit')}
-          {...form.register('unit_code')}
-          error={form.formState.errors.unit_code?.message}
-          placeholder={t('form.selectUnit')}
-          options={units.map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }))}
-        />
-        <Select
-          label={t('form.warehouse')}
-          {...form.register('warehouse_id')}
-          error={form.formState.errors.warehouse_id?.message}
-          placeholder={t('form.selectWarehouse')}
-          options={warehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
-        />
-      </div>
-      <div className="grid grid-cols-4 gap-4">
-        <Input label={t('form.minStockLevel')} type="number" step="0.0001" {...form.register('min_stock_level')} />
-        <Input label={t('form.maxStockLevel')} type="number" step="0.0001" {...form.register('max_stock_level')} />
-        <Input label={t('form.openingPrice')} type="number" step="0.01" {...form.register('opening_price')} />
-        <Input label={t('form.location')} {...form.register('location')} />
-      </div>
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mt-5">
-            <input type="checkbox" {...form.register('is_consumable')} className="rounded border-gray-300" />
-            {t('pages.items.consumable')}
-          </label>
+  const EditItemForm = ({ form, onSubmit, isLoading }: { form: any; onSubmit: any; isLoading: boolean }) => {
+    const categoryValue = form.watch('category_code');
+    const { data: subcategoriesData } = useSubcategories(categoryValue || '');
+    const subcategories = subcategoriesData || [];
+
+    useEffect(() => {
+      form.setValue('subcategory_id', null);
+    }, [categoryValue, form]);
+
+    return (
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Input label={t('form.nameAr')} {...form.register('name_ar')} error={form.formState.errors.name_ar?.message} />
         </div>
-        <Input label={t('pages.items.expiryAlertDays')} type="number" step="1" {...form.register('expiry_alert_days')} />
-        <Input label={t('pages.items.sapMaterialNumber')} {...form.register('sap_material_number')} />
-        <Input label={t('pages.items.glAccount')} {...form.register('gl_account')} />
-      </div>
-      <div className="flex justify-end gap-3">
-        <Button variant="secondary" type="button" onClick={() => { setIsCreateOpen(false); setEditingItem(null); form.reset(); }}>{t('common.cancel')}</Button>
-        <Button type="submit" isLoading={isLoading}>{t('common.save')}</Button>
-      </div>
-    </form>
-  );
+        <Input label={t('form.description')} {...form.register('description')} />
+        <div className="grid grid-cols-3 gap-4">
+          <Select
+            label={t('form.category')}
+            {...form.register('category_code')}
+            error={form.formState.errors.category_code?.message}
+            placeholder={t('form.selectCategory')}
+            options={categories.map((c: any) => ({ value: c.code, label: getLocalizedName(c) }))}
+          />
+          <Select
+            label={t('form.subcategory')}
+            {...form.register('subcategory_id')}
+            error={form.formState.errors.subcategory_id?.message}
+            placeholder={categoryValue ? t('form.selectSubcategory') : t('form.selectCategoryFirst')}
+            disabled={!categoryValue}
+            options={subcategories
+              .filter((s: any) => s.is_active !== false)
+              .map((s: any) => ({ value: s.id, label: getLocalizedName(s) }))}
+          />
+          <Select
+            label={t('form.unit')}
+            {...form.register('unit_code')}
+            error={form.formState.errors.unit_code?.message}
+            placeholder={t('form.selectUnit')}
+            options={units.map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }))}
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <Select
+            label={t('form.warehouse')}
+            {...form.register('warehouse_id')}
+            error={form.formState.errors.warehouse_id?.message}
+            placeholder={t('form.selectWarehouse')}
+            options={warehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
+          />
+          <Input label={t('form.minStockLevel')} type="number" step="0.0001" {...form.register('min_stock_level')} />
+          <Input label={t('form.maxStockLevel')} type="number" step="0.0001" {...form.register('max_stock_level')} />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <Input label={t('form.openingPrice')} type="number" step="0.01" {...form.register('opening_price')} />
+          <Input label={t('form.location')} {...form.register('location')} />
+          <Input label={t('pages.items.expiryAlertDays')} type="number" step="1" {...form.register('expiry_alert_days')} />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <Input label={t('pages.items.sapMaterialNumber')} {...form.register('sap_material_number')} />
+          <Input label={t('pages.items.glAccount')} {...form.register('gl_account')} />
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mt-5">
+              <input type="checkbox" {...form.register('is_consumable')} className="rounded border-gray-300" />
+              {t('pages.items.consumable')}
+            </label>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" type="button" onClick={() => { setIsCreateOpen(false); setEditingItem(null); form.reset(); }}>{t('common.cancel')}</Button>
+          <Button type="submit" isLoading={isLoading}>{t('common.save')}</Button>
+        </div>
+      </form>
+    );
+  };
 
   return (
     <div>
@@ -280,7 +317,7 @@ export default function ItemsPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} data={(data?.data || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
+      <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
       <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(); setSelectedCategory(''); }} title={t('pages.items.create')} size="lg">
         <CreateItemForm form={createForm} onSubmit={handleCreate} isLoading={createMutation.isPending} />

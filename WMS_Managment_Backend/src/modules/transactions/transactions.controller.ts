@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { transactionsService } from './transactions.service';
 import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
-import { sendSuccess } from '../../utils/response';
+import { sendData, sendPaginated } from '../../utils/response';
 import { createDraftSchema } from './transactions.validator';
 import { AuthError, NotFoundError, ValidationError } from '../../utils/AppError';
 
@@ -13,7 +13,7 @@ export class TransactionsController {
       const type = req.query.type as string | undefined;
       const status = req.query.status as string | undefined;
       const { items, pagination } = await transactionsService.getAll(page, limit, type, status);
-      sendSuccess(res, items, 200, pagination);
+      sendPaginated(res, items, pagination);
     } catch (e) { next(e); }
   }
 
@@ -23,7 +23,7 @@ export class TransactionsController {
       if (isNaN(id)) throw new ValidationError('Invalid transaction ID');
       const data = await transactionsService.getById(id);
       if (!data) throw new NotFoundError('Transaction', 'TRANSACTION_NOT_FOUND');
-      sendSuccess(res, data);
+      sendData(res, data);
     } catch (e) { next(e); }
   }
 
@@ -37,7 +37,7 @@ export class TransactionsController {
       const transaction = await transactionsService.createDraft(
         { ...header, created_by: req.user.userId }, details
       );
-      sendSuccess(res, transaction, 201);
+      sendData(res, transaction, { statusCode: 201 });
     } catch (error: any) {
       next(error);
     }
@@ -49,7 +49,7 @@ export class TransactionsController {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid transaction ID');
       const result = await transactionsService.approveTransaction(id, req.user.userId);
-      sendSuccess(res, result);
+      sendData(res, result);
     } catch (error: any) {
       next(error);
     }

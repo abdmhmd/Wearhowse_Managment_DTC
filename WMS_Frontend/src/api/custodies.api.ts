@@ -1,5 +1,5 @@
 import api from './client';
-import type { ApiResponse, Custody, CustodyStatus } from '@/types';
+import type { ApiResponse, Custody, CustodyStatus, PaginatedResponse } from '@/types';
 
 export interface CustodiesFilter {
   status?: CustodyStatus;
@@ -10,11 +10,11 @@ export interface CustodiesFilter {
 
 export const custodiesApi = {
   getAll: (page = 1, limit = 20, filter?: CustodiesFilter) =>
-    api.get<ApiResponse<Custody[]>>('/custodies', { params: { page, limit, ...filter } }),
+    api.get<PaginatedResponse<Custody>>('/custodies', { params: { page, limit, ...filter } }),
 
   getById: (id: number) =>
     api.get<ApiResponse<Custody>>(`/custodies/${id}`),
 
   returnItem: (id: number, notes?: string) =>
-    api.post<ApiResponse<Custody>>(`/custodies/${id}/return`, { notes }),
+    api.post<ApiResponse<{ message: string; transaction_id: number; transaction_no: string }>>(`/custodies/${id}/return`, { notes }),
 };

@@ -26,6 +26,10 @@ export interface TransactionDetail {
   total_price?: number;
   unit_cost?: number;
   total_value?: number;
+  batch_number?: string | null;
+  production_date?: string | Date | null;
+  expiry_date?: string | Date | null;
+  expiry_tracking_enabled?: boolean;
 }
 
 export interface StockMovement {
@@ -63,8 +67,8 @@ export class TransactionsRepository {
 
   async createDetail(client: PoolClient, detail: Omit<TransactionDetail, 'id' | 'total_price'>): Promise<TransactionDetail> {
     const query = `
-      INSERT INTO transaction_details (transaction_id, item_id, quantity, unit_code, unit_price, unit_cost, total_value)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO transaction_details (transaction_id, item_id, quantity, unit_code, unit_price, unit_cost, total_value, batch_number, production_date, expiry_date, expiry_tracking_enabled)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
     const values = [
@@ -75,6 +79,10 @@ export class TransactionsRepository {
       detail.unit_price ?? 0,
       detail.unit_cost ?? null,
       detail.total_value ?? null,
+      detail.batch_number ?? null,
+      detail.production_date ?? null,
+      detail.expiry_date ?? null,
+      detail.expiry_tracking_enabled ?? false,
     ];
     const res = await client.query(query, values);
     return res.rows[0];
@@ -87,7 +95,11 @@ export class TransactionsRepository {
   }
 
   async findDetailsByTransactionId(transactionId: number): Promise<TransactionDetail[]> {
-    const res = await pool.query('SELECT id, transaction_id, item_id, quantity, unit_code, unit_price, total_price, unit_cost, total_value FROM transaction_details WHERE transaction_id = $1', [transactionId]);
+    const res = await pool.query(
+      `SELECT id, transaction_id, item_id, quantity, unit_code, unit_price, total_price, unit_cost, total_value,
+              batch_number, production_date, expiry_date, expiry_tracking_enabled
+       FROM transaction_details WHERE transaction_id = $1`, [transactionId]
+    );
     return res.rows;
   }
 

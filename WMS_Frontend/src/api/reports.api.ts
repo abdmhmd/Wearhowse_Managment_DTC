@@ -1,5 +1,5 @@
 import api from './client';
-import type { ApiResponse, InventoryReportItem, PaginationMeta } from '@/types';
+import type { ApiResponse, InventoryReportItem, PaginatedResponse } from '@/types';
 
 export interface InventoryReportFilters {
   warehouse_id?: number;
@@ -14,7 +14,7 @@ export interface InventoryReportFilters {
 
 export const reportsApi = {
   getInventoryReport: (filters: InventoryReportFilters) =>
-    api.get<ApiResponse<InventoryReportItem[]>>('/reports/inventory', { params: filters }),
+    api.get<PaginatedResponse<InventoryReportItem>>('/reports/inventory', { params: filters }),
 
   getItemCard: (id: number) =>
     api.get<ApiResponse<InventoryReportItem>>(`/reports/item-card/${id}`),

@@ -1,9 +1,9 @@
 import api from './client';
-import type { ApiResponse, Supplier, PaginationMeta } from '@/types';
+import type { ApiResponse, PaginatedResponse, Supplier } from '@/types';
 
 export const suppliersApi = {
   getAll: (page = 1, limit = 20) =>
-    api.get<ApiResponse<Supplier[]>>('/suppliers', { params: { page, limit } }),
+    api.get<PaginatedResponse<Supplier>>('/suppliers', { params: { page, limit } }),
 
   getById: (id: number) =>
     api.get<ApiResponse<Supplier>>(`/suppliers/${id}`),

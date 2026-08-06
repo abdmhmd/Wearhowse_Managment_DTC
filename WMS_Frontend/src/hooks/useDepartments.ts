@@ -9,7 +9,7 @@ export function useDepartments(page = 1, limit = 20) {
     queryKey: ['departments', page, limit],
     queryFn: async () => {
       const res = await departmentsApi.getAll(page, limit);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -19,7 +19,7 @@ export function useAllDepartments() {
     queryKey: ['departments', 'all'],
     queryFn: async () => {
       const res = await departmentsApi.getAll(1, 200);
-      return res.data;
+      return res.data.data;
     },
   });
 }

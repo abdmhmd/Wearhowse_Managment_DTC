@@ -66,7 +66,7 @@ export default function DepartmentsPage() {
   return (
     <div>
       <PageHeader title={t('pages.departments.title')} subtitle={t('pages.departments.subtitle')} actions={<Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.departments.create')}</Button>} />
-      <DataTable columns={columns} data={(data?.data || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
+      <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
       <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(); }} title={t('pages.departments.create')}>
         <form onSubmit={createForm.handleSubmit(handleCreate)} className="space-y-4">

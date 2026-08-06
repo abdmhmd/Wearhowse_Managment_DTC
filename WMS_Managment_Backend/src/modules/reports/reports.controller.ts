@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { inventoryReportService } from './inventoryReport.service';
 import { itemsService } from '../items/items.service';
-import { sendSuccess } from '../../utils/response';
+import { sendData, sendPaginated } from '../../utils/response';
 import { inventoryReportQuerySchema, itemCardParamsSchema } from './reports.validator';
 import { ValidationError } from '../../utils/AppError';
 
@@ -20,7 +20,7 @@ export class ReportsController {
         page, limit,
       };
       const { items, pagination } = await inventoryReportService.getInventoryReport(filters);
-      sendSuccess(res, items, 200, pagination);
+      sendPaginated(res, items, pagination);
     } catch (e) { next(e); }
   }
 
@@ -29,7 +29,7 @@ export class ReportsController {
       const parsed = itemCardParamsSchema.safeParse(req.params);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
       const data = await itemsService.getItemCard(parsed.data.id);
-      sendSuccess(res, data);
+      sendData(res, data);
     } catch (e) { next(e); }
   }
 }

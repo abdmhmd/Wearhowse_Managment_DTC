@@ -6,7 +6,7 @@ export function useInventoryReport(filters: InventoryReportFilters) {
     queryKey: ['reports', 'inventory', filters],
     queryFn: async () => {
       const res = await reportsApi.getInventoryReport(filters);
-      return res.data;
+      return res.data.data;
     },
   });
 }

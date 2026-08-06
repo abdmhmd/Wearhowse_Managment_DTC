@@ -123,7 +123,7 @@ export default function MaterialRequestsListPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} data={((data as any)?.data?.items ?? []) as any[]} pagination={(data as any)?.data?.pagination ? { ...(data as any).data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
+      <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
       <Modal isOpen={!!rejecting} onClose={() => setRejecting(null)} title={t('pages.materialRequests.reject')}>
         <label className="block text-sm font-medium text-gray-700 mb-1">{t('pages.materialRequests.rejectReason')}</label>

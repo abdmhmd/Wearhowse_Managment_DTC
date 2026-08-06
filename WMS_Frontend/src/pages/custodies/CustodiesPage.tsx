@@ -65,7 +65,7 @@ export default function CustodiesPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} data={((data as any)?.data?.items ?? []) as any[]} pagination={(data as any)?.data?.pagination ? { ...(data as any).data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('pages.custodies.noData')} />
+      <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('pages.custodies.noData')} />
 
       <Modal isOpen={!!returningCustody} onClose={() => setReturningCustody(null)} title={t('pages.custodies.return')}>
         <p className="text-sm text-gray-500 mb-4">{t('pages.custodies.returnConfirm')}</p>

@@ -87,7 +87,7 @@ export default function TransactionsListPage() {
 
       <DataTable
         columns={columns}
-        data={(data?.data || []) as any[]}
+        data={(data?.items || []) as any[]}
         pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined}
         onRowClick={(item) => navigate(`/transactions/${(item as Transaction).id}`)}
         emptyMessage={t('common.noData')}

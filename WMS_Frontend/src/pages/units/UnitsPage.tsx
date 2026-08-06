@@ -67,7 +67,7 @@ export default function UnitsPage() {
   return (
     <div>
       <PageHeader title={t('pages.units.title')} subtitle={t('pages.units.subtitle')} actions={<Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.units.create')}</Button>} />
-      <DataTable columns={columns} data={(data?.data || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
+      <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
       <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(); }} title={t('pages.units.create')}>
         <form onSubmit={createForm.handleSubmit(handleCreate)} className="space-y-4">

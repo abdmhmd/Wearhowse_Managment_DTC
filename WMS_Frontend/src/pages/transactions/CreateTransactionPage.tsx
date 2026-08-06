@@ -6,6 +6,7 @@ import { useAllDepartments } from '@/hooks/useDepartments';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useItems } from '@/hooks/useItems';
 import { useAllUnits } from '@/hooks/useUnits';
+import { useUnitConversionsByItem } from '@/hooks/useUnitConversions';
 import { useCreateDraftTransaction } from '@/hooks/useTransactions';
 import { PageHeader, Button, Input, Select, Modal } from '@/components/ui';
 import { PlusIcon, TrashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
@@ -24,6 +25,10 @@ interface LineItem {
   unit_price?: number;
   unit_cost?: number;
   total_value?: number;
+  batch_number?: string | null;
+  expiry_tracking_enabled?: boolean;
+  production_date?: string | null;
+  expiry_date?: string | null;
 }
 
 export default function CreateTransactionPage() {
@@ -39,12 +44,24 @@ export default function CreateTransactionPage() {
   const { data: itemsData } = useItems(1, 200);
   const { data: unitsData } = useAllUnits();
   const createMutation = useCreateDraftTransaction();
+  const { data: conversionsData } = useUnitConversionsByItem(currentLine.item_id || 0);
 
-  const suppliers = suppliersData?.data || [];
-  const departments = departmentsData?.data || [];
-  const warehouses = warehousesData?.data || [];
-  const items = itemsData?.data || [];
-  const units = unitsData?.data || [];
+  const suppliers = suppliersData?.items || [];
+  const departments = departmentsData?.items || [];
+  const warehouses = warehousesData?.items || [];
+  const items = itemsData?.items || [];
+  const units = unitsData?.items || [];
+
+  const selectedItem = currentLine.item_id ? items.find((i: any) => i.id === currentLine.item_id) : undefined;
+  const conversions = conversionsData || [];
+  const validUnits = selectedItem
+    ? [selectedItem.unit_code, ...conversions
+        .filter((c: any) => c.from_unit_code === selectedItem.unit_code)
+        .map((c: any) => c.to_unit_code)]
+    : [];
+  const unitOptions = validUnits.length > 0
+    ? units.filter((u: any) => validUnits.includes(u.code)).map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }))
+    : units.map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }));
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<CreateDraftTransactionFormFormData>({
     resolver: zodResolver(createDraftTransactionFormSchema),
@@ -61,6 +78,10 @@ export default function CreateTransactionPage() {
       showError(t('transaction.fillRequired'));
       return;
     }
+    if (isRV && currentLine.expiry_tracking_enabled && !currentLine.expiry_date) {
+      showError(t('transaction.expiryDateRequired'));
+      return;
+    }
     const item = items.find((i: any) => i.id === currentLine.item_id);
     const unitPrice = Number(isRV ? (currentLine.unit_price || 0) : (item?.last_purchase_price || 0));
     const quantity = Number(currentLine.quantity);
@@ -72,6 +93,10 @@ export default function CreateTransactionPage() {
       unit_price: isRV ? unitPrice : 0,
       unit_cost: unitPrice,
       total_value: totalValue,
+      batch_number: currentLine.batch_number,
+      expiry_tracking_enabled: currentLine.expiry_tracking_enabled,
+      production_date: currentLine.production_date,
+      expiry_date: currentLine.expiry_date,
     };
     setLineItems([...lineItems, lineItem]);
     setCurrentLine({});
@@ -184,6 +209,8 @@ export default function CreateTransactionPage() {
                     <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.unit')}</th>
                     <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.quantity')}</th>
                     <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.unitPrice')}</th>
+                    {isRV && <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('transaction.productionDate')}</th>}
+                    {isRV && <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('transaction.expiryDate')}</th>}
                     <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.totalValue')}</th>
                     <th className="px-4 py-3 text-end text-xs font-semibold text-gray-600 uppercase">{t('table.action')}</th>
                   </tr>
@@ -202,6 +229,8 @@ export default function CreateTransactionPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">{line.unit_cost ? formatNumber(line.unit_cost, 2) : '-'}</td>
+                        {isRV && <td className="px-4 py-3 text-sm">{line.production_date || '-'}</td>}
+                        {isRV && <td className="px-4 py-3 text-sm">{line.expiry_date || '-'}</td>}
                         <td className="px-4 py-3 text-sm font-medium">{line.total_value ? formatNumber(line.total_value, 2) : '-'}</td>
                         <td className="px-4 py-3 text-end">
                           <Button type="button" variant="ghost" size="sm" onClick={() => removeLineItem(idx)}>
@@ -214,7 +243,7 @@ export default function CreateTransactionPage() {
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={4}></td>
+                    <td colSpan={isRV ? 6 : 4}></td>
                     <td className="px-4 py-2 text-sm font-semibold">{t('table.total')}</td>
                     <td className="px-4 py-2 text-sm font-bold">{formatNumber(lineItems.reduce((s, l) => s + (l.total_value || 0), 0), 2)}</td>
                     <td></td>
@@ -245,10 +274,13 @@ export default function CreateTransactionPage() {
                 item_id: Number(e.target.value),
                 unit_code: item?.unit_code || '',
                 unit_price: isRV ? undefined : Number(item?.last_purchase_price || 0),
+                expiry_tracking_enabled: false,
+                production_date: undefined,
+                expiry_date: undefined,
               });
             }}
             placeholder={t('form.selectItem')}
-            options={items.map((i: any) => ({ value: i.id, label: `${i.item_code} - ${getLocalizedName(i)} (${t('table.balance')}: ${i.current_balance})` }))}
+            options={items.map((i: any) => ({ value: i.id, label: `${i.item_code} - ${getLocalizedName(i)} (${t('table.balance')}: ${formatNumber(i.current_balance)} ${i.unit_code})` }))}
           />
           <div className="grid grid-cols-2 gap-4">
             <Input
@@ -262,8 +294,9 @@ export default function CreateTransactionPage() {
               label={`${t('table.unit')} *`}
               value={currentLine.unit_code || ''}
               onChange={(e) => setCurrentLine({ ...currentLine, unit_code: e.target.value })}
-              placeholder={t('form.selectUnit')}
-              options={units.map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }))}
+              placeholder={selectedItem ? t('form.selectUnit') : t('form.selectItemFirst')}
+              disabled={!selectedItem}
+              options={unitOptions}
             />
           </div>
           {isRV ? (
@@ -282,6 +315,35 @@ export default function CreateTransactionPage() {
                 disabled
                 className="block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
               />
+            </div>
+          )}
+          {isRV && (
+            <div className="border-t border-gray-100 pt-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={!!currentLine.expiry_tracking_enabled}
+                  onChange={(e) => setCurrentLine({ ...currentLine, expiry_tracking_enabled: e.target.checked })}
+                  className="rounded border-gray-300"
+                />
+                {t('transaction.expiryTracking')}
+              </label>
+              {currentLine.expiry_tracking_enabled && (
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <Input
+                    label={t('transaction.productionDate')}
+                    type="date"
+                    value={currentLine.production_date || ''}
+                    onChange={(e) => setCurrentLine({ ...currentLine, production_date: e.target.value || null })}
+                  />
+                  <Input
+                    label={`${t('transaction.expiryDate')} *`}
+                    type="date"
+                    value={currentLine.expiry_date || ''}
+                    onChange={(e) => setCurrentLine({ ...currentLine, expiry_date: e.target.value || null })}
+                  />
+                </div>
+              )}
             </div>
           )}
           {currentLine.quantity && currentLine.unit_price !== undefined && (

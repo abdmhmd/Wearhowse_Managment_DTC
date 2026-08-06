@@ -11,8 +11,8 @@ export default function SettingsPage() {
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
   useEffect(() => {
-    if (data?.data) {
-      reset(data.data);
+    if (data) {
+      reset(data);
     }
   }, [data, reset]);
 
@@ -36,35 +36,35 @@ export default function SettingsPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl space-y-6">
         <div className="bg-white rounded-xl shadow p-6 space-y-4">
-          <h3 className="text-lg font-semibold">{t('settings.accountingAccounts')}</h3>
+          <h3 className="text-lg font-semibold">{t('pages.settings.accountingAccounts')}</h3>
 
           <Input
-            label={t('settings.inventoryAccount')}
+            label={t('pages.settings.inventoryAccount')}
             {...register('inventory_account')}
             error={errors.inventory_account?.message as string}
           />
 
           <Input
-            label={t('settings.supplierAccount')}
+            label={t('pages.settings.supplierAccount')}
             {...register('supplier_account')}
             error={errors.supplier_account?.message as string}
           />
 
           <Input
-            label={t('settings.expenseAccountPrefix')}
+            label={t('pages.settings.expenseAccountPrefix')}
             {...register('expense_account_prefix')}
             error={errors.expense_account_prefix?.message as string}
           />
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.valuationMethod')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('pages.settings.valuationMethod')}</label>
             <select
               {...register('valuation_method')}
               className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
-              <option value="last_purchase">{t('settings.lastPurchase')}</option>
-              <option value="average">{t('settings.average')}</option>
-              <option value="fifo">{t('settings.fifo')}</option>
+              <option value="last_purchase">{t('pages.settings.lastPurchase')}</option>
+              <option value="average">{t('pages.settings.average')}</option>
+              <option value="fifo">{t('pages.settings.fifo')}</option>
             </select>
           </div>
         </div>

@@ -8,7 +8,7 @@ export function useMaterialRequests(page = 1, limit = 20, filter?: MaterialReque
     queryKey: ['material-requests', page, limit, filter],
     queryFn: async () => {
       const res = await materialRequestsApi.getAll(page, limit, filter);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -18,7 +18,7 @@ export function useMaterialRequest(id: number) {
     queryKey: ['material-requests', id],
     queryFn: async () => {
       const res = await materialRequestsApi.getById(id);
-      return res.data;
+      return res.data.data;
     },
     enabled: !!id,
   });

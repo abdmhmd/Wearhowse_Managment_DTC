@@ -22,15 +22,16 @@ export default function TransactionDetailPage() {
     return <div className="flex items-center justify-center h-64"><LoadingSpinner size="lg" /></div>;
   }
 
-  if (!data?.data) {
+  if (!data) {
     return <div className="text-center py-12 text-gray-500">{t('common.notFound')}</div>;
   }
 
-  const txn = data.data;
+  const txn = data;
   const details = txn.details || [];
 
   const txType = txn.type as TransactionType;
   const txStatus = txn.status as TransactionStatus;
+  const isInbound = txType === 'RV' || txType === 'RTV' || txType === 'TRF';
 
   const handleApprove = async () => {
     showConfirm(t('transaction.confirmApprove'), async () => {
@@ -135,6 +136,8 @@ export default function TransactionDetailPage() {
                 <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.itemId')}</th>
                 <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.unit')}</th>
                 <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.quantity')}</th>
+                {isInbound && <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('transaction.productionDate')}</th>}
+                {isInbound && <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('transaction.expiryDate')}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -148,6 +151,8 @@ export default function TransactionDetailPage() {
                       {formatNumber(detail.quantity)}
                     </span>
                   </td>
+                  {isInbound && <td className="px-4 py-3 text-sm">{detail.production_date || '-'}</td>}
+                  {isInbound && <td className="px-4 py-3 text-sm">{detail.expiry_date || '-'}</td>}
                 </tr>
               ))}
             </tbody>

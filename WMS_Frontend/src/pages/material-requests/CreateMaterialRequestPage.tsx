@@ -27,11 +27,11 @@ export default function CreateMaterialRequestPage() {
   const { data: projectsData } = useAllProjects();
   const createMutation = useCreateMaterialRequest();
 
-  const departments = departmentsData?.data || [];
-  const warehouses = warehousesData?.data || [];
-  const items = itemsData?.data || [];
-  const units = unitsData?.data || [];
-  const projects = (projectsData?.data || []).filter((p: any) => p.status === 'open');
+  const departments = departmentsData?.items || [];
+  const warehouses = warehousesData?.items || [];
+  const items = itemsData?.items || [];
+  const units = unitsData?.items || [];
+  const projects = (projectsData?.items || []).filter((p: any) => p.status === 'open');
 
   const form = useForm<CreateMaterialRequestFormData>({
     resolver: zodResolver(createMaterialRequestSchema),

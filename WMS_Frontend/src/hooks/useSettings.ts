@@ -8,7 +8,7 @@ export function useSettings() {
     queryKey: ['settings'],
     queryFn: async () => {
       const res = await settingsApi.getAll();
-      return res.data;
+      return res.data.data;
     },
   });
 }

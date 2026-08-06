@@ -9,7 +9,7 @@ export function useUnits(page = 1, limit = 20) {
     queryKey: ['units', page, limit],
     queryFn: async () => {
       const res = await unitsApi.getAll(page, limit);
-      return res.data;
+      return res.data.data;
     },
   });
 }
@@ -19,7 +19,7 @@ export function useUnit(code: string) {
     queryKey: ['units', code],
     queryFn: async () => {
       const res = await unitsApi.getByCode(code);
-      return res.data;
+      return res.data.data;
     },
     enabled: !!code,
   });
@@ -30,7 +30,7 @@ export function useAllUnits() {
     queryKey: ['units', 'all'],
     queryFn: async () => {
       const res = await unitsApi.getAll(1, 200);
-      return res.data;
+      return res.data.data;
     },
   });
 }

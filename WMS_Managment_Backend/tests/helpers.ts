@@ -78,6 +78,7 @@ export async function cleanup(prefix: string): Promise<void> {
   await pool.query('DELETE FROM transaction_details USING transactions WHERE transaction_details.transaction_id = transactions.id AND transactions.transaction_no LIKE $1', [`${prefix}%`]);
   await pool.query('DELETE FROM transactions WHERE transaction_no LIKE $1', [`${prefix}%`]);
   await pool.query('DELETE FROM unit_conversions WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)', [`${prefix}%`]);
+  await pool.query('DELETE FROM batches WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)', [`${prefix}%`]);
   await pool.query('DELETE FROM items WHERE item_code LIKE $1', [`${prefix}%`]);
   await pool.query('DELETE FROM warehouses WHERE code LIKE $1', [`${prefix}%`]);
   await pool.query('DELETE FROM categories WHERE code LIKE $1', [`${prefix}%`]);

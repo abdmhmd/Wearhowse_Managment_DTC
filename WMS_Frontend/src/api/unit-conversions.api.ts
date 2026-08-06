@@ -1,9 +1,9 @@
 import api from './client';
-import type { ApiResponse, UnitConversion, PaginationMeta } from '@/types';
+import type { ApiResponse, PaginatedResponse, UnitConversion } from '@/types';
 
 export const unitConversionsApi = {
   getAll: (page = 1, limit = 20) =>
-    api.get<ApiResponse<UnitConversion[]>>('/unit-conversions', { params: { page, limit } }),
+    api.get<PaginatedResponse<UnitConversion>>('/unit-conversions', { params: { page, limit } }),
 
   getByItemId: (itemId: number) =>
     api.get<ApiResponse<UnitConversion[]>>(`/unit-conversions/item/${itemId}`),
