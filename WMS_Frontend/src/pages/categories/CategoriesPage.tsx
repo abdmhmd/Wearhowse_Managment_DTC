@@ -27,10 +27,12 @@ import {
 import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog } from '@/components/ui';
 import { PlusIcon, PencilIcon, TrashIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
+import { useAuthStore } from '@/store/auth.store';
 import type { Category, Subcategory } from '@/types';
 
 export default function CategoriesPage() {
   const { t } = useTranslation();
+  const { can } = useAuthStore();
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -146,32 +148,36 @@ export default function CategoriesPage() {
           >
             <Squares2X2Icon className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditingCategory(item);
-              updateForm.reset({
-                name_ar: item.name_ar,
-                name_en: item.name_en || '',
-                parent_code: item.parent_code || null,
-                description: item.description || '',
-              });
-            }}
-          >
-            <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDeletingCategory(item);
-            }}
-          >
-            <TrashIcon className="h-4 w-4 text-red-500" />
-          </Button>
+          {can('categories:update') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingCategory(item);
+                updateForm.reset({
+                  name_ar: item.name_ar,
+                  name_en: item.name_en || '',
+                  parent_code: item.parent_code || null,
+                  description: item.description || '',
+                });
+              }}
+            >
+              <PencilIcon className="h-4 w-4" />
+            </Button>
+          )}
+          {can('categories:delete') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeletingCategory(item);
+              }}
+            >
+              <TrashIcon className="h-4 w-4 text-red-500" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -183,10 +189,12 @@ export default function CategoriesPage() {
         title={t('pages.categories.title')}
         subtitle={t('pages.categories.subtitle')}
         actions={
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <PlusIcon className="h-4 w-4 me-2" />
-            {t('pages.categories.create')}
-          </Button>
+          can('categories:create') ? (
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <PlusIcon className="h-4 w-4 me-2" />
+              {t('pages.categories.create')}
+            </Button>
+          ) : undefined
         }
       />
 
@@ -285,30 +293,32 @@ export default function CategoriesPage() {
         size="lg"
       >
         <div className="space-y-4">
-          <form onSubmit={subcatForm.handleSubmit(handleCreateSubcategory)} className="space-y-4 border border-gray-100 rounded-lg p-4">
-            <div className="grid grid-cols-2 gap-4">
+          {can('categories:create') && (
+            <form onSubmit={subcatForm.handleSubmit(handleCreateSubcategory)} className="space-y-4 border border-gray-100 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label={t('form.code')}
+                  {...subcatForm.register('code')}
+                  error={subcatForm.formState.errors.code?.message}
+                />
+                <Input
+                  label={t('form.nameAr')}
+                  {...subcatForm.register('name_ar')}
+                  error={subcatForm.formState.errors.name_ar?.message}
+                />
+              </div>
               <Input
-                label={t('form.code')}
-                {...subcatForm.register('code')}
-                error={subcatForm.formState.errors.code?.message}
+                label={t('form.nameEn')}
+                {...subcatForm.register('name_en')}
               />
-              <Input
-                label={t('form.nameAr')}
-                {...subcatForm.register('name_ar')}
-                error={subcatForm.formState.errors.name_ar?.message}
-              />
-            </div>
-            <Input
-              label={t('form.nameEn')}
-              {...subcatForm.register('name_en')}
-            />
-            <div className="flex justify-end">
-              <Button type="submit" isLoading={createSubcatMutation.isPending}>
-                <PlusIcon className="h-4 w-4 me-2" />
-                {t('pages.categories.addSubcategory')}
-              </Button>
-            </div>
-          </form>
+              <div className="flex justify-end">
+                <Button type="submit" isLoading={createSubcatMutation.isPending}>
+                  <PlusIcon className="h-4 w-4 me-2" />
+                  {t('pages.categories.addSubcategory')}
+                </Button>
+              </div>
+            </form>
+          )}
 
           {subcategories.length === 0 ? (
             <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
@@ -326,24 +336,28 @@ export default function CategoriesPage() {
                     {sub.is_active === false && <Badge variant="danger">{t('common.inactive')}</Badge>}
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setEditingSubcategory(sub);
-                        editSubcatForm.reset({
-                          name_ar: sub.name_ar,
-                          name_en: sub.name_en || '',
-                          description: sub.description || '',
-                          is_active: sub.is_active !== false,
-                        });
-                      }}
-                    >
-                      <PencilIcon className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setDeletingSubcategory(sub)}>
-                      <TrashIcon className="h-4 w-4 text-red-500" />
-                    </Button>
+                    {can('categories:update') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingSubcategory(sub);
+                          editSubcatForm.reset({
+                            name_ar: sub.name_ar,
+                            name_en: sub.name_en || '',
+                            description: sub.description || '',
+                            is_active: sub.is_active !== false,
+                          });
+                        }}
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {can('categories:delete') && (
+                      <Button variant="ghost" size="sm" onClick={() => setDeletingSubcategory(sub)}>
+                        <TrashIcon className="h-4 w-4 text-red-500" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

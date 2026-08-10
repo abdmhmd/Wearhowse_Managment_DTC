@@ -8,10 +8,12 @@ import { createUnitSchema, updateUnitSchema, type CreateUnitFormData, type Updat
 import { PageHeader, Button, DataTable, Modal, Input, ConfirmDialog } from '@/components/ui';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
+import { useAuthStore } from '@/store/auth.store';
 import type { Unit } from '@/types';
 
 export default function UnitsPage() {
   const { t } = useTranslation();
+  const { can } = useAuthStore();
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
@@ -53,12 +55,16 @@ export default function UnitsPage() {
       key: 'actions', header: t('table.actions'), className: 'text-end',
       render: (item: Unit) => (
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingUnit(item); updateForm.reset({ name_ar: item.name_ar, name_en: item.name_en }); }}>
-            <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingUnit(item); }}>
-            <TrashIcon className="h-4 w-4 text-red-500" />
-          </Button>
+          {can('units:update') && (
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingUnit(item); updateForm.reset({ name_ar: item.name_ar, name_en: item.name_en }); }}>
+              <PencilIcon className="h-4 w-4" />
+            </Button>
+          )}
+          {can('units:delete') && (
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingUnit(item); }}>
+              <TrashIcon className="h-4 w-4 text-red-500" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -66,7 +72,7 @@ export default function UnitsPage() {
 
   return (
     <div>
-      <PageHeader title={t('pages.units.title')} subtitle={t('pages.units.subtitle')} actions={<Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.units.create')}</Button>} />
+      <PageHeader title={t('pages.units.title')} subtitle={t('pages.units.subtitle')} actions={can('units:create') ? <Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.units.create')}</Button> : undefined} />
       <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
       <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(); }} title={t('pages.units.create')}>

@@ -8,16 +8,15 @@ const router = Router();
 router.use(authenticate);
 
 // Get all transactions
-router.get('/', transactionsController.getAll);
+router.get('/', authorize('transactions:view'), transactionsController.getAll);
 
 // Get a single transaction by ID
-router.get('/:id', transactionsController.getById);
+router.get('/:id', authorize('transactions:view'), transactionsController.getById);
 
-// Create a draft transaction (any authenticated user can create a draft in this basic setup, 
-// but realistically only storekeeper, warehouse_manager, system_admin)
-router.post('/', authorize(['storekeeper', 'warehouse_manager', 'system_admin']), transactionsController.createDraft);
+// Create a draft transaction (system_admin only)
+router.post('/', authorize('transactions:create'), transactionsController.createDraft);
 
-// Approve a transaction (only managers and admins)
-router.post('/:id/approve', authorize(['warehouse_manager', 'system_admin']), transactionsController.approve);
+// Approve a transaction (system_admin only)
+router.post('/:id/approve', authorize('transactions:approve'), transactionsController.approve);
 
 export default router;

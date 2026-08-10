@@ -15,9 +15,9 @@ describe('users CRUD', () => {
       username,
       password_hash: 'dummy_hash',
       full_name: 'Test User',
-      role: 'storekeeper',
+      role: 'department_manager',
     });
-    expect(result).toMatchObject({ username, full_name: 'Test User', role: 'storekeeper', is_active: true });
+    expect(result).toMatchObject({ username, full_name: 'Test User', role: 'department_manager', is_active: true });
     expect(result.id).toBeGreaterThan(0);
     createdId = result.id;
   });

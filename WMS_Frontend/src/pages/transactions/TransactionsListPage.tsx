@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useAuthStore } from '@/store/auth.store';
 import { PageHeader, Button, DataTable, Badge } from '@/components/ui';
 import { PlusIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { formatDateTime } from '@/utils';
@@ -10,6 +11,7 @@ import type { Transaction, TransactionType, TransactionStatus } from '@/types';
 export default function TransactionsListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { can } = useAuthStore();
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -56,10 +58,12 @@ export default function TransactionsListPage() {
         title={t('nav.transactions')}
         subtitle={t('pages.transactions.subtitle')}
         actions={
-          <Button onClick={() => navigate('/transactions/new')}>
-            <PlusIcon className="h-4 w-4 me-2" />
-            {t('transaction.newTransaction')}
-          </Button>
+          can('transactions:create') ? (
+            <Button onClick={() => navigate('/transactions/new')}>
+              <PlusIcon className="h-4 w-4 me-2" />
+              {t('transaction.newTransaction')}
+            </Button>
+          ) : undefined
         }
       />
 

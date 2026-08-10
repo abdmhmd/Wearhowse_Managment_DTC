@@ -1,7 +1,28 @@
 import { pool } from '../../config/database';
 import { PoolClient } from 'pg';
+import { scopeForUser, type DataScope } from '../authorization/scope';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
-export type CustodyStatus = 'active' | 'returned';
+export type CustodyStatus = 'active' | 'returned' | 'damaged' | 'lost';
+export type CustodyCondition = 'good' | 'damaged' | 'lost';
+
+export function custodyScopeClause(user: AuthUserContext, startIndex = 1): { clause: string; params: any[] } {
+  const scope: DataScope = scopeForUser(user);
+  let n = startIndex;
+  if (scope === 'GLOBAL') return { clause: 'TRUE', params: [] };
+  if (scope === 'WAREHOUSE') {
+    if (user.warehouse_ids.length === 0) return { clause: 'FALSE', params: [] };
+    return { clause: `c.warehouse_id = ANY($${n})`, params: [user.warehouse_ids] };
+  }
+  if (scope === 'DEPARTMENT' && user.department_id != null) {
+    return {
+      clause: `(EXISTS (SELECT 1 FROM projects p WHERE p.id = c.project_id AND p.department_id = $${n})
+                OR c.assigned_to IN (SELECT id FROM users u WHERE u.department_id = $${n}))`,
+      params: [user.department_id],
+    };
+  }
+  return { clause: 'FALSE', params: [] };
+}
 
 export interface Custody {
   id: number;
@@ -15,6 +36,8 @@ export interface Custody {
   request_id?: number | null;
   project_id?: number | null;
   status: CustodyStatus;
+  condition?: CustodyCondition | null;
+  expected_return_at?: string | Date | null;
   notes?: string | null;
   returned_at?: Date | null;
   is_active: boolean;
@@ -29,6 +52,8 @@ export interface CustodyFilters {
   warehouse_id?: number;
   limit?: number;
   offset?: number;
+  /** Current authenticated user — used to build the authorization scope clause. */
+  user?: AuthUserContext;
 }
 
 export class CustodiesRepository {
@@ -44,13 +69,14 @@ export class CustodiesRepository {
       issued_transaction_id: number;
       request_id?: number | null;
       project_id?: number | null;
+      expected_return_at?: string | Date | null;
       notes?: string | null;
     }
   ): Promise<Custody> {
     const res = await client.query(
       `INSERT INTO custodies
-         (item_id, warehouse_id, assigned_to, quantity, unit_code, issued_transaction_id, request_id, project_id, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         (item_id, warehouse_id, assigned_to, quantity, unit_code, issued_transaction_id, request_id, project_id, expected_return_at, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         data.item_id,
@@ -61,6 +87,7 @@ export class CustodiesRepository {
         data.issued_transaction_id,
         data.request_id ?? null,
         data.project_id ?? null,
+        data.expected_return_at ?? null,
         data.notes ?? null,
       ]
     );
@@ -76,6 +103,12 @@ export class CustodiesRepository {
     if (filters.assigned_to)  { where += ` AND c.assigned_to = $${i++}`;  params.push(filters.assigned_to); }
     if (filters.project_id)   { where += ` AND c.project_id = $${i++}`;   params.push(filters.project_id); }
     if (filters.warehouse_id) { where += ` AND c.warehouse_id = $${i++}`; params.push(filters.warehouse_id); }
+    if (filters.user) {
+      const scope = custodyScopeClause(filters.user, i);
+      where += ` AND (${scope.clause})`;
+      params.push(...scope.params);
+      i += scope.params.length;
+    }
 
     const limit = filters.limit ?? 20;
     const offset = filters.offset ?? 0;
@@ -139,12 +172,62 @@ export class CustodiesRepository {
     const res = await client.query(
       `UPDATE custodies
        SET status = 'returned',
+           condition = 'good',
            return_transaction_id = $2,
            returned_at = NOW(),
            notes = COALESCE($3, notes)
        WHERE id = $1 AND is_active = true AND status = 'active'
        RETURNING *`,
       [id, returnTransactionId, notes ?? null]
+    );
+    return res.rows[0] || null;
+  }
+
+  /**
+   * Reduce a custody's outstanding quantity after a partial (good) return.
+   * The custody stays 'active' with the remaining quantity; the returned part
+   * is restored to inventory via the linked RTI transaction.
+   */
+  async reduceQuantity(
+    client: PoolClient,
+    id: number,
+    returnedQuantity: number,
+    returnTransactionId: number,
+    notes?: string | null
+  ): Promise<Custody | null> {
+    const res = await client.query(
+      `UPDATE custodies
+       SET quantity = quantity - $2,
+           condition = 'good',
+           return_transaction_id = $3,
+           notes = COALESCE($4, notes)
+       WHERE id = $1 AND is_active = true AND status = 'active' AND quantity >= $2
+       RETURNING *`,
+      [id, returnedQuantity, returnTransactionId, notes ?? null]
+    );
+    return res.rows[0] || null;
+  }
+
+  /**
+   * Close a custody WITHOUT restoring stock (damaged / lost material). The
+   * record is preserved with the given status + condition so the material is
+   * never silently restored to the available balance.
+   */
+  async markUnrestored(
+    client: PoolClient,
+    id: number,
+    status: 'damaged' | 'lost',
+    notes?: string | null
+  ): Promise<Custody | null> {
+    const res = await client.query(
+      `UPDATE custodies
+       SET status = $2::custody_status,
+           condition = $3::custody_condition,
+           returned_at = NOW(),
+           notes = COALESCE($4, notes)
+       WHERE id = $1 AND is_active = true AND status = 'active'
+       RETURNING *`,
+      [id, status, status, notes ?? null]
     );
     return res.rows[0] || null;
   }

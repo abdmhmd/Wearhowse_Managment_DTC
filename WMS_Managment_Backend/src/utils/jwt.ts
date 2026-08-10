@@ -8,9 +8,16 @@ export interface TokenPayload {
   username: string;
   role: string;
   department_id?: number | null;
+  token_version?: number;
 }
 
-function toTokenPayload(data: { userId: number; username: string; role: string; department_id?: number | null }): TokenPayload {
+function toTokenPayload(data: {
+  userId: number;
+  username: string;
+  role: string;
+  department_id?: number | null;
+  token_version?: number;
+}): TokenPayload {
   return { ...data, id: data.userId };
 }
 

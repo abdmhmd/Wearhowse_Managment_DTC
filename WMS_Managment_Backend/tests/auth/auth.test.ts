@@ -85,7 +85,7 @@ describe('Auth Login', () => {
     const inactiveUser = `${prefix}${shortId()}`;
     await pool.query(
       `INSERT INTO users (username, password_hash, full_name, role, is_active)
-       VALUES ($1, $2, $3, 'storekeeper', false)`,
+       VALUES ($1, $2, $3, 'warehouse_manager', false)`,
       [inactiveUser, password_hash, inactiveUser]
     );
 
@@ -97,6 +97,26 @@ describe('Auth Login', () => {
     expect(next).toHaveBeenCalled();
     const err = next.mock.calls[0][0];
     expect(err.status).toBe(401);
+  });
+
+  test('should reject login for a deactivated role (storekeeper)', async () => {
+    const password_hash = await hashPassword('legacyPass');
+    const legacyUser = `${prefix}${shortId()}`;
+    await pool.query(
+      `INSERT INTO users (username, password_hash, full_name, role, is_active)
+       VALUES ($1, $2, $3, 'storekeeper', true)`,
+      [legacyUser, password_hash, legacyUser]
+    );
+
+    const controller = new AuthController();
+    const { req, res } = mockReqRes({ username: legacyUser, password: 'legacyPass' });
+    const next = jest.fn();
+    await controller.login(req as Request, res as Response, next);
+
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err.status).toBe(401);
+    expect(err.code).toBe('AUTH_ROLE_DISABLED');
   });
 });
 
@@ -112,10 +132,10 @@ describe('Auth Middleware', () => {
     return { req, res };
   }
 
-  test('should reject request without token', () => {
+  test('should reject request without token', async () => {
     const { req, res } = mockReqResWithHeaders(undefined);
     const next = jest.fn();
-    authenticate(req as any, res as Response, next);
+    await authenticate(req as any, res as Response, next);
 
     expect(next).toHaveBeenCalled();
     const err = next.mock.calls[0][0];
@@ -123,10 +143,10 @@ describe('Auth Middleware', () => {
     expect(err.message).toBe('Authentication required');
   });
 
-  test('should reject request with malformed token', () => {
+  test('should reject request with malformed token', async () => {
     const { req, res } = mockReqResWithHeaders('Bearer invalidtoken123');
     const next = jest.fn();
-    authenticate(req as any, res as Response, next);
+    await authenticate(req as any, res as Response, next);
 
     expect(next).toHaveBeenCalled();
     const err = next.mock.calls[0][0];
@@ -134,13 +154,14 @@ describe('Auth Middleware', () => {
     expect(err.message).toBe('Invalid or expired token');
   });
 
-  test('should accept request with valid token', () => {
+  test('should accept request with valid token', async () => {
     const token = generateToken({ userId, username, role: 'system_admin' });
     const { req, res } = mockReqResWithHeaders(`Bearer ${token}`);
     const next = jest.fn();
-    authenticate(req as any, res as Response, next);
+    await authenticate(req as any, res as Response, next);
 
     expect(next).toHaveBeenCalled();
+    expect(next.mock.calls[0][0]).toBeUndefined();
     expect((req as any).user).toBeDefined();
     expect((req as any).user.userId).toBe(userId);
   });

@@ -19,6 +19,7 @@ export class BatchesController {
         search: search as string,
         limit: limitNum,
         offset: (pageNum - 1) * limitNum,
+        user: req.user,
       });
 
       sendPaginated(res, result.items, {

@@ -1,7 +1,16 @@
 import { pool, runInTransaction } from '../../config/database';
 import { PoolClient } from 'pg';
+import { scopeClause } from '../authorization/scope';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
-export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'issued' | 'cancelled';
+export type RequestStatus =
+  | 'pending'          // created, awaiting department approval
+  | 'dept_approved'    // approved by the department manager
+  | 'forwarded'        // forwarded by the department manager to the warehouse admin
+  | 'admin_approved'   // approved by the warehouse admin
+  | 'admin_rejected'   // rejected by the warehouse admin
+  | 'issued'           // stock issued (transaction completed)
+  | 'cancelled';       // cancelled by the creator or an admin
 export type RequestPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type RequestType = 'experiment' | 'semester' | 'project';
 
@@ -20,6 +29,11 @@ export interface MaterialRequestHeader {
   rejection_reason?: string | null;
   approved_by?: number | null;
   approved_at?: Date | null;
+  dept_approved_by?: number | null;
+  dept_approved_at?: Date | null;
+  forwarded_by?: number | null;
+  forwarded_at?: Date | null;
+  rejected_by?: number | null;
   issued_by?: number | null;
   issued_at?: Date | null;
   transaction_id?: number | null;
@@ -85,14 +99,20 @@ export class MaterialRequestsRepository {
               d.name_ar AS department_name_ar, d.name_en AS department_name_en,
               w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
               u.full_name AS requested_by_name,
+              dau.full_name AS dept_approved_by_name,
+              fu.full_name AS forwarded_by_name,
               au.full_name AS approved_by_name,
+              ru.full_name AS rejected_by_name,
               iu.full_name AS issued_by_name,
               p.project_no, p.name AS project_name
        FROM material_requests mr
        JOIN departments d ON d.id = mr.department_id
        JOIN warehouses w ON w.id = mr.warehouse_id
        JOIN users u ON u.id = mr.requested_by
+       LEFT JOIN users dau ON dau.id = mr.dept_approved_by
+       LEFT JOIN users fu ON fu.id = mr.forwarded_by
        LEFT JOIN users au ON au.id = mr.approved_by
+       LEFT JOIN users ru ON ru.id = mr.rejected_by
        LEFT JOIN users iu ON iu.id = mr.issued_by
        LEFT JOIN projects p ON p.id = mr.project_id
        WHERE mr.id = $1 AND mr.is_active = true`,
@@ -101,8 +121,44 @@ export class MaterialRequestsRepository {
     return res.rows[0] || null;
   }
 
-  async findDetailsByRequestId(requestId: number) {
-    const res = await pool.query(
+  /**
+   * Locks the material request row for the duration of the caller's
+   * transaction (SELECT ... FOR UPDATE). Used by state-transition methods so
+   * concurrent state changes — e.g. a double issue — are serialized: the second
+   * transaction blocks until the first commits, then observes the new status.
+   */
+  async findByIdForUpdate(client: PoolClient, id: number) {
+    const res = await client.query(
+      `SELECT mr.*,
+              d.name_ar AS department_name_ar, d.name_en AS department_name_en,
+              w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
+              u.full_name AS requested_by_name,
+              dau.full_name AS dept_approved_by_name,
+              fu.full_name AS forwarded_by_name,
+              au.full_name AS approved_by_name,
+              ru.full_name AS rejected_by_name,
+              iu.full_name AS issued_by_name,
+              p.project_no, p.name AS project_name
+       FROM material_requests mr
+       JOIN departments d ON d.id = mr.department_id
+       JOIN warehouses w ON w.id = mr.warehouse_id
+       JOIN users u ON u.id = mr.requested_by
+       LEFT JOIN users dau ON dau.id = mr.dept_approved_by
+       LEFT JOIN users fu ON fu.id = mr.forwarded_by
+       LEFT JOIN users au ON au.id = mr.approved_by
+       LEFT JOIN users ru ON ru.id = mr.rejected_by
+       LEFT JOIN users iu ON iu.id = mr.issued_by
+       LEFT JOIN projects p ON p.id = mr.project_id
+       WHERE mr.id = $1 AND mr.is_active = true
+       FOR UPDATE OF mr`,
+      [id]
+    );
+    return res.rows[0] || null;
+  }
+
+  async findDetailsByRequestId(requestId: number, client?: PoolClient) {
+    const q = client ?? pool;
+    const res = await (q as any).query(
       `SELECT mrd.*,
               i.item_code, i.name_ar AS item_name_ar, i.name_en AS item_name_en,
               i.current_balance, i.is_consumable,
@@ -124,6 +180,12 @@ export class MaterialRequestsRepository {
     request_type?: RequestType;
     limit?: number;
     offset?: number;
+    /** Pre-built authorization scope fragment (from scopeClause). */
+    scope?: { clause: string; params: any[] };
+    /** Current authenticated user — used to build the authorization scope clause. */
+    user?: AuthUserContext;
+    /** When true, the user's own requests are always included (requests:view_own). */
+    includeOwnRequests?: boolean;
   }) {
     let where = 'WHERE mr.is_active = true';
     const params: any[] = [];
@@ -134,6 +196,21 @@ export class MaterialRequestsRepository {
     if (filters.warehouse_id)  { where += ` AND mr.warehouse_id = $${i++}`;  params.push(filters.warehouse_id); }
     if (filters.requested_by)  { where += ` AND mr.requested_by = $${i++}`;  params.push(filters.requested_by); }
     if (filters.request_type)  { where += ` AND mr.request_type = $${i++}`;  params.push(filters.request_type); }
+    if (filters.user) {
+      const scope = scopeClause(
+        filters.user,
+        { departmentCol: 'mr.department_id', warehouseCol: 'mr.warehouse_id' },
+        i
+      );
+      if (filters.includeOwnRequests) {
+        where += ` AND (${scope.clause} OR mr.requested_by = $${i + scope.params.length})`;
+        params.push(...scope.params, filters.user.id);
+      } else {
+        where += ` AND (${scope.clause})`;
+        params.push(...scope.params);
+      }
+      i += scope.params.length + (filters.includeOwnRequests ? 1 : 0);
+    }
 
     const limit = filters.limit ?? 20;
     const offset = filters.offset ?? 0;
@@ -163,7 +240,10 @@ export class MaterialRequestsRepository {
     id: number,
     status: RequestStatus,
     options?: {
+      dept_approved_by?: number;
+      forwarded_by?: number;
       approved_by?: number;
+      rejected_by?: number;
       issued_by?: number;
       rejection_reason?: string;
       transaction_id?: number;
@@ -173,9 +253,11 @@ export class MaterialRequestsRepository {
     const vals: any[] = [id, status];
     let idx = 3;
 
-    if (status === 'approved')   { sets.push(`approved_by = $${idx++}`, `approved_at = NOW()`); vals.push(options?.approved_by); }
-    if (status === 'issued')     { sets.push(`issued_by = $${idx++}`, `issued_at = NOW()`, `transaction_id = $${idx++}`); vals.push(options?.issued_by, options?.transaction_id); }
-    if (status === 'rejected')   { sets.push(`rejection_reason = $${idx++}`); vals.push(options?.rejection_reason); }
+    if (status === 'dept_approved')  { sets.push(`dept_approved_by = $${idx++}`, `dept_approved_at = NOW()`); vals.push(options?.dept_approved_by); }
+    if (status === 'forwarded')      { sets.push(`forwarded_by = $${idx++}`, `forwarded_at = NOW()`); vals.push(options?.forwarded_by); }
+    if (status === 'admin_approved') { sets.push(`approved_by = $${idx++}`, `approved_at = NOW()`); vals.push(options?.approved_by); }
+    if (status === 'admin_rejected') { sets.push(`rejected_by = $${idx++}`, `rejection_reason = $${idx++}`); vals.push(options?.rejected_by, options?.rejection_reason); }
+    if (status === 'issued')         { sets.push(`issued_by = $${idx++}`, `issued_at = NOW()`, `transaction_id = $${idx++}`); vals.push(options?.issued_by, options?.transaction_id); }
 
     const res = await (client as any).query(
       `UPDATE material_requests SET ${sets.join(', ')} WHERE id = $1 AND is_active = true RETURNING *`,

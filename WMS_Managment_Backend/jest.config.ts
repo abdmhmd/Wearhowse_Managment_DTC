@@ -10,6 +10,7 @@ const config: Config = {
   forceExit: true,
   detectOpenHandles: true,
   testTimeout: 60000,
+  globalSetup: '<rootDir>/tests/global-setup.ts',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 };
 

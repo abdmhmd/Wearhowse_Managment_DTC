@@ -5,7 +5,9 @@ import { unitsRepository } from '../units/units.repository';
 import { warehousesRepository } from '../warehouses/warehouses.repository';
 import { pool } from '../../config/database';
 import { PaginationMeta } from '../../utils/response';
-import { AppError, NotFoundError, ValidationError } from '../../utils/AppError';
+import { AppError, ForbiddenError, NotFoundError, ValidationError } from '../../utils/AppError';
+import { warehouseAccessClause } from '../authorization/scope';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
 export class ItemsService {
   async generateItemCode(categoryCode: string): Promise<string> {
@@ -27,11 +29,12 @@ export class ItemsService {
     return `${rawPrefix}-${nextNum}`;
   }
 
-  async getAll(page = 1, limit = 20, filter?: ItemsFilter): Promise<{ items: any[]; pagination: PaginationMeta }> {
+  async getAll(page = 1, limit = 20, filter?: ItemsFilter, user?: AuthUserContext): Promise<{ items: any[]; pagination: PaginationMeta }> {
     const offset = (page - 1) * limit;
+    const effectiveFilter = user ? { ...filter, user } : filter;
     const [items, total] = await Promise.all([
-      itemsRepository.findAll(limit, offset, filter),
-      itemsRepository.countAll(filter),
+      itemsRepository.findAll(limit, offset, effectiveFilter),
+      itemsRepository.countAll(effectiveFilter),
     ]);
     return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
@@ -90,7 +93,18 @@ export class ItemsService {
     expiry_alert_days?: number;
     sap_material_number?: string | null;
     gl_account?: string | null;
-  }) {
+  }, user?: AuthUserContext) {
+    // Direct stock creation is reserved for system_admin: a non-admin may only
+    // register an item master record (opening balance stays zero and any stock
+    // arrives through the Material Request -> Approve -> Issue workflow).
+    const openingBalance = data.current_balance ?? 0;
+    if (user && user.role !== 'system_admin' && openingBalance > 0) {
+      throw new ForbiddenError(
+        'Only the system administrator can set an opening stock balance. Use a material request instead.',
+        { current_balance: openingBalance }
+      );
+    }
+
     const item_code = data.item_code || await this.generateItemCode(data.category_code);
     const openingPrice = data.opening_price || 0;
     await this.validateItemData({ ...data, item_code });
@@ -103,7 +117,7 @@ export class ItemsService {
         client,
         item.id,
         data.warehouse_id,
-        data.current_balance || 0,
+        openingBalance,
         data.min_stock_level || 0,
         data.max_stock_level || 999999
       );
@@ -114,7 +128,16 @@ export class ItemsService {
     return item;
   }
 
-  async updateItem(id: number, data: Partial<any>) {
+  async updateItem(id: number, data: Partial<any>, user?: AuthUserContext) {
+    // Direct balance edits are a stock modification and are reserved for
+    // system_admin; other users manage master data only.
+    if (user && user.role !== 'system_admin' && data.current_balance !== undefined) {
+      throw new ForbiddenError(
+        'Only the system administrator can modify an item balance directly. Use a material request instead.',
+        { current_balance: data.current_balance }
+      );
+    }
+
     const existing = await itemsRepository.getItemById(id);
     if (!existing) throw new NotFoundError('Item', 'ITEM_NOT_FOUND', { id });
     await this.validateItemData({ ...data, id }, true, existing);
@@ -134,7 +157,16 @@ export class ItemsService {
     return itemsRepository.deleteItem(id);
   }
 
-  async getItemCard(item_id: number) {
+  async getItemCard(item_id: number, user?: AuthUserContext) {
+    let scopeClause = '';
+    const params: any[] = [item_id];
+    if (user) {
+      const scope = warehouseAccessClause(user, 'i.warehouse_id', 2);
+      if (scope.clause !== 'TRUE') {
+        scopeClause = ` AND ${scope.clause}`;
+        params.push(...scope.params);
+      }
+    }
     const item = await pool.query(
       `SELECT i.*, c.name_ar AS category_name_ar, c.name_en AS category_name_en,
               sc.name_ar AS subcategory_name_ar, sc.name_en AS subcategory_name_en,
@@ -145,9 +177,36 @@ export class ItemsService {
        LEFT JOIN subcategories sc ON sc.id = i.subcategory_id
        LEFT JOIN units u ON u.code = i.unit_code
        LEFT JOIN warehouses w ON w.id = i.warehouse_id
-       WHERE i.id = $1`, [item_id]
+       WHERE i.id = $1${scopeClause}`, params
     );
     if (item.rows.length === 0) throw new NotFoundError('Item', 'ITEM_NOT_FOUND', { id: item_id });
+
+    // Movement-level data scoping. Each sub-query restricts rows to the
+    // warehouses the current user may access; the warehouse is taken from
+    // stock_movements.warehouse_id (the TRUE movement warehouse), never from
+    // the item's home warehouse.
+    const movementScope = (startIndex: number) => {
+      if (!user) return { clause: '', params: [] as any[] };
+      const scope = warehouseAccessClause(user, 'sm.warehouse_id', startIndex);
+      if (scope.clause === 'TRUE') return { clause: '', params: [] as any[] };
+      return { clause: ` AND ${scope.clause}`, params: scope.params };
+    };
+    // Scopes transaction-level voucher lookups by the warehouses of the
+    // movements actually recorded for that transaction+item.
+    const txnScope = (alias: string, startIndex: number) => {
+      if (!user) return { clause: '', params: [] as any[] };
+      const scope = warehouseAccessClause(user, 'sms.warehouse_id', startIndex);
+      if (scope.clause === 'TRUE') return { clause: '', params: [] as any[] };
+      return {
+        clause: ` AND EXISTS (SELECT 1 FROM stock_movements sms WHERE sms.transaction_id = ${alias}.id AND sms.item_id = td.item_id AND ${scope.clause})`,
+        params: scope.params,
+      };
+    };
+
+    const mov = movementScope(2);
+    const sum = movementScope(2);
+    const rv = txnScope('t', 2);
+    const ln = txnScope('t', 2);
 
     const [movements, summary, lastReceiving, lastIssuing, warehouseStock] = await Promise.all([
       pool.query(
@@ -156,25 +215,29 @@ export class ItemsService {
          FROM stock_movements sm
          JOIN transactions t ON t.id = sm.transaction_id
          LEFT JOIN transaction_details td ON td.transaction_id = sm.transaction_id AND td.item_id = sm.item_id
-         WHERE sm.item_id = $1 ORDER BY sm.movement_date DESC LIMIT 20`, [item_id]
+         WHERE sm.item_id = $1${mov.clause} ORDER BY sm.movement_date DESC LIMIT 20`,
+        [item_id, ...mov.params]
       ),
       pool.query(
         `SELECT COUNT(*)::int AS total_movements,
                 COALESCE(SUM(CASE WHEN sm.movement_type = 'IN' THEN sm.quantity_change ELSE 0 END), 0) AS total_in,
                 COALESCE(SUM(CASE WHEN sm.movement_type = 'OUT' THEN sm.quantity_change ELSE 0 END), 0) AS total_out
-         FROM stock_movements sm WHERE sm.item_id = $1`, [item_id]
+         FROM stock_movements sm WHERE sm.item_id = $1${sum.clause}`,
+        [item_id, ...sum.params]
       ),
       pool.query(
         `SELECT t.id, t.transaction_no, t.transaction_date, t.notes, td.quantity, td.unit_price, s.name_ar AS supplier_name_ar, s.name_en AS supplier_name_en
          FROM transactions t JOIN transaction_details td ON td.transaction_id = t.id LEFT JOIN suppliers s ON s.id = t.supplier_id
-         WHERE td.item_id = $1 AND t.type = 'RV' ORDER BY t.transaction_date DESC LIMIT 1`, [item_id]
+         WHERE td.item_id = $1 AND t.type = 'RV'${rv.clause} ORDER BY t.transaction_date DESC LIMIT 1`,
+        [item_id, ...rv.params]
       ),
       pool.query(
         `SELECT t.id, t.transaction_no, t.transaction_date, t.notes, td.quantity, td.unit_price, d.name_ar AS department_name_ar, d.name_en AS department_name_en
          FROM transactions t JOIN transaction_details td ON td.transaction_id = t.id LEFT JOIN departments d ON d.id = t.department_id
-         WHERE td.item_id = $1 AND t.type = 'LN' ORDER BY t.transaction_date DESC LIMIT 1`, [item_id]
+         WHERE td.item_id = $1 AND t.type = 'LN'${ln.clause} ORDER BY t.transaction_date DESC LIMIT 1`,
+        [item_id, ...ln.params]
       ),
-      itemsRepository.getStockByWarehouse(item_id),
+      itemsRepository.getStockByWarehouse(item_id, user),
     ]);
 
     return {

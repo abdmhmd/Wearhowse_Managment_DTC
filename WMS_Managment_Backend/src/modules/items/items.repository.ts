@@ -1,5 +1,7 @@
 import { PoolClient } from 'pg';
 import { pool } from '../../config/database';
+import { warehouseAccessClause } from '../authorization/scope';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
 export interface ItemsFilter {
   category_code?: string;
@@ -7,6 +9,10 @@ export interface ItemsFilter {
   warehouse_id?: number;
   search?: string;
   is_active?: boolean;
+  /** Current authenticated user — used to restrict visible items to their
+   *  accessible warehouses (warehouse_manager -> assigned, department_manager
+   *  -> department-owned warehouses). */
+  user?: AuthUserContext;
 }
 
 export class ItemsRepository {
@@ -52,6 +58,14 @@ export class ItemsRepository {
       params.push(`%${filter.search}%`);
       paramIndex++;
     }
+    if (filter?.user) {
+      const scope = warehouseAccessClause(filter.user, 'i.warehouse_id', paramIndex);
+      if (scope.clause !== 'TRUE') {
+        query += ` AND ${scope.clause}`;
+        params.push(...scope.params);
+        paramIndex += scope.params.length;
+      }
+    }
 
     query += ' ORDER BY i.id';
     if (limit !== undefined && offset !== undefined) {
@@ -89,6 +103,14 @@ export class ItemsRepository {
       query += ` AND (item_code ILIKE $${paramIndex} OR name_ar ILIKE $${paramIndex})`;
       params.push(`%${filter.search}%`);
       paramIndex++;
+    }
+    if (filter?.user) {
+      const scope = warehouseAccessClause(filter.user, 'warehouse_id', paramIndex);
+      if (scope.clause !== 'TRUE') {
+        query += ` AND ${scope.clause}`;
+        params.push(...scope.params);
+        paramIndex += scope.params.length;
+      }
     }
 
     const res = await pool.query(query, params);
@@ -129,6 +151,26 @@ export class ItemsRepository {
     }
   }
 
+  /**
+   * Upserts a per-warehouse stock balance WITHOUT touching the legacy
+   * items.current_balance column. Used by multi-warehouse transfers where the
+   * legacy column must keep reflecting the item's PRIMARY warehouse balance.
+   */
+  async upsertWarehouseStock(client: PoolClient, itemId: number, warehouseId: number, newBalance: number) {
+    await client.query(
+      `INSERT INTO item_warehouse_stock (item_id, warehouse_id, current_balance)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (item_id, warehouse_id)
+       DO UPDATE SET current_balance = EXCLUDED.current_balance`,
+      [itemId, warehouseId, newBalance]
+    );
+  }
+
+  /** Sets the legacy items.current_balance (the primary warehouse balance). */
+  async setPrimaryBalance(client: PoolClient, itemId: number, balance: number) {
+    await client.query('UPDATE items SET current_balance = $1 WHERE id = $2', [balance, itemId]);
+  }
+
   /** Get stock balance for a specific item in a specific warehouse */
   async getWarehouseStock(client: PoolClient | null, itemId: number, warehouseId: number) {
     const q = client ?? pool;
@@ -139,16 +181,24 @@ export class ItemsRepository {
     return res.rows[0] || null;
   }
 
-  /** Get stock balances across all warehouses for an item */
-  async getStockByWarehouse(itemId: number) {
-    const res = await pool.query(
-      `SELECT iws.*, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en
+  /** Get stock balances across the warehouses the current user may access. */
+  async getStockByWarehouse(itemId: number, user?: AuthUserContext) {
+    let query = `SELECT iws.*, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en
        FROM item_warehouse_stock iws
        JOIN warehouses w ON w.id = iws.warehouse_id
-       WHERE iws.item_id = $1
-       ORDER BY w.code`,
-      [itemId]
-    );
+       WHERE iws.item_id = $1`;
+    const params: any[] = [itemId];
+    let paramIndex = 2;
+    if (user) {
+      const scope = warehouseAccessClause(user, 'iws.warehouse_id', paramIndex);
+      if (scope.clause !== 'TRUE') {
+        query += ` AND ${scope.clause}`;
+        params.push(...scope.params);
+        paramIndex += scope.params.length;
+      }
+    }
+    query += ' ORDER BY w.code';
+    const res = await pool.query(query, params);
     return res.rows;
   }
 

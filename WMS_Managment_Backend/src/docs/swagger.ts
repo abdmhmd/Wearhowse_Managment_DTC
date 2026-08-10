@@ -29,7 +29,11 @@ const swaggerDocument = {
       },
       UserRole: {
         type: 'string',
-        enum: ['system_admin', 'warehouse_manager', 'storekeeper', 'accountant'],
+        enum: ['system_admin', 'warehouse_manager', 'department_manager'],
+      },
+      RequestStatus: {
+        type: 'string',
+        enum: ['pending', 'dept_approved', 'forwarded', 'admin_approved', 'admin_rejected', 'issued', 'cancelled'],
       },
       Error: {
         type: 'object',

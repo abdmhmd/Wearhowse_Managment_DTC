@@ -4,6 +4,7 @@ import { sendData, sendPaginated } from '../../utils/response';
 import { hashPassword } from '../../utils/crypto';
 import { createUserSchema, updateUserSchema } from './users.validator';
 import { NotFoundError, ValidationError } from '../../utils/AppError';
+import { writeAudit } from '../authorization/audit.service';
 
 export class UsersController {
   async getAll(req: Request, res: Response, next: NextFunction) {
@@ -29,6 +30,15 @@ export class UsersController {
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
       const password_hash = await hashPassword(parsed.data.password);
       const data = await usersService.create({ ...parsed.data, password_hash });
+      await writeAudit({
+        user_id: (req as any).user?.userId ?? null,
+        action: 'USER_CREATED',
+        resource: 'users',
+        resource_id: data.id,
+        details: { username: data.username, role: data.role },
+        ip_address: req.ip,
+        user_agent: req.headers?.['user-agent'] ?? null,
+      });
       sendData(res, data, { statusCode: 201 });
     } catch (e) { next(e); }
   }
@@ -48,6 +58,22 @@ export class UsersController {
 
       const data = await usersService.update(id, updateData);
       if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id });
+
+      const actor = (req as any).user;
+      const details: Record<string, unknown> = {};
+      if (updateData.role !== undefined) details.role = updateData.role;
+      if (updateData.is_active !== undefined) details.is_active = updateData.is_active;
+      if (updateData.password_hash !== undefined) details.password_changed = true;
+      if (updateData.warehouse_ids !== undefined) details.warehouse_ids = updateData.warehouse_ids;
+      await writeAudit({
+        user_id: actor?.userId ?? null,
+        action: updateData.password_hash !== undefined ? 'USER_PASSWORD_CHANGED' : 'USER_UPDATED',
+        resource: 'users',
+        resource_id: id,
+        details,
+        ip_address: req.ip,
+        user_agent: req.headers?.['user-agent'] ?? null,
+      });
       sendData(res, data);
     } catch (e) { next(e); }
   }
@@ -57,6 +83,21 @@ export class UsersController {
       if (isNaN(id)) throw new ValidationError('Invalid user ID');
       const data = await usersService.delete(id);
       if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id: req.params.id });
+      await writeAudit({
+        user_id: (req as any).user?.userId ?? null,
+        action: 'USER_DELETED',
+        resource: 'users',
+        resource_id: id,
+        details: { username: data.username },
+        ip_address: req.ip,
+        user_agent: req.headers?.['user-agent'] ?? null,
+      });
+      sendData(res, data);
+    } catch (e) { next(e); }
+  }
+  async getSupervisors(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await usersService.getSupervisors();
       sendData(res, data);
     } catch (e) { next(e); }
   }

@@ -41,6 +41,17 @@ export default function CreateMaterialRequestPage() {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'items' });
 
   const requestType = form.watch('request_type') as RequestType;
+  const selectedDepartmentId = form.watch('department_id');
+
+  // Requests are fulfilled from the department's MAIN warehouse into one of the
+  // department's own warehouses. Only offer the receiving (non-main) warehouses
+  // of the currently selected department.
+  const availableWarehouses = warehouses.filter(
+    (w: any) =>
+      Number(w.department_id) === Number(selectedDepartmentId) &&
+      !w.is_main &&
+      w.is_active !== false
+  );
 
   const handleSubmit = async (formData: CreateMaterialRequestFormData) => {
     setSubmitting(true);
@@ -79,7 +90,7 @@ export default function CreateMaterialRequestPage() {
           <div className="grid grid-cols-3 gap-4">
             <Select
               label={t('pages.materialRequests.department')}
-              {...form.register('department_id')}
+              {...form.register('department_id', { onChange: () => form.setValue('warehouse_id', undefined as any) })}
               error={form.formState.errors.department_id?.message}
               placeholder={t('form.selectDepartment')}
               options={departments.map((d: any) => ({ value: d.id, label: getLocalizedName(d) }))}
@@ -88,8 +99,9 @@ export default function CreateMaterialRequestPage() {
               label={t('pages.materialRequests.warehouse')}
               {...form.register('warehouse_id')}
               error={form.formState.errors.warehouse_id?.message}
-              placeholder={t('form.selectWarehouse')}
-              options={warehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
+              placeholder={selectedDepartmentId ? t('form.selectWarehouse') : t('pages.materialRequests.selectDepartmentFirst')}
+              disabled={!selectedDepartmentId}
+              options={availableWarehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
             />
             <Select
               label={t('pages.materialRequests.requestType')}

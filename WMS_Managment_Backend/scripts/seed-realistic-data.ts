@@ -56,11 +56,15 @@ const SUBCATEGORIES = [
 ];
 
 const WAREHOUSES = [
-  { code: 'DEMO-WH-1', name_ar: 'المخزن الرئيسي', name_en: 'Main Warehouse', location: 'المبنى الرئيسي - الدور الأرضي' },
-  { code: 'DEMO-WH-2', name_ar: 'مخزن المواد الخام', name_en: 'Raw Materials Warehouse', location: 'المبنى الرئيسي - الدور الأول' },
-  { code: 'DEMO-WH-3', name_ar: 'مخزن المنتجات النهائية', name_en: 'Finished Goods Warehouse', location: 'المبنى الرئيسي - الدور الثاني' },
-  { code: 'DEMO-WH-4', name_ar: 'مخزن الكيماويات', name_en: 'Chemicals Warehouse', location: 'المستودع الخارجي الشمالي' },
-  { code: 'DEMO-WH-5', name_ar: 'مخزن الصيانة', name_en: 'Maintenance Warehouse', location: 'المستودع الخارجي الجنوبي' },
+  // DEMO-WH-1 doubles as the Engineering department's MAIN warehouse (the
+  // stock source for material requests). DEMO-WH-6 is Engineering's receiving
+  // warehouse. Each remaining department owns its own receiving warehouse.
+  { code: 'DEMO-WH-1', name_ar: 'المخزن الرئيسي', name_en: 'Main Warehouse', location: 'المبنى الرئيسي - الدور الأرضي', department_code: 'DEMO-ENG', is_main: true },
+  { code: 'DEMO-WH-2', name_ar: 'مخزن المعمل الكيميائي', name_en: 'Chemical Lab Warehouse', location: 'المبنى الرئيسي - الدور الأول', department_code: 'DEMO-LAB', is_main: false },
+  { code: 'DEMO-WH-3', name_ar: 'مخزن الجودة', name_en: 'Quality Control Warehouse', location: 'المبنى الرئيسي - الدور الثاني', department_code: 'DEMO-QC', is_main: false },
+  { code: 'DEMO-WH-4', name_ar: 'مخزن الصيانة', name_en: 'Maintenance Warehouse', location: 'المستودع الخارجي الشمالي', department_code: 'DEMO-MAINT', is_main: false },
+  { code: 'DEMO-WH-5', name_ar: 'مخزن الإنتاج', name_en: 'Production Warehouse', location: 'المستودع الخارجي الجنوبي', department_code: 'DEMO-PROD', is_main: false },
+  { code: 'DEMO-WH-6', name_ar: 'مخزن استلام الهندسة', name_en: 'Engineering Warehouse', location: 'المبنى الرئيسي - الدور الأرضي - جناح الهندسة', department_code: 'DEMO-ENG', is_main: false },
 ];
 
 const LOCATIONS = [
@@ -69,6 +73,7 @@ const LOCATIONS = [
   { warehouse_code: 'DEMO-WH-3', rack: 'C', shelf: '03', bin: '003', barcode: 'DEMO-LOC-003' },
   { warehouse_code: 'DEMO-WH-4', rack: 'D', shelf: '04', bin: '004', barcode: 'DEMO-LOC-004' },
   { warehouse_code: 'DEMO-WH-5', rack: 'E', shelf: '05', bin: '005', barcode: 'DEMO-LOC-005' },
+  { warehouse_code: 'DEMO-WH-6', rack: 'F', shelf: '01', bin: '001', barcode: 'DEMO-LOC-006' },
 ];
 
 const SUPPLIERS = [
@@ -127,15 +132,15 @@ const UNIT_CONVERSIONS = [
 
 const PROJECTS = [
   { name: 'مشروع تطوير المختبر المركزي', department_code: 'DEMO-LAB', supervisor_username: 'dept_manager', notes: 'DEMO-WMS مشروع تطوير المختبر المركزي' },
-  { name: 'مشروع خط الإنتاج الجديد', department_code: 'DEMO-PROD', supervisor_username: 'storekeeper', notes: 'DEMO-WMS مشروع خط الإنتاج الجديد' },
+  { name: 'مشروع خط الإنتاج الجديد', department_code: 'DEMO-PROD', supervisor_username: 'wh_manager', notes: 'DEMO-WMS مشروع خط الإنتاج الجديد' },
   { name: 'مشروع صيانة المخازن', department_code: 'DEMO-MAINT', supervisor_username: 'wh_manager', notes: 'DEMO-WMS مشروع صيانة المخازن' },
-  { name: 'مشروع أنظمة الجودة', department_code: 'DEMO-QC', supervisor_username: 'accountant', notes: 'DEMO-WMS مشروع أنظمة الجودة' },
+  { name: 'مشروع أنظمة الجودة', department_code: 'DEMO-QC', supervisor_username: 'dept_manager2', notes: 'DEMO-WMS مشروع أنظمة الجودة' },
   { name: 'مشروع البنية التحتية للشبكات', department_code: 'DEMO-ENG', supervisor_username: 'dept_manager', notes: 'DEMO-WMS مشروع البنية التحتية للشبكات' },
 ];
 
 const REQUESTS = [
   {
-    department_code: 'DEMO-ENG', warehouse_code: 'DEMO-WH-1', requester_username: 'dept_manager',
+    department_code: 'DEMO-ENG', warehouse_code: 'DEMO-WH-6', requester_username: 'dept_manager',
     request_type: 'project', project_index: 4, priority: 'high', needed_by: '2026-08-15',
     notes: 'DEMO-WMS طلب مشروع البنية التحتية للشبكات',
     items: [
@@ -146,7 +151,7 @@ const REQUESTS = [
     action: 'issue',
   },
   {
-    department_code: 'DEMO-LAB', warehouse_code: 'DEMO-WH-1', requester_username: 'accountant',
+    department_code: 'DEMO-LAB', warehouse_code: 'DEMO-WH-2', requester_username: 'dept_manager',
     request_type: 'experiment', project_index: -1, priority: 'normal', needed_by: '2026-08-20',
     notes: 'DEMO-WMS طلب تجارب المعمل الكيميائي',
     items: [
@@ -156,7 +161,7 @@ const REQUESTS = [
     action: 'approve',
   },
   {
-    department_code: 'DEMO-MAINT', warehouse_code: 'DEMO-WH-1', requester_username: 'wh_manager',
+    department_code: 'DEMO-MAINT', warehouse_code: 'DEMO-WH-4', requester_username: 'wh_manager',
     request_type: 'project', project_index: 2, priority: 'high', needed_by: '2026-08-12',
     notes: 'DEMO-WMS طلب مشروع صيانة المخازن',
     items: [
@@ -166,7 +171,7 @@ const REQUESTS = [
     action: 'pending',
   },
   {
-    department_code: 'DEMO-QC', warehouse_code: 'DEMO-WH-1', requester_username: 'storekeeper',
+    department_code: 'DEMO-QC', warehouse_code: 'DEMO-WH-3', requester_username: 'dept_manager2',
     request_type: 'semester', project_index: -1, priority: 'normal', needed_by: '2026-08-25',
     notes: 'DEMO-WMS طلب احتياجات فصل إدارة الجودة',
     items: [
@@ -175,7 +180,7 @@ const REQUESTS = [
     action: 'approve',
   },
   {
-    department_code: 'DEMO-PROD', warehouse_code: 'DEMO-WH-1', requester_username: 'dept_manager',
+    department_code: 'DEMO-PROD', warehouse_code: 'DEMO-WH-5', requester_username: 'dept_manager',
     request_type: 'project', project_index: 1, priority: 'normal', needed_by: '2026-08-18',
     notes: 'DEMO-WMS طلب مشروع خط الإنتاج الجديد',
     items: [
@@ -215,7 +220,7 @@ interface DemoIds {
 
 async function collectDemoIds(): Promise<DemoIds> {
   const [items, warehouses, departments, categories, suppliers, projects, requests, sessions] = await Promise.all([
-    pool.query("SELECT id FROM items WHERE item_code LIKE 'DEMO-WMS%'"),
+    pool.query("SELECT id FROM items WHERE item_code LIKE 'DEMO-WMS%' OR category_code LIKE 'DEMO-%'"),
     pool.query("SELECT id FROM warehouses WHERE code LIKE 'DEMO-WH%'"),
     pool.query("SELECT id FROM departments WHERE code LIKE 'DEMO-%'"),
     pool.query("SELECT code FROM categories WHERE code LIKE 'DEMO-%'"),
@@ -317,7 +322,14 @@ async function ensureSubcategory(s: any) {
 async function ensureWarehouse(w: any) {
   const existing = await pool.query('SELECT * FROM warehouses WHERE code = $1', [w.code]);
   if (existing.rows.length > 0) return existing.rows[0];
-  return warehousesRepository.create(w);
+  return warehousesRepository.create({
+    code: w.code,
+    name_ar: w.name_ar,
+    name_en: w.name_en,
+    location: w.location,
+    is_main: w.is_main ?? false,
+    department_id: w.department_id ?? null,
+  });
 }
 
 async function ensureSupplier(s: any) {
@@ -369,6 +381,21 @@ async function seed(): Promise<void> {
     return;
   }
 
+  // Resolve the semantic usernames used below to real accounts by role, so the
+  // seed keeps working even if the demo user accounts are renamed/re-seeded.
+  const resolveUser = (key: string): any => {
+    if (userMap[key]) return userMap[key];
+    const roleMap: Record<string, string> = {
+      'dept_manager': 'department_manager',
+      'dept_manager2': 'department_manager',
+      'wh_manager': 'warehouse_manager',
+    };
+    const role = roleMap[key];
+    const matches = usersRes.rows.filter((u: any) => u.role === role && u.is_active);
+    const idx = key === 'dept_manager2' ? 1 : 0;
+    return matches[Math.min(idx, matches.length - 1)];
+  };
+
   const mode = EXECUTE ? 'EXECUTE' : 'DRY RUN (no changes)';
   console.log(`Connected to database: ${dbRes.rows[0].db}`);
   console.log(`Mode: ${mode}`);
@@ -383,11 +410,13 @@ async function seed(): Promise<void> {
 
   if (!EXECUTE) {
     console.log('Planned inserts:');
-    console.log(`  5 x units, departments, categories, subcategories, warehouses, locations, suppliers, items`);
-    console.log(`  5 x unit_conversions, projects, material_requests, transactions, custodies, inventory_sessions`);
+    console.log(`  5 x units, departments, categories, subcategories, suppliers, items`);
+    console.log(`  6 x warehouses, locations`);
+    console.log(`  5 x unit_conversions, projects, material_requests, transactions, custodies`);
+    console.log(`  6 x inventory_sessions`);
     console.log(`  4 x system_settings`);
-    console.log(`  Derived rows: transaction_details=11, stock_movements=12, batches=6, journal_entries=5, inventory_counts=5`);
-    console.log(`  users=6 untouched; alerts expected 0`);
+    console.log(`  Derived rows: transaction_details=11, stock_movements=15, batches=6, journal_entries=5, inventory_counts=6`);
+    console.log(`  users untouched; alerts expected 0`);
     console.log('');
     console.log('DRY RUN complete. Re-run with --execute to perform the seed.');
     return;
@@ -425,7 +454,14 @@ async function seed(): Promise<void> {
 
   const whIds: Record<string, any> = {};
   for (const w of WAREHOUSES) {
-    whIds[w.code] = await ensureWarehouse(w);
+    whIds[w.code] = await ensureWarehouse({
+      code: w.code,
+      name_ar: w.name_ar,
+      name_en: w.name_en,
+      location: w.location,
+      is_main: w.is_main ?? false,
+      department_id: w.department_code ? deptIds[w.department_code].id : null,
+    });
   }
   console.log(`  warehouses: ${WAREHOUSES.length}`);
 
@@ -486,15 +522,16 @@ async function seed(): Promise<void> {
     const proj = await projectsService.create(ADMIN.id, {
       name: p.name,
       department_id: deptIds[p.department_code].id,
-      supervisor_id: userMap[p.supervisor_username].id,
+      supervisor_id: resolveUser(p.supervisor_username).id,
       notes: p.notes,
     });
     projectIds.push(proj.id);
   }
   console.log(`  projects: ${PROJECTS.length}`);
 
-  const wh1 = whIds['DEMO-WH-1'].id;
+  const wh1 = whIds['DEMO-WH-1'].id; // Engineering MAIN warehouse (stock source)
   const wh2 = whIds['DEMO-WH-2'].id;
+  const wh6 = whIds['DEMO-WH-6'].id; // Engineering receiving warehouse
   const cable = itemIds['DEMO-WMS-001'].id;
   const paint = itemIds['DEMO-WMS-002'].id;
   const nails = itemIds['DEMO-WMS-003'].id;
@@ -529,7 +566,7 @@ async function seed(): Promise<void> {
   const requestIds: number[] = [];
   const requestNos: string[] = [];
   for (const r of REQUESTS) {
-    const req = await materialRequestsService.createRequest(userMap[r.requester_username].id, {
+    const req = await materialRequestsService.createRequest(resolveUser(r.requester_username).id, {
       department_id: deptIds[r.department_code].id,
       warehouse_id: whIds[r.warehouse_code].id,
       request_type: r.request_type,
@@ -550,13 +587,17 @@ async function seed(): Promise<void> {
 
   for (let i = 0; i < REQUESTS.length; i++) {
     if (REQUESTS[i].action === 'approve') {
-      await materialRequestsService.approveRequest(requestIds[i], ADMIN.id);
+      await materialRequestsService.approveRequest(requestIds[i], ADMIN.id); // pending -> dept_approved
+      await materialRequestsService.forwardRequest(requestIds[i], ADMIN.id); // dept_approved -> forwarded
+      await materialRequestsService.approveRequest(requestIds[i], ADMIN.id); // forwarded -> admin_approved
     }
   }
 
   const req1 = requestIds[0];
-  await materialRequestsService.approveRequest(req1, ADMIN.id);
-  const issued = await materialRequestsService.issueRequest(req1, userMap['storekeeper'].id);
+  await materialRequestsService.approveRequest(req1, ADMIN.id); // pending -> dept_approved
+  await materialRequestsService.forwardRequest(req1, ADMIN.id); // dept_approved -> forwarded
+  await materialRequestsService.approveRequest(req1, ADMIN.id); // forwarded -> admin_approved
+  const issued = await materialRequestsService.issueRequest(req1, ADMIN.id);
   const lnTxnId = issued.transaction_id as number;
   console.log(`  material_request issued -> LN transaction id=${lnTxnId}`);
 
@@ -616,9 +657,9 @@ async function seed(): Promise<void> {
 
   const custodyDefs = [
     { assigned_username: 'wh_manager', quantity: 3, notes: 'DEMO-WMS عهدة أجهزة قياس - مشرف المخازن' },
-    { assigned_username: 'storekeeper', quantity: 1, notes: 'DEMO-WMS عهدة جهاز قياس - أمين المخزن' },
-    { assigned_username: 'accountant', quantity: 1, notes: 'DEMO-WMS عهدة جهاز قياس - المحاسب' },
-    { assigned_username: 'viewer', quantity: 1, notes: 'DEMO-WMS عهدة جهاز قياس - مراجع' },
+    { assigned_username: 'dept_manager', quantity: 1, notes: 'DEMO-WMS عهدة جهاز قياس - مدير القسم' },
+    { assigned_username: 'dept_manager2', quantity: 1, notes: 'DEMO-WMS عهدة جهاز قياس - مدير الإنتاج' },
+    { assigned_username: 'admin', quantity: 1, notes: 'DEMO-WMS عهدة جهاز قياس - مدير النظام' },
   ];
 
   const custodyIds: number[] = [];
@@ -626,8 +667,8 @@ async function seed(): Promise<void> {
     for (const c of custodyDefs) {
       const row = await custodiesRepository.create(client, {
         item_id: thermo,
-        warehouse_id: wh1,
-        assigned_to: userMap[c.assigned_username].id,
+        warehouse_id: wh6,
+        assigned_to: resolveUser(c.assigned_username).id,
         quantity: c.quantity,
         unit_code: 'PC',
         issued_transaction_id: lnTxnId,

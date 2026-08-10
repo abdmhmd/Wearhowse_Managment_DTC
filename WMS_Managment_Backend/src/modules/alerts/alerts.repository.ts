@@ -1,4 +1,6 @@
 import { pool } from '../../config/database';
+import { warehouseAccessClause } from '../authorization/scope';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
 export type AlertType   = 'low_stock' | 'expiry_warning' | 'overstock' | 'pending_request';
 export type AlertStatus = 'active' | 'acknowledged' | 'resolved';
@@ -11,6 +13,11 @@ export class AlertsRepository {
     warehouse_id?: number;
     limit?: number;
     offset?: number;
+    /** Current authenticated user — restricts alerts to their accessible
+     *  warehouses (warehouse_manager -> assigned, department_manager ->
+     *  department-owned warehouses, system_admin -> all). Alerts without a
+     *  warehouse are only visible to a system_admin. */
+    user?: AuthUserContext;
   }) {
     let where = 'WHERE 1=1';
     const params: any[] = [];
@@ -19,6 +26,15 @@ export class AlertsRepository {
     if (filters.status)      { where += ` AND a.status = $${i++}`;      params.push(filters.status); }
     if (filters.type)        { where += ` AND a.type = $${i++}`;        params.push(filters.type); }
     if (filters.warehouse_id){ where += ` AND a.warehouse_id = $${i++}`;params.push(filters.warehouse_id); }
+
+    if (filters.user) {
+      const scope = warehouseAccessClause(filters.user, 'a.warehouse_id', i);
+      if (scope.clause !== 'TRUE') {
+        where += ` AND ${scope.clause}`;
+        params.push(...scope.params);
+        i += scope.params.length;
+      }
+    }
 
     const limit  = filters.limit  ?? 50;
     const offset = filters.offset ?? 0;
@@ -44,26 +60,57 @@ export class AlertsRepository {
     return { items: listRes.rows, total: countRes.rows[0].total };
   }
 
-  async findSummary() {
+  async findSummary(user?: AuthUserContext) {
+    let where = 'WHERE 1=1';
+    const params: any[] = [];
+    let i = 1;
+
+    if (user) {
+      const scope = warehouseAccessClause(user, 'warehouse_id', i);
+      if (scope.clause !== 'TRUE') {
+        where += ` AND ${scope.clause}`;
+        params.push(...scope.params);
+      }
+    }
+
     const res = await pool.query(
       `SELECT
          type,
          COUNT(*) FILTER (WHERE status = 'active') AS active_count,
          COUNT(*) FILTER (WHERE status = 'acknowledged') AS acknowledged_count
        FROM alerts
+       ${where}
        GROUP BY type
-       ORDER BY type`
+       ORDER BY type`,
+      params
     );
     return res.rows;
   }
 
-  async acknowledge(id: number, userId: number) {
+  /**
+   * Acknowledges an alert only when it belongs to the current user's
+   * warehouse/department scope. Returns null (treated as 404 by the caller)
+   * when the alert is outside the scope or already acknowledged.
+   */
+  async acknowledge(id: number, userId: number, user?: AuthUserContext) {
+    let where = 'id = $1 AND status = \'active\'';
+    const params: any[] = [id];
+    let i = 2;
+
+    if (user) {
+      const scope = warehouseAccessClause(user, 'warehouse_id', i);
+      if (scope.clause !== 'TRUE') {
+        where += ` AND ${scope.clause}`;
+        params.push(...scope.params);
+      }
+    }
+
     const res = await pool.query(
       `UPDATE alerts
-       SET status = 'acknowledged', acknowledged_by = $2, acknowledged_at = NOW()
-       WHERE id = $1 AND status = 'active'
+       SET status = 'acknowledged', acknowledged_by = $${i}, acknowledged_at = NOW()
+       WHERE ${where}
        RETURNING *`,
-      [id, userId]
+      [...params, userId]
     );
     return res.rows[0] || null;
   }

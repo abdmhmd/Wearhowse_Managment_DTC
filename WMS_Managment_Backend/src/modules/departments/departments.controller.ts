@@ -3,19 +3,20 @@ import { departmentsService } from './departments.service';
 import { sendData, sendPaginated } from '../../utils/response';
 import { createDepartmentSchema, updateDepartmentSchema } from './departments.validator';
 import { NotFoundError, ValidationError } from '../../utils/AppError';
+import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
 
 export class DepartmentsController {
-  async getAll(req: Request, res: Response, next: NextFunction) {
+  async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const page = Math.max(1, Number(req.query.page) || 1);
       const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-      const { items, pagination } = await departmentsService.getAll(page, limit);
+      const { items, pagination } = await departmentsService.getAll(page, limit, req.user);
       sendPaginated(res, items, pagination);
     } catch (e) { next(e); }
   }
-  async getByCode(req: Request, res: Response, next: NextFunction) {
+  async getByCode(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const data = await departmentsService.getByCode(req.params.code);
+      const data = await departmentsService.getByCode(req.params.code, req.user);
       if (!data) throw new NotFoundError('Department', 'DEPARTMENT_NOT_FOUND', { code: req.params.code });
       sendData(res, data);
     } catch (e) { next(e); }

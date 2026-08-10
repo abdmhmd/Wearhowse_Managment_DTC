@@ -5,9 +5,9 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', suppliersController.getAll);
-router.get('/:id', suppliersController.getById);
-router.post('/', authorize(['warehouse_manager', 'system_admin']), suppliersController.create);
-router.put('/:id', authorize(['warehouse_manager', 'system_admin']), suppliersController.update);
-router.delete('/:id', authorize(['system_admin']), suppliersController.delete);
+router.get('/', authorize('suppliers:view'), suppliersController.getAll);
+router.get('/:id', authorize('suppliers:view'), suppliersController.getById);
+router.post('/', authorize('suppliers:create'), suppliersController.create);
+router.put('/:id', authorize('suppliers:update'), suppliersController.update);
+router.delete('/:id', authorize('suppliers:delete'), suppliersController.delete);
 export default router;

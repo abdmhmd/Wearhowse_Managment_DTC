@@ -1,10 +1,33 @@
 export type UserRole =
   | 'system_admin'
   | 'warehouse_manager'
-  | 'storekeeper'
-  | 'accountant'
-  | 'department_manager'
-  | 'viewer';
+  | 'department_manager';
+
+/**
+ * Canonical permission codes. Mirrors the backend catalog
+ * (backend: src/modules/authorization/permissions.ts) and the
+ * `permissions.code` values seeded by migration 017.
+ */
+export type Permission =
+  | 'dashboard:view'
+  | 'categories:view' | 'categories:create' | 'categories:update' | 'categories:delete'
+  | 'units:view' | 'units:create' | 'units:update' | 'units:delete'
+  | 'suppliers:view' | 'suppliers:create' | 'suppliers:update' | 'suppliers:delete'
+  | 'departments:view' | 'departments:create' | 'departments:update' | 'departments:delete'
+  | 'warehouses:view' | 'warehouses:create' | 'warehouses:update' | 'warehouses:delete'
+  | 'users:view' | 'users:create' | 'users:update' | 'users:delete'
+  | 'items:view' | 'items:create' | 'items:update' | 'items:delete'
+  | 'unit-conversions:view' | 'unit-conversions:create' | 'unit-conversions:update' | 'unit-conversions:delete'
+  | 'transactions:view' | 'transactions:create' | 'transactions:approve'
+  | 'stock-movements:view' | 'stock-movements:view-all'
+  | 'reports:view'
+  | 'settings:view' | 'settings:update'
+  | 'requests:view' | 'requests:view_own' | 'requests:create' | 'requests:approve' | 'requests:reject' | 'requests:issue' | 'requests:cancel' | 'requests:forward'
+  | 'alerts:view' | 'alerts:acknowledge'
+  | 'inventory:session:open' | 'inventory:session:view' | 'inventory:count:record' | 'inventory:session:close'
+  | 'batches:view'
+  | 'projects:view' | 'projects:create' | 'projects:update' | 'projects:close' | 'projects:delete'
+  | 'custodies:view' | 'custodies:return';
 
 export type TransactionType = 'RV' | 'LN' | 'RTV' | 'RTI' | 'ADJ' | 'TRF';
 export type TransactionStatus = 'draft' | 'approved';
@@ -12,9 +35,10 @@ export type MovementType = 'IN' | 'OUT';
 
 export type RequestType = 'experiment' | 'semester' | 'project';
 export type RequestPriority = 'low' | 'normal' | 'high' | 'urgent';
-export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'issued' | 'cancelled';
-export type ProjectStatus = 'open' | 'closed';
-export type CustodyStatus = 'active' | 'returned';
+export type RequestStatus = 'pending' | 'dept_approved' | 'forwarded' | 'admin_approved' | 'admin_rejected' | 'issued' | 'cancelled';
+export type ProjectStatus = 'open' | 'closed' | 'cancelled';
+export type CustodyStatus = 'active' | 'returned' | 'damaged' | 'lost';
+export type CustodyCondition = 'good' | 'damaged' | 'lost';
 
 export interface User {
   id: number;
@@ -84,6 +108,8 @@ export interface Warehouse {
   name_ar: string;
   name_en?: string;
   location: string | null;
+  is_main?: boolean;
+  department_id?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -144,6 +170,20 @@ export interface TransactionHeader {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  warehouse_code?: string;
+  warehouse_name_ar?: string;
+  warehouse_name_en?: string;
+  to_warehouse_code?: string;
+  to_warehouse_name_ar?: string;
+  to_warehouse_name_en?: string;
+  department_name_ar?: string;
+  department_name_en?: string;
+  supplier_name_ar?: string;
+  supplier_name_en?: string;
+  created_by_username?: string;
+  created_by_name?: string;
+  approved_by_username?: string;
+  approved_by_name?: string;
 }
 
 export interface TransactionDetail {
@@ -160,6 +200,9 @@ export interface TransactionDetail {
   expiry_tracking_enabled?: boolean;
   production_date?: string | null;
   expiry_date?: string | null;
+  item_code?: string;
+  item_name_ar?: string;
+  item_name_en?: string;
 }
 
 export interface Transaction extends TransactionHeader {
@@ -224,7 +267,25 @@ export interface LoginResponse {
     username: string;
     full_name: string;
     role: UserRole;
+    department_id: number | null;
+    permissions?: Permission[];
+    warehouse_ids?: number[];
   };
+}
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  full_name: string;
+  role: UserRole;
+  department_id: number | null;
+  permissions: Permission[];
+  warehouses: Warehouse[];
+  warehouse_ids: number[];
+}
+
+export interface MeResponse {
+  user: AuthUser;
 }
 
 export interface ItemCard {
@@ -254,6 +315,11 @@ export interface MaterialRequest {
   rejection_reason: string | null;
   approved_by: number | null;
   approved_at: string | null;
+  dept_approved_by: number | null;
+  dept_approved_at: string | null;
+  forwarded_by: number | null;
+  forwarded_at: string | null;
+  rejected_by: number | null;
   issued_by: number | null;
   issued_at: string | null;
   transaction_id: number | null;
@@ -266,6 +332,9 @@ export interface MaterialRequest {
   warehouse_name_en?: string;
   requested_by_name?: string;
   approved_by_name?: string;
+  dept_approved_by_name?: string;
+  forwarded_by_name?: string;
+  rejected_by_name?: string;
   issued_by_name?: string;
   project_no?: string | null;
   project_name?: string | null;
@@ -291,8 +360,13 @@ export interface Project {
   project_no: string;
   name: string;
   department_id: number;
+  warehouse_id: number;
   supervisor_id: number;
   status: ProjectStatus;
+  academic_year: string | null;
+  description: string | null;
+  start_date: string | null;
+  expected_completion_date: string | null;
   notes: string | null;
   closed_by: number | null;
   closed_at: string | null;
@@ -302,11 +376,24 @@ export interface Project {
   updated_at: string;
   department_name_ar?: string;
   department_name_en?: string;
+  warehouse_name_ar?: string;
+  warehouse_name_en?: string;
   supervisor_name?: string;
   created_by_name?: string;
   closed_by_name?: string;
   request_count?: number;
   active_custodies?: number;
+  students_count?: number;
+  borrowed_count?: number;
+  students?: ProjectStudent[];
+  materials?: Custody[];
+}
+
+export interface ProjectStudent {
+  id?: number;
+  full_name: string;
+  student_id?: string | null;
+  role?: string | null;
 }
 
 export interface Custody {
@@ -321,6 +408,9 @@ export interface Custody {
   request_id: number | null;
   project_id: number | null;
   status: CustodyStatus;
+  condition?: CustodyCondition | null;
+  expected_return_at?: string | null;
+  returned_quantity?: number | null;
   notes: string | null;
   returned_at: string | null;
   is_active: boolean;
@@ -379,10 +469,7 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
 export const ROLE_LABELS: Record<UserRole, string> = {
   system_admin: 'System Admin',
   warehouse_manager: 'Warehouse Manager',
-  storekeeper: 'Storekeeper',
-  accountant: 'Accountant',
   department_manager: 'Department Manager',
-  viewer: 'Viewer',
 };
 
 export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
@@ -393,8 +480,10 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
 
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   pending: 'Pending',
-  approved: 'Approved',
-  rejected: 'Rejected',
+  dept_approved: 'Dept Approved',
+  forwarded: 'Forwarded',
+  admin_approved: 'Admin Approved',
+  admin_rejected: 'Admin Rejected',
   issued: 'Issued',
   cancelled: 'Cancelled',
 };
@@ -402,11 +491,20 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   open: 'Open',
   closed: 'Closed',
+  cancelled: 'Cancelled',
 };
 
 export const CUSTODY_STATUS_LABELS: Record<CustodyStatus, string> = {
   active: 'Active',
   returned: 'Returned',
+  damaged: 'Damaged',
+  lost: 'Lost',
+};
+
+export const CUSTODY_CONDITION_LABELS: Record<CustodyCondition, string> = {
+  good: 'Good',
+  damaged: 'Damaged',
+  lost: 'Lost',
 };
 
 export const ITEM_TYPE_LABELS: Record<'consumable' | 'durable', string> = {

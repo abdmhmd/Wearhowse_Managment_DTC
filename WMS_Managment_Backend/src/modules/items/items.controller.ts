@@ -3,9 +3,10 @@ import { itemsService } from './items.service';
 import { sendData, sendPaginated } from '../../utils/response';
 import { createItemSchema, updateItemSchema } from './items.validator';
 import { NotFoundError, ValidationError } from '../../utils/AppError';
+import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
 
 export class ItemsController {
-  async getAll(req: Request, res: Response, next: NextFunction) {
+  async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const page = Math.max(1, Number(req.query.page) || 1);
       const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
@@ -15,7 +16,7 @@ export class ItemsController {
         search: req.query.search as string | undefined,
         is_active: req.query.is_active !== undefined ? req.query.is_active === 'true' : undefined,
       };
-      const { items, pagination } = await itemsService.getAll(page, limit, filter);
+      const { items, pagination } = await itemsService.getAll(page, limit, filter, req.user);
       sendPaginated(res, items, pagination);
     } catch (e) { next(e); }
   }
@@ -27,32 +28,32 @@ export class ItemsController {
     } catch (e) { next(e); }
   }
 
-  async create(req: Request, res: Response, next: NextFunction) {
+  async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const parsed = createItemSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
-      const item = await itemsService.createItem(parsed.data);
+      const item = await itemsService.createItem(parsed.data, req.user);
       sendData(res, item, { statusCode: 201 });
     } catch (e) { next(e); }
   }
 
-  async getById(req: Request, res: Response, next: NextFunction) {
+  async getById(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid item ID');
-      const item = await itemsService.getItemCard(id);
+      const item = await itemsService.getItemCard(id, req.user);
       if (!item) throw new NotFoundError('Item', 'ITEM_NOT_FOUND', { id: req.params.id });
       sendData(res, item);
     } catch (e) { next(e); }
   }
 
-  async update(req: Request, res: Response, next: NextFunction) {
+  async update(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid item ID');
       const parsed = updateItemSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
-      const item = await itemsService.updateItem(id, parsed.data);
+      const item = await itemsService.updateItem(id, parsed.data, req.user);
       sendData(res, item);
     } catch (e) { next(e); }
   }

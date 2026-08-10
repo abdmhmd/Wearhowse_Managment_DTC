@@ -32,6 +32,9 @@ export const materialRequestsApi = {
   approve: (id: number) =>
     api.patch<ApiResponse<MaterialRequest>>(`/requests/${id}/approve`),
 
+  forward: (id: number) =>
+    api.patch<ApiResponse<MaterialRequest>>(`/requests/${id}/forward`),
+
   reject: (id: number, reason: string) =>
     api.patch<ApiResponse<MaterialRequest>>(`/requests/${id}/reject`, { reason }),
 

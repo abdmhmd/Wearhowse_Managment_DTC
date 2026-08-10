@@ -6,7 +6,7 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', settingsController.getAll);
-router.put('/', authorize(['system_admin']), settingsController.update);
+router.get('/', authorize('settings:view'), settingsController.getAll);
+router.put('/', authorize('settings:update'), settingsController.update);
 
 export default router;

@@ -5,9 +5,9 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', warehousesController.getAll);
-router.get('/:id', warehousesController.getById);
-router.post('/', authorize(['warehouse_manager', 'system_admin']), warehousesController.create);
-router.put('/:id', authorize(['warehouse_manager', 'system_admin']), warehousesController.update);
-router.delete('/:id', authorize(['system_admin']), warehousesController.delete);
+router.get('/', authorize('warehouses:view'), warehousesController.getAll);
+router.get('/:id', authorize('warehouses:view'), warehousesController.getById);
+router.post('/', authorize('warehouses:create'), warehousesController.create);
+router.put('/:id', authorize('warehouses:update'), warehousesController.update);
+router.delete('/:id', authorize('warehouses:delete'), warehousesController.delete);
 export default router;

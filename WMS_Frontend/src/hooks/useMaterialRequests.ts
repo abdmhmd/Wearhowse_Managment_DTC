@@ -52,6 +52,20 @@ export function useApproveMaterialRequest() {
   });
 }
 
+export function useForwardMaterialRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => materialRequestsApi.forward(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['material-requests'] });
+      showSuccess('Request forwarded to warehouse admin');
+    },
+    onError: (error: Error) => {
+      showError(getErrorMessage(error, 'Failed to forward request'));
+    },
+  });
+}
+
 export function useRejectMaterialRequest() {
   const queryClient = useQueryClient();
   return useMutation({

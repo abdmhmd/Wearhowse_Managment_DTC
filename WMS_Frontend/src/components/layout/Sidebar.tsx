@@ -20,30 +20,33 @@ import {
   ShieldCheckIcon,
   ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';
+import type { Permission } from '@/types';
 import { cn } from '@/utils';
 
 interface NavItem {
   labelKey: string;
   path: string;
   icon: React.ElementType;
-  roles?: string[];
+  permissions?: Permission[];
 }
 
 const navItems: NavItem[] = [
   { labelKey: 'nav.dashboard', path: '/', icon: HomeIcon },
-  { labelKey: 'nav.categories', path: '/categories', icon: RectangleStackIcon, roles: ['system_admin', 'warehouse_manager'] },
-  { labelKey: 'nav.units', path: '/units', icon: CubeIcon, roles: ['system_admin', 'warehouse_manager'] },
-  { labelKey: 'nav.suppliers', path: '/suppliers', icon: TruckIcon, roles: ['system_admin', 'warehouse_manager'] },
-  { labelKey: 'nav.departments', path: '/departments', icon: BuildingStorefrontIcon, roles: ['system_admin', 'warehouse_manager'] },
-  { labelKey: 'nav.warehouses', path: '/warehouses', icon: BuildingStorefrontIcon, roles: ['system_admin', 'warehouse_manager'] },
-  { labelKey: 'nav.items', path: '/items', icon: CubeIcon, roles: ['system_admin', 'warehouse_manager', 'storekeeper'] },
-  { labelKey: 'nav.unitConversions', path: '/unit-conversions', icon: ArrowsRightLeftIcon, roles: ['system_admin', 'warehouse_manager'] },
-  { labelKey: 'nav.transactions', path: '/transactions', icon: DocumentTextIcon },
-  { labelKey: 'nav.stockMovements', path: '/stock-movements', icon: ClipboardDocumentListIcon },
-  { labelKey: 'nav.materialRequests', path: '/requests', icon: ClipboardDocumentCheckIcon },
-  { labelKey: 'nav.projects', path: '/projects', icon: FolderIcon },
-  { labelKey: 'nav.custodies', path: '/custodies', icon: ShieldCheckIcon },
-  { labelKey: 'nav.users', path: '/users', icon: UserGroupIcon, roles: ['system_admin'] },
+  { labelKey: 'nav.categories', path: '/categories', icon: RectangleStackIcon, permissions: ['categories:view'] },
+  { labelKey: 'nav.units', path: '/units', icon: CubeIcon, permissions: ['units:view'] },
+  { labelKey: 'nav.suppliers', path: '/suppliers', icon: TruckIcon, permissions: ['suppliers:view'] },
+  { labelKey: 'nav.departments', path: '/departments', icon: BuildingStorefrontIcon, permissions: ['departments:view'] },
+  { labelKey: 'nav.warehouses', path: '/warehouses', icon: BuildingStorefrontIcon, permissions: ['warehouses:view'] },
+  { labelKey: 'nav.items', path: '/items', icon: CubeIcon, permissions: ['items:view'] },
+  { labelKey: 'nav.unitConversions', path: '/unit-conversions', icon: ArrowsRightLeftIcon, permissions: ['unit-conversions:view'] },
+  { labelKey: 'nav.transactions', path: '/transactions', icon: DocumentTextIcon, permissions: ['transactions:view'] },
+  { labelKey: 'nav.stockMovements', path: '/stock-movements', icon: ClipboardDocumentListIcon, permissions: ['stock-movements:view-all'] },
+  { labelKey: 'nav.materialRequests', path: '/requests', icon: ClipboardDocumentCheckIcon, permissions: ['requests:view'] },
+  { labelKey: 'nav.projects', path: '/projects', icon: FolderIcon, permissions: ['projects:view'] },
+  { labelKey: 'nav.custodies', path: '/custodies', icon: ShieldCheckIcon, permissions: ['custodies:view'] },
+  { labelKey: 'nav.reports', path: '/reports', icon: ChartBarIcon, permissions: ['reports:view'] },
+  { labelKey: 'nav.settings', path: '/settings', icon: Cog6ToothIcon, permissions: ['settings:view'] },
+  { labelKey: 'nav.users', path: '/users', icon: UserGroupIcon, permissions: ['users:view'] },
 ];
 
 interface SidebarProps {
@@ -53,7 +56,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, canAny, logout } = useAuthStore();
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -63,7 +66,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   };
 
   const filteredItems = navItems.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.role))
+    (item) => !item.permissions || canAny(...item.permissions)
   );
 
   return (

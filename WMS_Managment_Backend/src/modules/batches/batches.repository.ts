@@ -1,5 +1,7 @@
 import { pool } from '../../config/database';
 import { PoolClient } from 'pg';
+import { warehouseAccessClause } from '../authorization/scope';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
 export interface BatchRow {
   id: number;
@@ -47,7 +49,7 @@ export class BatchesRepository {
     return res.rows[0] || null;
   }
 
-  async findAll(filters: { item_id?: number; warehouse_id?: number; expiring_in_days?: number; search?: string; limit?: number; offset?: number }) {
+  async findAll(filters: { item_id?: number; warehouse_id?: number; expiring_in_days?: number; search?: string; limit?: number; offset?: number; user?: AuthUserContext }) {
     let where = 'WHERE b.is_active = true AND b.quantity > 0';
     const params: any[] = [];
     let i = 1;
@@ -64,6 +66,18 @@ export class BatchesRepository {
       where += ` AND (b.batch_number ILIKE $${i} OR i.name_ar ILIKE $${i})`;
       params.push(`%${filters.search}%`);
       i++;
+    }
+
+    // Data-scope enforcement: warehouse_manager sees batches of their assigned
+    // warehouses, department_manager sees batches of their department's
+    // warehouses (plus explicitly assigned ones), system_admin sees everything.
+    if (filters.user) {
+      const scope = warehouseAccessClause(filters.user, 'b.warehouse_id', i);
+      if (scope.clause !== 'TRUE') {
+        where += ` AND ${scope.clause}`;
+        params.push(...scope.params);
+        i += scope.params.length;
+      }
     }
 
     const limit = filters.limit ?? 20;

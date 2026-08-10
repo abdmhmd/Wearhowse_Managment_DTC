@@ -8,6 +8,8 @@ import { stockMovementsRepository } from '../stock-movements/stock-movements.rep
 import { batchesRepository } from '../batches/batches.repository';
 import { PaginationMeta } from '../../utils/response';
 import { AppError, NotFoundError, ValidationError } from '../../utils/AppError';
+import { scopeForUser, type DataScope } from '../authorization/scope';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
 export class TransactionsService {
   async generateTransactionNo(type: string, client?: PoolClient): Promise<string> {
@@ -18,14 +20,35 @@ export class TransactionsService {
     return `${type}-${year}-${String(seq).padStart(6, '0')}`;
   }
 
-  async getById(id: number) {
+  async getById(id: number, user?: AuthUserContext) {
     const header = await transactionsRepository.findHeaderById(id);
     if (!header) return null;
+    if (user && !(await this.inScope(header, user))) return null;
     const details = await transactionsRepository.findDetailsByTransactionId(id);
     return { ...header, details };
   }
 
-  async getAll(page = 1, limit = 20, type?: string, status?: string): Promise<{ items: any[]; pagination: PaginationMeta }> {
+  private async inScope(header: { warehouse_id: number; to_warehouse_id?: number | null; department_id?: number | null }, user: AuthUserContext): Promise<boolean> {
+    const scope: DataScope = scopeForUser(user);
+    if (scope === 'GLOBAL') return true;
+    if (scope === 'DEPARTMENT') {
+      if (header.department_id === user.department_id) return true;
+      const whIds = [header.warehouse_id, header.to_warehouse_id].filter((v): v is number => v != null);
+      if (whIds.length === 0) return false;
+      const res = await pool.query(
+        'SELECT 1 FROM warehouses WHERE id = ANY($1) AND department_id = $2 AND is_active = true LIMIT 1',
+        [whIds, user.department_id]
+      );
+      return res.rows.length > 0;
+    }
+    if (scope === 'WAREHOUSE') {
+      return user.warehouse_ids.includes(header.warehouse_id) ||
+        (header.to_warehouse_id != null && user.warehouse_ids.includes(header.to_warehouse_id));
+    }
+    return false;
+  }
+
+  async getAll(page = 1, limit = 20, type?: string, status?: string, user?: AuthUserContext): Promise<{ items: any[]; pagination: PaginationMeta }> {
     const offset = (page - 1) * limit;
     let where = '';
     const params: any[] = [];
@@ -33,6 +56,31 @@ export class TransactionsService {
 
     if (type) { where += ` WHERE type = $${paramIndex++}`; params.push(type); }
     if (status) { where += where ? ` AND status = $${paramIndex++}` : ` WHERE status = $${paramIndex++}`; params.push(status); }
+
+    // Data-scope enforcement (department/warehouse visibility).
+    if (user) {
+      const scope: DataScope = scopeForUser(user);
+      if (scope === 'DEPARTMENT' && user.department_id != null) {
+        const cond = where ? ' AND ' : ' WHERE ';
+        // Transactions of the department itself OR involving the department's
+        // own warehouses (e.g. LN vouchers issued from the department's main
+        // warehouse).
+        where += `${cond} (department_id = $${paramIndex++}
+              OR warehouse_id IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${paramIndex++} AND w.is_active = true)
+              OR to_warehouse_id IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${paramIndex++} AND w.is_active = true))`;
+        params.push(user.department_id, user.department_id, user.department_id);
+      } else if (scope === 'WAREHOUSE' && user.warehouse_ids.length > 0) {
+        const cond = where ? ' AND ' : ' WHERE ';
+        where += `${cond} (warehouse_id = ANY($${paramIndex++}) OR to_warehouse_id = ANY($${paramIndex++}))`;
+        params.push(user.warehouse_ids, user.warehouse_ids);
+      } else if (scope !== 'GLOBAL') {
+        // Fail closed: a user with no resolvable department or warehouse scope
+        // (e.g. a misconfigured warehouse_manager with zero assignments) must
+        // never fall through to seeing all transactions.
+        const cond = where ? ' AND ' : ' WHERE ';
+        where += `${cond} FALSE`;
+      }
+    }
 
     const [itemsRes, countRes] = await Promise.all([
       pool.query(
@@ -164,6 +212,7 @@ export class TransactionsService {
             item_id: detail.item_id, transaction_id: header.id, movement_type: 'OUT',
             quantity_before: sourceBalance, quantity_change: -parsedQuantity,
             quantity_after: newSourceBalance, user_id: approvedBy,
+            warehouse_id: header.warehouse_id,
           });
 
           // Add to destination warehouse
@@ -178,6 +227,7 @@ export class TransactionsService {
             item_id: detail.item_id, transaction_id: header.id, movement_type: 'IN',
             quantity_before: destBalance, quantity_change: parsedQuantity,
             quantity_after: newDestBalance, user_id: approvedBy,
+            warehouse_id: header.to_warehouse_id,
           });
 
           // Update detail cost
@@ -264,6 +314,7 @@ export class TransactionsService {
             item_id: item.id, transaction_id: header.id, movement_type: movementType,
             quantity_before: quantityBefore, quantity_change: quantityChange,
             quantity_after: newBalance, user_id: approvedBy,
+            warehouse_id: header.warehouse_id,
           });
 
           // Batch processing

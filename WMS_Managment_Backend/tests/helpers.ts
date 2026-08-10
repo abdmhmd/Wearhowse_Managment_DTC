@@ -1,4 +1,5 @@
 import { pool } from '../src/config/database';
+import { cleanupTestData } from './cleanup-db';
 import { randomBytes } from 'crypto';
 import { PoolClient } from 'pg';
 
@@ -36,11 +37,12 @@ export async function seedUnit(): Promise<string> {
   return code;
 }
 
-export async function seedWarehouse(): Promise<number> {
+export async function seedWarehouse(options: { department_id?: number; is_main?: boolean; is_active?: boolean } = {}): Promise<number> {
   const code = `${TEST_PREFIX}wh_${shortId()}`;
   const res = await pool.query(
-    `INSERT INTO warehouses (code, name_ar) VALUES ($1, $2) RETURNING id`,
-    [code, code]
+    `INSERT INTO warehouses (code, name_ar, is_main, department_id, is_active)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [code, code, options.is_main ?? false, options.department_id ?? null, options.is_active ?? true]
   );
   return res.rows[0].id;
 }
@@ -74,16 +76,5 @@ export async function seedDepartment(): Promise<number> {
 }
 
 export async function cleanup(prefix: string): Promise<void> {
-  await pool.query('DELETE FROM stock_movements USING transactions WHERE stock_movements.transaction_id = transactions.id AND transactions.transaction_no LIKE $1', [`${prefix}%`]);
-  await pool.query('DELETE FROM transaction_details USING transactions WHERE transaction_details.transaction_id = transactions.id AND transactions.transaction_no LIKE $1', [`${prefix}%`]);
-  await pool.query('DELETE FROM transactions WHERE transaction_no LIKE $1', [`${prefix}%`]);
-  await pool.query('DELETE FROM unit_conversions WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)', [`${prefix}%`]);
-  await pool.query('DELETE FROM batches WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)', [`${prefix}%`]);
-  await pool.query('DELETE FROM items WHERE item_code LIKE $1', [`${prefix}%`]);
-  await pool.query('DELETE FROM warehouses WHERE code LIKE $1', [`${prefix}%`]);
-  await pool.query('DELETE FROM categories WHERE code LIKE $1', [`${prefix}%`]);
-  await pool.query('DELETE FROM units WHERE code LIKE $1', [`${prefix}%`]);
-  await pool.query('DELETE FROM users WHERE username LIKE $1', [`${prefix}%`]);
-  await pool.query('DELETE FROM suppliers WHERE name_ar LIKE $1', [`${prefix}%`]);
-  await pool.query('DELETE FROM departments WHERE code LIKE $1', [`${prefix}%`]);
+  await cleanupTestData(prefix);
 }

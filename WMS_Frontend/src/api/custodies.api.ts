@@ -1,11 +1,18 @@
 import api from './client';
-import type { ApiResponse, Custody, CustodyStatus, PaginatedResponse } from '@/types';
+import type { ApiResponse, Custody, CustodyCondition, CustodyStatus, PaginatedResponse } from '@/types';
 
 export interface CustodiesFilter {
   status?: CustodyStatus;
   assigned_to?: number;
   project_id?: number;
   warehouse_id?: number;
+}
+
+export interface ReturnItemPayload {
+  notes?: string;
+  condition?: CustodyCondition;
+  /** Quantity returned in good condition. Omit for a full return. */
+  returned_quantity?: number;
 }
 
 export const custodiesApi = {
@@ -15,6 +22,6 @@ export const custodiesApi = {
   getById: (id: number) =>
     api.get<ApiResponse<Custody>>(`/custodies/${id}`),
 
-  returnItem: (id: number, notes?: string) =>
-    api.post<ApiResponse<{ message: string; transaction_id: number; transaction_no: string }>>(`/custodies/${id}/return`, { notes }),
+  returnItem: (id: number, payload: ReturnItemPayload = {}) =>
+    api.post<ApiResponse<{ message: string; transaction_id: number; transaction_no: string }>>(`/custodies/${id}/return`, payload),
 };

@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
-import { useMaterialRequest, useApproveMaterialRequest, useRejectMaterialRequest, useIssueMaterialRequest, useCancelMaterialRequest } from '@/hooks/useMaterialRequests';
+import { useMaterialRequest, useApproveMaterialRequest, useForwardMaterialRequest, useRejectMaterialRequest, useIssueMaterialRequest, useCancelMaterialRequest } from '@/hooks/useMaterialRequests';
 import { PageHeader, Button, Badge, LoadingSpinner, Modal, ConfirmDialog } from '@/components/ui';
-import { ArrowLeftIcon, CheckIcon, XMarkIcon, ArrowUpTrayIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, CheckIcon, XMarkIcon, ArrowUpTrayIcon, PaperAirplaneIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useAuthStore } from '@/store/auth.store';
@@ -12,7 +12,7 @@ export default function MaterialRequestDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, can } = useAuthStore();
   const [showReject, setShowReject] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [confirmIssue, setConfirmIssue] = useState(false);
@@ -20,11 +20,16 @@ export default function MaterialRequestDetailPage() {
 
   const { data, isLoading } = useMaterialRequest(Number(id));
   const approveMutation = useApproveMaterialRequest();
+  const forwardMutation = useForwardMaterialRequest();
   const rejectMutation = useRejectMaterialRequest();
   const issueMutation = useIssueMaterialRequest();
   const cancelMutation = useCancelMaterialRequest();
 
-  const isOps = user && ['system_admin', 'warehouse_manager', 'storekeeper'].includes(user.role);
+  const canApprove = can('requests:approve');
+  const canForward = can('requests:forward');
+  const canReject = can('requests:reject');
+  const canIssue = can('requests:issue');
+  const canCancel = can('requests:cancel');
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><LoadingSpinner size="lg" /></div>;
@@ -36,8 +41,16 @@ export default function MaterialRequestDetailPage() {
 
   const req = data;
 
+  // UX only: hide the approve action for a department_manager viewing their
+  // own request. Backend enforcement (403 SELF_APPROVAL_NOT_ALLOWED) is final.
+  const isSelfApproval = user?.role === 'department_manager' && user?.id === req.requested_by;
+
   const handleApprove = async () => {
     await approveMutation.mutateAsync(req.id);
+  };
+
+  const handleForward = async () => {
+    await forwardMutation.mutateAsync(req.id);
   };
 
   const handleReject = async () => {
@@ -82,30 +95,40 @@ export default function MaterialRequestDetailPage() {
           <div><dt className="text-sm text-gray-500">{t('pages.materialRequests.requestedAt')}</dt><dd className="text-sm font-medium">{formatDate(req.created_at)}</dd></div>
           <div><dt className="text-sm text-gray-500">{t('pages.materialRequests.neededBy')}</dt><dd className="text-sm font-medium">{req.needed_by ? formatDate(req.needed_by) : '-'}</dd></div>
           <div><dt className="text-sm text-gray-500">{t('table.notes')}</dt><dd className="text-sm font-medium">{req.notes || '-'}</dd></div>
-          {req.status === 'rejected' && <div><dt className="text-sm text-gray-500">{t('pages.materialRequests.rejectReason')}</dt><dd className="text-sm font-medium text-red-600">{req.rejection_reason || '-'}</dd></div>}
+          {req.status === 'admin_rejected' && <div><dt className="text-sm text-gray-500">{t('pages.materialRequests.rejectReason')}</dt><dd className="text-sm font-medium text-red-600">{req.rejection_reason || '-'}</dd></div>}
         </dl>
 
-        {req.status !== 'cancelled' && req.status !== 'rejected' && (
+        {req.status !== 'cancelled' && req.status !== 'admin_rejected' && (
           <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
-            {isOps && req.status === 'pending' && (
+            {canApprove && ['pending', 'forwarded'].includes(req.status) && (
               <>
-                <Button variant="outline" type="button" onClick={handleApprove} isLoading={approveMutation.isPending}>
-                  <CheckIcon className="h-4 w-4 me-2" />
-                  {t('pages.materialRequests.approve')}
-                </Button>
-                <Button variant="danger" type="button" onClick={() => setShowReject(true)}>
-                  <XMarkIcon className="h-4 w-4 me-2" />
-                  {t('pages.materialRequests.reject')}
-                </Button>
+                {!isSelfApproval && (
+                  <Button variant="outline" type="button" onClick={handleApprove} isLoading={approveMutation.isPending}>
+                    <CheckIcon className="h-4 w-4 me-2" />
+                    {t('pages.materialRequests.approve')}
+                  </Button>
+                )}
+                {canReject && (
+                  <Button variant="danger" type="button" onClick={() => setShowReject(true)}>
+                    <XMarkIcon className="h-4 w-4 me-2" />
+                    {t('pages.materialRequests.reject')}
+                  </Button>
+                )}
               </>
             )}
-            {isOps && req.status === 'approved' && (
+            {canForward && req.status === 'dept_approved' && (
+              <Button variant="outline" type="button" onClick={handleForward} isLoading={forwardMutation.isPending}>
+                <PaperAirplaneIcon className="h-4 w-4 me-2" />
+                {t('pages.materialRequests.forward')}
+              </Button>
+            )}
+            {canIssue && req.status === 'admin_approved' && (
               <Button type="button" onClick={() => setConfirmIssue(true)} isLoading={issueMutation.isPending}>
                 <ArrowUpTrayIcon className="h-4 w-4 me-2" />
                 {t('pages.materialRequests.issue')}
               </Button>
             )}
-            {(isOps || req.requested_by === user?.id) && ['pending', 'approved'].includes(req.status) && (
+            {(canCancel || req.requested_by === user?.id) && ['pending', 'dept_approved', 'forwarded'].includes(req.status) && (
               <Button variant="secondary" type="button" onClick={() => setConfirmCancel(true)}>
                 <NoSymbolIcon className="h-4 w-4 me-2" />
                 {t('pages.materialRequests.cancel')}

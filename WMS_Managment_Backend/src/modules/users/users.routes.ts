@@ -5,9 +5,10 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', usersController.getAll);
-router.get('/:id', usersController.getById);
-router.post('/', authorize(['system_admin']), usersController.create);
-router.put('/:id', authorize(['system_admin']), usersController.update);
-router.delete('/:id', authorize(['system_admin']), usersController.delete);
+router.get('/', authorize('users:view'), usersController.getAll);
+router.get('/supervisors', authorize('users:view'), usersController.getSupervisors);
+router.get('/:id', authorize('users:view'), usersController.getById);
+router.post('/', authorize('users:create'), usersController.create);
+router.put('/:id', authorize('users:update'), usersController.update);
+router.delete('/:id', authorize('users:delete'), usersController.delete);
 export default router;

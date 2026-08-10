@@ -8,10 +8,12 @@ import { createSupplierSchema, updateSupplierSchema, type CreateSupplierFormData
 import { PageHeader, Button, DataTable, Modal, Input, ConfirmDialog } from '@/components/ui';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
+import { useAuthStore } from '@/store/auth.store';
 import type { Supplier } from '@/types';
 
 export default function SuppliersPage() {
   const { t } = useTranslation();
+  const { can } = useAuthStore();
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -54,12 +56,16 @@ export default function SuppliersPage() {
       key: 'actions', header: t('table.actions'), className: 'text-end',
       render: (item: Supplier) => (
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingSupplier(item); updateForm.reset({ name_ar: item.name_ar, phone: item.phone || '', email: item.email || '', address: item.address || '' }); }}>
-            <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingSupplier(item); }}>
-            <TrashIcon className="h-4 w-4 text-red-500" />
-          </Button>
+          {can('suppliers:update') && (
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingSupplier(item); updateForm.reset({ name_ar: item.name_ar, phone: item.phone || '', email: item.email || '', address: item.address || '' }); }}>
+              <PencilIcon className="h-4 w-4" />
+            </Button>
+          )}
+          {can('suppliers:delete') && (
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingSupplier(item); }}>
+              <TrashIcon className="h-4 w-4 text-red-500" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -80,7 +86,7 @@ export default function SuppliersPage() {
 
   return (
     <div>
-      <PageHeader title={t('pages.suppliers.title')} subtitle={t('pages.suppliers.subtitle')} actions={<Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.suppliers.create')}</Button>} />
+      <PageHeader title={t('pages.suppliers.title')} subtitle={t('pages.suppliers.subtitle')} actions={can('suppliers:create') ? <Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.suppliers.create')}</Button> : undefined} />
       <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
       <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(); }} title={t('pages.suppliers.create')}>

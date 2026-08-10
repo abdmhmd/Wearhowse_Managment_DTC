@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useMaterialRequests, useApproveMaterialRequest, useRejectMaterialRequest, useCancelMaterialRequest } from '@/hooks/useMaterialRequests';
+import { useMaterialRequests, useApproveMaterialRequest, useForwardMaterialRequest, useRejectMaterialRequest, useCancelMaterialRequest } from '@/hooks/useMaterialRequests';
 import { PageHeader, Button, DataTable, Badge, Modal, ConfirmDialog } from '@/components/ui';
-import { PlusIcon, EyeIcon, CheckIcon, XMarkIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, EyeIcon, CheckIcon, XMarkIcon, PaperAirplaneIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useAuthStore } from '@/store/auth.store';
@@ -12,7 +12,7 @@ import type { MaterialRequest, RequestStatus } from '@/types';
 export default function MaterialRequestsListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, can } = useAuthStore();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -25,14 +25,27 @@ export default function MaterialRequestsListPage() {
     ...(typeFilter ? { request_type: typeFilter as any } : {}),
   });
   const approveMutation = useApproveMaterialRequest();
+  const forwardMutation = useForwardMaterialRequest();
   const rejectMutation = useRejectMaterialRequest();
   const cancelMutation = useCancelMaterialRequest();
 
-  const isOps = user && ['system_admin', 'warehouse_manager', 'storekeeper'].includes(user.role);
-  const isManager = user?.role === 'department_manager';
+  const canApprove = can('requests:approve');
+  const canForward = can('requests:forward');
+  const canReject = can('requests:reject');
+  const canCancel = can('requests:cancel');
+  const canCreate = can('requests:create');
+
+  // UX only: a department_manager cannot approve their own request (the backend
+  // enforces this with 403 SELF_APPROVAL_NOT_ALLOWED).
+  const isSelfApproval = (item: MaterialRequest) =>
+    user?.role === 'department_manager' && user?.id === item.requested_by;
 
   const handleApprove = async (item: MaterialRequest) => {
     await approveMutation.mutateAsync(item.id);
+  };
+
+  const handleForward = async (item: MaterialRequest) => {
+    await forwardMutation.mutateAsync(item.id);
   };
 
   const handleReject = async () => {
@@ -52,8 +65,10 @@ export default function MaterialRequestsListPage() {
   const statusBadge = (status: RequestStatus) => {
     const variants: Record<RequestStatus, any> = {
       pending: 'warning',
-      approved: 'info',
-      rejected: 'danger',
+      dept_approved: 'info',
+      forwarded: 'info',
+      admin_approved: 'success',
+      admin_rejected: 'danger',
       issued: 'success',
       cancelled: 'default',
     };
@@ -76,17 +91,24 @@ export default function MaterialRequestsListPage() {
           <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/requests/${item.id}`); }}>
             <EyeIcon className="h-4 w-4" />
           </Button>
-          {isOps && item.status === 'pending' && (
+          {canApprove && ['pending', 'forwarded'].includes(item.status) && !isSelfApproval(item) && (
             <>
               <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleApprove(item); }}>
                 <CheckIcon className="h-4 w-4 text-green-600" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setRejecting(item); setRejectReason(''); }}>
-                <XMarkIcon className="h-4 w-4 text-red-500" />
-              </Button>
+              {canReject && (
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setRejecting(item); setRejectReason(''); }}>
+                  <XMarkIcon className="h-4 w-4 text-red-500" />
+                </Button>
+              )}
             </>
           )}
-          {(isOps || isManager) && ['pending', 'approved'].includes(item.status) && (
+          {canForward && item.status === 'dept_approved' && (
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleForward(item); }}>
+              <PaperAirplaneIcon className="h-4 w-4 text-blue-600" />
+            </Button>
+          )}
+          {canCancel && ['pending', 'dept_approved', 'forwarded'].includes(item.status) && (
             <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setCancelling(item); }}>
               <NoSymbolIcon className="h-4 w-4 text-gray-500" />
             </Button>
@@ -98,7 +120,7 @@ export default function MaterialRequestsListPage() {
 
   return (
     <div>
-      <PageHeader title={t('pages.materialRequests.title')} subtitle={t('pages.materialRequests.subtitle')} actions={<Button onClick={() => navigate('/requests/new')}><PlusIcon className="h-4 w-4 me-2" />{t('pages.materialRequests.create')}</Button>} />
+      <PageHeader title={t('pages.materialRequests.title')} subtitle={t('pages.materialRequests.subtitle')} actions={canCreate ? <Button onClick={() => navigate('/requests/new')}><PlusIcon className="h-4 w-4 me-2" />{t('pages.materialRequests.create')}</Button> : undefined} />
 
       <div className="mb-4 flex gap-3">
         <select
@@ -107,7 +129,7 @@ export default function MaterialRequestsListPage() {
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
         >
           <option value="">{t('common.all')}</option>
-          {(['pending', 'approved', 'rejected', 'issued', 'cancelled'] as RequestStatus[]).map((s) => (
+          {(['pending', 'dept_approved', 'forwarded', 'admin_approved', 'admin_rejected', 'issued', 'cancelled'] as RequestStatus[]).map((s) => (
             <option key={s} value={s}>{t(`pages.materialRequests.statuses.${s}`)}</option>
           ))}
         </select>

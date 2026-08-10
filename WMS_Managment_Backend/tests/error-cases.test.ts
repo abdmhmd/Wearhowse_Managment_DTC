@@ -8,7 +8,6 @@ import { usersService } from '../src/modules/users/users.service';
 import { warehousesService } from '../src/modules/warehouses/warehouses.service';
 import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedUser, seedItem, cleanup } from './helpers';
 import { authorize } from '../src/middlewares/auth.middleware';
-import { generateToken } from '../src/utils/jwt';
 import { createUnitConversionSchema } from '../src/modules/unit-conversions/unit-conversions.validator';
 import { createUserSchema } from '../src/modules/users/users.validator';
 import { Request, Response } from 'express';
@@ -102,7 +101,7 @@ describe('400 Validation Errors', () => {
         username: `${prefix}${shortId()}`,
         password: '12345',
         full_name: 'Test',
-        role: 'storekeeper',
+        role: 'department_manager',
       });
       expect(parsed.success).toBe(false);
     });
@@ -162,50 +161,54 @@ describe('404 Not Found Errors', () => {
 // --- 403 Forbidden (Authorization) Tests ---
 
 describe('403 Forbidden Errors', () => {
-  function mockReqRes(role: string): { req: Partial<Request>; res: Partial<Response> } {
+  function mockReqUser(permissions: string[]): { req: Partial<Request>; res: Partial<Response> } {
     const json = jest.fn().mockReturnValue({});
     const status = jest.fn().mockReturnValue({ json });
-    const token = generateToken({ userId: 1, username: 'test', role });
-    const req = { user: { userId: 1, username: 'test', role }, headers: { authorization: `Bearer ${token}` } } as any;
+    const req = {
+      user: { userId: 1, username: 'test', role: 'warehouse_manager', permissions },
+      headers: { authorization: 'Bearer test' },
+    } as any;
     const res = { status, json } as Partial<Response>;
     return { req, res };
   }
 
-  test('storekeeper cannot create categories', () => {
-    const { req, res } = mockReqRes('storekeeper');
+  test('role without permission cannot create categories', () => {
+    const { req, res } = mockReqUser(['categories:view', 'items:view']);
     const next = jest.fn();
-    authorize(['warehouse_manager', 'system_admin'])(req as any, res as Response, next);
+    authorize('categories:create')(req as any, res as Response, next);
     expect(next).toHaveBeenCalled();
     expect(next.mock.calls[0][0].status).toBe(403);
   });
 
-  test('storekeeper cannot delete items', () => {
-    const { req, res } = mockReqRes('storekeeper');
+  test('role without permission cannot delete items', () => {
+    const { req, res } = mockReqUser(['items:view', 'items:create']);
     const next = jest.fn();
-    authorize(['system_admin'])(req as any, res as Response, next);
+    authorize('items:delete')(req as any, res as Response, next);
     expect(next).toHaveBeenCalled();
     expect(next.mock.calls[0][0].status).toBe(403);
   });
 
-  test('accountant cannot approve transactions', () => {
-    const { req, res } = mockReqRes('accountant');
+  test('role without permission cannot approve transactions', () => {
+    const { req, res } = mockReqUser(['transactions:view', 'reports:view']);
     const next = jest.fn();
-    authorize(['warehouse_manager', 'system_admin'])(req as any, res as Response, next);
+    authorize('transactions:approve')(req as any, res as Response, next);
     expect(next).toHaveBeenCalled();
     expect(next.mock.calls[0][0].status).toBe(403);
   });
 
-  test('warehouse_manager can create categories', () => {
-    const { req, res } = mockReqRes('warehouse_manager');
+  test('role with the permission passes', () => {
+    const { req, res } = mockReqUser(['categories:view', 'categories:create']);
     const next = jest.fn();
-    authorize(['warehouse_manager', 'system_admin'])(req as any, res as Response, next);
+    authorize('categories:create')(req as any, res as Response, next);
     expect(next).toHaveBeenCalled();
+    expect(next.mock.calls[0][0]).toBeUndefined();
   });
 
   test('system_admin can delete users', () => {
-    const { req, res } = mockReqRes('system_admin');
+    const { req, res } = mockReqUser(['users:view', 'users:delete']);
     const next = jest.fn();
-    authorize(['system_admin'])(req as any, res as Response, next);
+    authorize('users:delete')(req as any, res as Response, next);
     expect(next).toHaveBeenCalled();
+    expect(next.mock.calls[0][0]).toBeUndefined();
   });
 });

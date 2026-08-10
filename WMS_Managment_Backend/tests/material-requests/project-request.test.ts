@@ -17,9 +17,9 @@ let projectId: number;
 beforeAll(async () => {
   catCode = await seedCategory();
   unitCode = await seedUnit();
-  whId = await seedWarehouse();
-  requesterId = await seedUser();
   deptId = await seedDepartment();
+  whId = await seedWarehouse({ department_id: deptId });
+  requesterId = await seedUser();
   itemId = await seedItem(catCode, unitCode, whId, 100);
   const supervisorId = await seedUser();
   projectId = await (await projectsService.create(requesterId, {

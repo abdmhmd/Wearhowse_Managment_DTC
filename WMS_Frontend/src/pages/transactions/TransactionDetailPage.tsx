@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { PageHeader, LoadingSpinner, Badge, Button } from '@/components/ui';
 import { ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { formatDateTime, formatNumber } from '@/utils';
+import { getLocalizedName } from '@/i18n/helpers';
 import type { TransactionType, TransactionStatus } from '@/types';
 import { showConfirm } from '@/utils/toast';
 
@@ -14,9 +15,9 @@ export default function TransactionDetailPage() {
   const navigate = useNavigate();
   const { data, isLoading } = useTransaction(Number(id));
   const approveMutation = useApproveTransaction();
-  const { user } = useAuthStore();
+  const { can } = useAuthStore();
 
-  const canApprove = user && ['warehouse_manager', 'system_admin'].includes(user.role);
+  const canApprove = can('transactions:approve');
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><LoadingSpinner size="lg" /></div>;
@@ -28,6 +29,21 @@ export default function TransactionDetailPage() {
 
   const txn = data;
   const details = txn.details || [];
+
+  const displayName = (name_ar?: string, name_en?: string, fallback?: string): string => {
+    const localized = getLocalizedName({ name_ar, name_en });
+    return localized !== '-' ? localized : (fallback ?? '-');
+  };
+
+  const warehouseLabel = (() => {
+    const name = displayName(txn.warehouse_name_ar, txn.warehouse_name_en, `#${txn.warehouse_id}`);
+    return txn.warehouse_code ? `${txn.warehouse_code} - ${name}` : name;
+  })();
+
+  const itemLabel = (detail: any): string => {
+    const name = displayName(detail.item_name_ar, detail.item_name_en, `#${detail.item_id}`);
+    return detail.item_code ? `${detail.item_code} - ${name}` : name;
+  };
 
   const txType = txn.type as TransactionType;
   const txStatus = txn.status as TransactionStatus;
@@ -60,7 +76,7 @@ export default function TransactionDetailPage() {
     <div>
       <PageHeader
         title={txn.transaction_no}
-        subtitle={`${t('transaction.types.' + txType)} - ${formatDateTime(txn.created_at)}`}
+        subtitle={`${t('transaction.types.' + txType)} - ${formatDateTime(txn.transaction_date)}`}
         actions={
           <div className="flex gap-3">
             {canApprove && txStatus === 'draft' && (
@@ -93,25 +109,25 @@ export default function TransactionDetailPage() {
             <p className="mt-1 text-sm font-medium">{formatDateTime(txn.transaction_date)}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">{t('table.warehouseId')}</p>
-            <p className="mt-1 text-sm font-medium">#{txn.warehouse_id}</p>
+            <p className="text-sm text-gray-500">{t('table.warehouse')}</p>
+            <p className="mt-1 text-sm font-medium">{warehouseLabel}</p>
           </div>
           {txn.supplier_id && (
             <div>
-              <p className="text-sm text-gray-500">{t('transaction.supplierId')}</p>
-              <p className="mt-1 text-sm font-medium">#{txn.supplier_id}</p>
+              <p className="text-sm text-gray-500">{t('transaction.supplier')}</p>
+              <p className="mt-1 text-sm font-medium">{displayName(txn.supplier_name_ar, txn.supplier_name_en, `#${txn.supplier_id}`)}</p>
             </div>
           )}
           {txn.department_id && (
             <div>
-              <p className="text-sm text-gray-500">{t('transaction.departmentId')}</p>
-              <p className="mt-1 text-sm font-medium">#{txn.department_id}</p>
+              <p className="text-sm text-gray-500">{t('transaction.department')}</p>
+              <p className="mt-1 text-sm font-medium">{displayName(txn.department_name_ar, txn.department_name_en, `#${txn.department_id}`)}</p>
             </div>
           )}
           {txn.approved_by && (
             <div>
               <p className="text-sm text-gray-500">{t('transaction.approvedBy')}</p>
-              <p className="mt-1 text-sm font-medium">{t('transaction.user')} #{txn.approved_by}</p>
+              <p className="mt-1 text-sm font-medium">{txn.approved_by_name || txn.approved_by_username || `#${txn.approved_by}`}</p>
             </div>
           )}
           {txn.notes && (
@@ -133,7 +149,7 @@ export default function TransactionDetailPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">#</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.itemId')}</th>
+                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.item')}</th>
                 <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.unit')}</th>
                 <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('table.quantity')}</th>
                 {isInbound && <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('transaction.productionDate')}</th>}
@@ -144,7 +160,7 @@ export default function TransactionDetailPage() {
               {details.map((detail: any, idx: number) => (
                 <tr key={detail.id || idx} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-500">{idx + 1}</td>
-                  <td className="px-4 py-3 text-sm font-medium">#{detail.item_id}</td>
+                  <td className="px-4 py-3 text-sm font-medium">{itemLabel(detail)}</td>
                   <td className="px-4 py-3 text-sm">{detail.unit_code}</td>
                   <td className="px-4 py-3 text-sm">
                     <span className={txType === 'LN' || txType === 'RTV' ? 'text-red-600' : 'text-green-600'}>

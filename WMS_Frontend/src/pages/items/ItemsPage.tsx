@@ -12,12 +12,14 @@ import { PageHeader, Button, DataTable, Modal, Input, Select, ConfirmDialog, Bad
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { formatNumber } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
+import { useAuthStore } from '@/store/auth.store';
 import type { Item } from '@/types';
 import type { ItemsFilter } from '@/api/items.api';
 
 export default function ItemsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { can } = useAuthStore();
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<ItemsFilter>({});
   const [search, setSearch] = useState('');
@@ -107,27 +109,31 @@ export default function ItemsPage() {
           <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/items/${item.id}`); }}>
             <EyeIcon className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={(e) => {
-            e.stopPropagation();
-            setEditingItem(item);
-            updateForm.reset({
-              name_ar: item.name_ar, description: item.description || '',
-              category_code: item.category_code, subcategory_id: item.subcategory_id ?? null,
-              unit_code: item.unit_code, warehouse_id: item.warehouse_id,
-              min_stock_level: item.min_stock_level, max_stock_level: item.max_stock_level,
-              opening_price: item.opening_price || 0,
-              location: item.location || '',
-              is_consumable: item.is_consumable !== false,
-              expiry_alert_days: item.expiry_alert_days || 30,
-              sap_material_number: item.sap_material_number || '',
-              gl_account: item.gl_account || '',
-            });
-          }}>
-            <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingItem(item); }}>
-            <TrashIcon className="h-4 w-4 text-red-500" />
-          </Button>
+          {can('items:update') && (
+            <Button variant="ghost" size="sm" onClick={(e) => {
+              e.stopPropagation();
+              setEditingItem(item);
+              updateForm.reset({
+                name_ar: item.name_ar, description: item.description || '',
+                category_code: item.category_code, subcategory_id: item.subcategory_id ?? null,
+                unit_code: item.unit_code, warehouse_id: item.warehouse_id,
+                min_stock_level: item.min_stock_level, max_stock_level: item.max_stock_level,
+                opening_price: item.opening_price || 0,
+                location: item.location || '',
+                is_consumable: item.is_consumable !== false,
+                expiry_alert_days: item.expiry_alert_days || 30,
+                sap_material_number: item.sap_material_number || '',
+                gl_account: item.gl_account || '',
+              });
+            }}>
+              <PencilIcon className="h-4 w-4" />
+            </Button>
+          )}
+          {can('items:delete') && (
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingItem(item); }}>
+              <TrashIcon className="h-4 w-4 text-red-500" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -289,7 +295,7 @@ export default function ItemsPage() {
 
   return (
     <div>
-      <PageHeader title={t('pages.items.title')} subtitle={t('pages.items.subtitle')} actions={<Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.items.create')}</Button>} />
+      <PageHeader title={t('pages.items.title')} subtitle={t('pages.items.subtitle')} actions={can('items:create') ? <Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.items.create')}</Button> : undefined} />
 
       <div className="mb-4 flex gap-3">
         <input

@@ -40,10 +40,13 @@ const UNITS = [
   { code: 'L', name_ar: 'لتر', name_en: 'Liter' },
 ];
 
+// WH-MAIN is the IT department's MAIN warehouse (the stock source for IT
+// material requests); WH-SEC is IT's receiving warehouse. Under the
+// main-warehouse routing model, stock is issued MAIN -> department warehouse.
 const WAREHOUSES = [
-  { code: 'WH-MAIN', name_ar: 'المستودع الرئيسي', name_en: 'Main Warehouse', location: 'المبنى الرئيسي - الطابق الأول' },
-  { code: 'WH-SEC', name_ar: 'المستودع الثانوي', name_en: 'Secondary Warehouse', location: 'المبنى المجاور - الطابق الثاني' },
-  { code: 'WH-DAM', name_ar: 'مستودع التالف', name_en: 'Damaged Goods Warehouse', location: 'المبنى الرئيسي - القبو' },
+  { code: 'WH-MAIN', name_ar: 'المستودع الرئيسي', name_en: 'Main Warehouse', location: 'المبنى الرئيسي - الطابق الأول', is_main: true, department: 'IT' },
+  { code: 'WH-SEC', name_ar: 'المستودع الثانوي', name_en: 'Secondary Warehouse', location: 'المبنى المجاور - الطابق الثاني', is_main: false, department: 'IT' },
+  { code: 'WH-DAM', name_ar: 'مستودع التالف', name_en: 'Damaged Goods Warehouse', location: 'المبنى الرئيسي - القبو', is_main: false, department: null },
 ];
 
 const SUPPLIERS = [
@@ -61,10 +64,10 @@ const DEPARTMENTS = [
 ];
 
 const USERS = [
-  { username: 'admin', full_name: 'System Administrator', full_name_ar: 'مدير النظام', role: 'system_admin' },
-  { username: 'wh_manager', full_name: 'Warehouse Manager', full_name_ar: 'مدير المستودع', role: 'warehouse_manager' },
-  { username: 'storekeeper', full_name: 'Storekeeper', full_name_ar: 'أمين المخزن', role: 'storekeeper' },
-  { username: 'accountant', full_name: 'Accountant', full_name_ar: 'محاسب', role: 'accountant' },
+  { username: 'admin', full_name: 'System Administrator', full_name_ar: 'مدير النظام', role: 'system_admin', department_code: null },
+  { username: 'wh_manager', full_name: 'Warehouse Manager', full_name_ar: 'مدير المستودع', role: 'warehouse_manager', department_code: null },
+  { username: 'dept_manager', full_name: 'Department Manager', full_name_ar: 'مدير القسم', role: 'department_manager', department_code: 'IT' },
+  { username: 'dept_manager_ops', full_name: 'Operations Manager', full_name_ar: 'مدير العمليات', role: 'department_manager', department_code: 'OPS' },
 ];
 
 const ITEMS = [
@@ -125,13 +128,17 @@ async function seedDemoData(): Promise<void> {
 
     // ── 3. Warehouses ───────────────────────────────────────────────
     log('🏭 Seeding warehouses...');
+    const deptRows = await client.query('SELECT id, code FROM departments');
+    const deptMap: Record<string, number> = {};
+    for (const row of deptRows.rows) deptMap[row.code] = row.id;
+
     let whCount = 0;
     for (const w of WAREHOUSES) {
       const existing = await client.query('SELECT code FROM warehouses WHERE code = $1', [w.code]);
       if (existing.rows.length === 0) {
         await client.query(
-          'INSERT INTO warehouses (code, name_ar, name_en, location) VALUES ($1, $2, $3, $4)',
-          [w.code, w.name_ar, w.name_en, w.location]
+          'INSERT INTO warehouses (code, name_ar, name_en, location, is_main, department_id) VALUES ($1, $2, $3, $4, $5, $6)',
+          [w.code, w.name_ar, w.name_en, w.location, w.is_main, w.department ? deptMap[w.department] : null]
         );
         whCount++;
       }
@@ -179,8 +186,8 @@ async function seedDemoData(): Promise<void> {
       const existing = await client.query('SELECT id FROM users WHERE username = $1', [u.username]);
       if (existing.rows.length === 0) {
         await client.query(
-          'INSERT INTO users (username, password_hash, full_name, role, is_active) VALUES ($1, $2, $3, $4, true)',
-          [u.username, passwordHash, u.full_name, u.role]
+          'INSERT INTO users (username, password_hash, full_name, role, department_id, is_active) VALUES ($1, $2, $3, $4, $5, true)',
+          [u.username, passwordHash, u.full_name, u.role, u.department_code ? deptMap[u.department_code] : null]
         );
         userCount++;
       }
@@ -250,10 +257,6 @@ async function seedDemoData(): Promise<void> {
     const supNameToId: Record<string, number> = {};
     for (const row of supRows.rows) supNameToId[row.name_ar] = row.id;
 
-    const deptRows = await client.query('SELECT id, code FROM departments');
-    const deptMap: Record<string, number> = {};
-    for (const row of deptRows.rows) deptMap[row.code] = row.id;
-
     // Helper to generate transaction number
     async function nextTxnNo(type: string): Promise<string> {
       const res = await client.query("SELECT nextval('transaction_no_seq') AS seq");
@@ -287,7 +290,7 @@ async function seedDemoData(): Promise<void> {
         `INSERT INTO transactions (transaction_no, type, status, supplier_id, warehouse_id, created_by, approved_by, notes)
          VALUES ($1, 'RV', 'approved', $2, $3, $4, $5, $6)
          RETURNING id`,
-        [txn1No, supNameToId['شركة تكنولوجيا التوريد'], whMap['WH-MAIN'], userMap['storekeeper'], userMap['wh_manager'], notes1]
+        [txn1No, supNameToId['شركة تكنولوجيا التوريد'], whMap['WH-MAIN'], userMap['admin'], userMap['admin'], notes1]
       );
       const txn1Id = txn1.rows[0].id;
 
@@ -307,7 +310,7 @@ async function seedDemoData(): Promise<void> {
         await client.query(
           `INSERT INTO stock_movements (item_id, transaction_id, movement_type, quantity_before, quantity_change, quantity_after, user_id)
            VALUES ($1, $2, 'IN', $3, $4, $5, $6)`,
-          [itemId, txn1Id, before, d.qty, after, userMap['wh_manager']]
+          [itemId, txn1Id, before, d.qty, after, userMap['admin']]
         );
       }
       txnCount++;
@@ -324,7 +327,7 @@ async function seedDemoData(): Promise<void> {
         `INSERT INTO transactions (transaction_no, type, status, department_id, warehouse_id, created_by, approved_by, notes)
          VALUES ($1, 'LN', 'approved', $2, $3, $4, $5, $6)
          RETURNING id`,
-        [txn2No, deptMap['OPS'], whMap['WH-MAIN'], userMap['storekeeper'], userMap['wh_manager'], notes2]
+        [txn2No, deptMap['OPS'], whMap['WH-MAIN'], userMap['admin'], userMap['admin'], notes2]
       );
       const txn2Id = txn2.rows[0].id;
 
@@ -344,7 +347,7 @@ async function seedDemoData(): Promise<void> {
         await client.query(
           `INSERT INTO stock_movements (item_id, transaction_id, movement_type, quantity_before, quantity_change, quantity_after, user_id)
            VALUES ($1, $2, 'OUT', $3, $4, $5, $6)`,
-          [itemId, txn2Id, before, -d.qty, after, userMap['wh_manager']]
+          [itemId, txn2Id, before, -d.qty, after, userMap['admin']]
         );
       }
       txnCount++;
@@ -361,7 +364,7 @@ async function seedDemoData(): Promise<void> {
         `INSERT INTO transactions (transaction_no, type, status, supplier_id, warehouse_id, created_by, notes)
          VALUES ($1, 'RV', 'draft', $2, $3, $4, $5)
          RETURNING id`,
-        [txn3No, supNameToId['أوفيس مارت'], whMap['WH-MAIN'], userMap['storekeeper'], notes3]
+        [txn3No, supNameToId['أوفيس مارت'], whMap['WH-MAIN'], userMap['admin'], notes3]
       );
       const txn3Id = txn3.rows[0].id;
 
@@ -387,7 +390,7 @@ async function seedDemoData(): Promise<void> {
         `INSERT INTO transactions (transaction_no, type, status, department_id, warehouse_id, created_by, notes)
          VALUES ($1, 'LN', 'draft', $2, $3, $4, $5)
          RETURNING id`,
-        [txn4No, deptMap['IT'], whMap['WH-SEC'], userMap['storekeeper'], notes4]
+        [txn4No, deptMap['IT'], whMap['WH-SEC'], userMap['admin'], notes4]
       );
       const txn4Id = txn4.rows[0].id;
 
@@ -451,8 +454,7 @@ async function seedDemoData(): Promise<void> {
     log('  ├──────────────┼────────────┼─────────────────────┤');
     log('  │ admin        │ Admin@123  │ system_admin        │');
     log('  │ wh_manager   │ Admin@123  │ warehouse_manager   │');
-    log('  │ storekeeper  │ Admin@123  │ storekeeper         │');
-    log('  │ accountant   │ Admin@123  │ accountant          │');
+    log('  │ dept_manager │ Admin@123  │ department_manager  │');
     log('  └──────────────┴────────────┴─────────────────────┘');
     log('');
 

@@ -14,6 +14,17 @@ export function useUsers(page = 1, limit = 20) {
   });
 }
 
+export function useSupervisors(enabled = true) {
+  return useQuery({
+    queryKey: ['users', 'supervisors'],
+    queryFn: async () => {
+      const res = await usersApi.getSupervisors();
+      return res.data.data;
+    },
+    enabled,
+  });
+}
+
 export function useCreateUser() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -5,8 +5,9 @@ import { ValidationError } from '../../utils/AppError';
 
 interface User {
   username: string; password_hash: string; full_name: string;
-  role: 'system_admin' | 'warehouse_manager' | 'storekeeper' | 'accountant' | 'department_manager' | 'viewer';
+  role: 'system_admin' | 'warehouse_manager' | 'department_manager';
   department_id?: number | null;
+  warehouse_ids?: number[];
 }
 
 export class UsersService {
@@ -20,11 +21,46 @@ export class UsersService {
   }
 
   async getById(id: number) {
-    return usersRepository.findById(id);
+    const user = await usersRepository.findById(id);
+    if (!user) return user;
+    const warehouse_ids = await usersRepository.getWarehouseAssignments(id);
+    return { ...user, warehouse_ids };
   }
 
   async create(data: User) {
-    return usersRepository.create(data);
+    // Service-level enforcement (defense in depth): a warehouse_manager MUST
+    // be assigned to at least one warehouse, otherwise their data scope would
+    // silently resolve to NONE and they could see nothing.
+    if (data.role === 'warehouse_manager' && (!data.warehouse_ids || data.warehouse_ids.length === 0)) {
+      throw new ValidationError('warehouse_manager must be assigned at least one warehouse', { role: data.role });
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `INSERT INTO users (username, password_hash, full_name, role, department_id)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, username, full_name, role, department_id, is_active, token_version, created_at, updated_at`,
+        [data.username, data.password_hash, data.full_name, data.role, data.department_id ?? null]
+      );
+      const user = result.rows[0];
+      if (data.warehouse_ids && data.warehouse_ids.length > 0) {
+        for (const warehouseId of data.warehouse_ids) {
+          await client.query(
+            'INSERT INTO user_warehouses (user_id, warehouse_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [user.id, warehouseId]
+          );
+        }
+      }
+      await client.query('COMMIT');
+      const warehouse_ids = data.warehouse_ids || [];
+      return { ...user, warehouse_ids };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async update(id: number, data: Partial<User> & { is_active?: boolean }) {
@@ -44,7 +80,85 @@ export class UsersService {
         }
       }
     }
-    return usersRepository.update(id, data);
+
+    const { warehouse_ids, ...restData } = data;
+
+    // Service-level enforcement: a warehouse_manager must keep at least one
+    // warehouse assignment. Checked against the FINAL state of the user (the
+    // update may be changing either the role or the assignments).
+    {
+      const finalRole = (restData as any).role ?? await pool
+        .query('SELECT role FROM users WHERE id = $1', [id])
+        .then((r) => r.rows[0]?.role);
+      const finalAssignments = warehouse_ids !== undefined
+        ? warehouse_ids
+        : await usersRepository.getWarehouseAssignments(id);
+      if (finalRole === 'warehouse_manager' && finalAssignments.length === 0) {
+        throw new ValidationError('warehouse_manager must be assigned at least one warehouse', { user_id: id });
+      }
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      let user: any = null;
+      const restKeys = Object.keys(restData);
+      if (restKeys.length > 0) {
+        const result = await client.query(
+          `UPDATE users
+              SET ${restKeys.map((key, i) => `"${key}" = $${i + 2}`).join(', ')}
+            WHERE id = $1
+            RETURNING id, username, full_name, role, department_id, is_active, token_version, created_at, updated_at`,
+          [id, ...restKeys.map((k) => (restData as any)[k])]
+        );
+        user = result.rows[0];
+        if (!user) {
+          await client.query('ROLLBACK');
+          return null;
+        }
+      } else {
+        const current = await client.query(
+          'SELECT id, username, full_name, role, department_id, is_active, token_version, created_at, updated_at FROM users WHERE id = $1',
+          [id]
+        );
+        user = current.rows[0];
+        if (!user) {
+          await client.query('ROLLBACK');
+          return null;
+        }
+      }
+
+      if (warehouse_ids !== undefined) {
+        await client.query('DELETE FROM user_warehouses WHERE user_id = $1', [id]);
+        for (const warehouseId of warehouse_ids) {
+          await client.query(
+            'INSERT INTO user_warehouses (user_id, warehouse_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [id, warehouseId]
+          );
+        }
+      }
+
+      // Session revocation: role, is_active, or password changes invalidate tokens.
+      const revokingKeys = Object.keys(restData).filter((k) =>
+        ['role', 'is_active', 'password_hash'].includes(k)
+      );
+      if (revokingKeys.length > 0) {
+        await client.query('UPDATE users SET token_version = token_version + 1 WHERE id = $1', [id]);
+      }
+
+      await client.query('COMMIT');
+
+      const warehouse_ids_result = warehouse_ids !== undefined
+        ? warehouse_ids
+        : await usersRepository.getWarehouseAssignments(id);
+      return { ...user, warehouse_ids: warehouse_ids_result };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async delete(id: number) {
@@ -64,6 +178,9 @@ export class UsersService {
     }
     return usersRepository.delete(id);
   }
+
+  async getSupervisors() {
+    return usersRepository.findSupervisors();
+  }
 }
 export const usersService = new UsersService();
-

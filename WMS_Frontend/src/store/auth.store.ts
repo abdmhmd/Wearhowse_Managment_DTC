@@ -1,13 +1,7 @@
 import { create } from 'zustand';
-import type { UserRole } from '@/types';
+import type { UserRole, AuthUser, Permission } from '@/types';
 import api from '@/api/client';
-
-interface AuthUser {
-  id: number;
-  username: string;
-  full_name: string;
-  role: UserRole;
-}
+import { authApi } from '@/api/auth.api';
 
 interface AuthState {
   token: string | null;
@@ -15,10 +9,12 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   hasValidated: boolean;
-  login: (token: string, refreshToken: string, user: AuthUser) => void;
+  login: (token: string, refreshToken: string, user: Partial<AuthUser>) => void;
   logout: () => void;
   validateToken: () => Promise<boolean>;
   hasRole: (...roles: UserRole[]) => boolean;
+  can: (...permissions: Permission[]) => boolean;
+  canAny: (...permissions: Permission[]) => boolean;
 }
 
 let validationPromise: Promise<boolean> | null = null;
@@ -37,11 +33,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   hasValidated: false,
 
-  login: (token: string, refreshToken: string, user: AuthUser) => {
+  login: (token: string, refreshToken: string, user: Partial<AuthUser>) => {
     localStorage.setItem('wms_token', token);
     localStorage.setItem('wms_refresh_token', refreshToken);
     localStorage.setItem('wms_user', JSON.stringify(user));
-    set({ token, user, isAuthenticated: true, hasValidated: false });
+    set({
+      token,
+      user: {
+        id: user.id!,
+        username: user.username!,
+        full_name: user.full_name!,
+        role: user.role!,
+        department_id: user.department_id ?? null,
+        permissions: user.permissions ?? [],
+        warehouses: user.warehouses ?? [],
+        warehouse_ids: user.warehouse_ids ?? [],
+      },
+      isAuthenticated: true,
+      hasValidated: false,
+    });
   },
 
   logout: () => {
@@ -69,8 +79,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     validationPromise = (async () => {
       set({ isLoading: true });
       try {
-        await api.get('/settings');
-        set({ isAuthenticated: true, hasValidated: true, isLoading: false });
+        // Full context (permissions + assigned warehouses) is loaded fresh from
+        // the server so the UI can gate on real authorities, not cached role claims.
+        const res = await authApi.me();
+        const user = res.data.data.user;
+        localStorage.setItem('wms_user', JSON.stringify(user));
+        set({ user, isAuthenticated: true, hasValidated: true, isLoading: false });
         return true;
       } catch {
         set({ isAuthenticated: false, user: null, token: null, hasValidated: true, isLoading: false });
@@ -86,5 +100,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   hasRole: (...roles: UserRole[]) => {
     const { user } = get();
     return user ? roles.includes(user.role) : false;
+  },
+
+  can: (...permissions: Permission[]) => {
+    const perms = get().user?.permissions ?? [];
+    return permissions.every((p) => perms.includes(p));
+  },
+
+  canAny: (...permissions: Permission[]) => {
+    const perms = get().user?.permissions ?? [];
+    return permissions.some((p) => perms.includes(p));
   },
 }));

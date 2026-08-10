@@ -295,43 +295,42 @@ describe('API Integration Tests', () => {
 
   // --- Role-based authorization via API ---
   describe('Role Authorization', () => {
-    let accountantToken: string;
+    let whManagerToken: string;
 
     beforeAll(async () => {
-      const acctUsername = `${prefix}acct_${shortId()}`;
-      const acctHash = await hashPassword('acctPass123');
+      const wmUsername = `${prefix}wm_${shortId()}`;
+      const wmHash = await hashPassword('wmPass123');
       await pool.query(
         `INSERT INTO users (username, password_hash, full_name, role, is_active)
-         VALUES ($1, $2, $3, 'accountant', true)`,
-        [acctUsername, acctHash, acctUsername]
+         VALUES ($1, $2, $3, 'warehouse_manager', true)`,
+        [wmUsername, wmHash, wmUsername]
       );
       const loginRes = await request(app)
         .post('/api/auth/login')
-        .send({ username: acctUsername, password: 'acctPass123' });
-      accountantToken = loginRes.body.data?.token;
+        .send({ username: wmUsername, password: 'wmPass123' });
+      whManagerToken = loginRes.body.data?.token;
     });
 
-    test('accountant cannot create categories (403)', async () => {
+    test('warehouse_manager cannot create categories (403)', async () => {
       const res = await request(app)
         .post('/api/categories')
-        .set('Authorization', `Bearer ${accountantToken}`)
+        .set('Authorization', `Bearer ${whManagerToken}`)
         .send({ code: `${prefix}${shortId()}`, name_ar: 'Should Fail' });
       expect(res.status).toBe(403);
       expect(res.body.success).toBe(false);
     });
 
-    test('accountant cannot approve transactions (403)', async () => {
+    test('warehouse_manager cannot approve transactions (403)', async () => {
       const res = await request(app)
         .post('/api/transactions/1/approve')
-        .set('Authorization', `Bearer ${accountantToken}`);
+        .set('Authorization', `Bearer ${whManagerToken}`);
       expect(res.status).toBe(403);
     });
 
-    test('accountant can view reports (if permitted)', async () => {
-      // Reports permit warehouse_manager, system_admin, and accountant
+    test('warehouse_manager can view reports', async () => {
       const res = await request(app)
         .get('/api/reports/inventory')
-        .set('Authorization', `Bearer ${accountantToken}`);
+        .set('Authorization', `Bearer ${whManagerToken}`);
       expect(res.status).toBe(200);
     });
   });

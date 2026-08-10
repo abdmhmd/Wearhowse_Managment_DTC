@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, authorize, ROLES } from '../../middlewares/auth.middleware';
+import { authenticate, authorize } from '../../middlewares/auth.middleware';
 import { materialRequestsController } from './material-requests.controller';
 
 const router = Router();
@@ -10,49 +10,59 @@ router.use(authenticate);
 // GET /api/requests — list requests (scoped by role automatically in controller)
 router.get(
   '/',
-  authorize([...ROLES.WAREHOUSE_OPS, 'department_manager', 'accountant', 'viewer']),
+  authorize('requests:view'),
   materialRequestsController.getAll.bind(materialRequestsController)
 );
 
 // GET /api/requests/:id — view single request
 router.get(
   '/:id',
-  authorize([...ROLES.WAREHOUSE_OPS, 'department_manager', 'accountant', 'viewer']),
+  authorize('requests:view'),
   materialRequestsController.getById.bind(materialRequestsController)
 );
 
-// POST /api/requests — create new request (department_manager or above)
+// POST /api/requests — create new request (warehouse_manager or system_admin;
+// department_manager is the approval layer and cannot create requests)
 router.post(
   '/',
-  authorize([...ROLES.CAN_REQUEST]),
+  authorize('requests:create'),
   materialRequestsController.create.bind(materialRequestsController)
 );
 
-// PATCH /api/requests/:id/approve — warehouse approves
+// PATCH /api/requests/:id/approve — department manager approves (dept_approved)
+// or system admin approves a forwarded request (admin_approved)
 router.patch(
   '/:id/approve',
-  authorize([...ROLES.WAREHOUSE_OPS]),
+  authorize('requests:approve'),
   materialRequestsController.approve.bind(materialRequestsController)
 );
 
-// PATCH /api/requests/:id/reject — warehouse rejects
+// PATCH /api/requests/:id/forward — department manager forwards the
+// dept-approved request to the warehouse admin for issuance
+router.patch(
+  '/:id/forward',
+  authorize('requests:forward'),
+  materialRequestsController.forward.bind(materialRequestsController)
+);
+
+// PATCH /api/requests/:id/reject — admin rejects a forwarded request
 router.patch(
   '/:id/reject',
-  authorize([...ROLES.WAREHOUSE_OPS]),
+  authorize('requests:reject'),
   materialRequestsController.reject.bind(materialRequestsController)
 );
 
-// POST /api/requests/:id/issue — storekeeper issues LN voucher
+// POST /api/requests/:id/issue — admin issues the LN voucher
 router.post(
   '/:id/issue',
-  authorize([...ROLES.WAREHOUSE_OPS]),
+  authorize('requests:issue'),
   materialRequestsController.issue.bind(materialRequestsController)
 );
 
 // PATCH /api/requests/:id/cancel — requester or manager cancels
 router.patch(
   '/:id/cancel',
-  authorize([...ROLES.CAN_REQUEST, ...ROLES.WAREHOUSE_OPS]),
+  authorize('requests:cancel'),
   materialRequestsController.cancel.bind(materialRequestsController)
 );
 

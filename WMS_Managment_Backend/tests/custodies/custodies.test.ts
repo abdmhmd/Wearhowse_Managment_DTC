@@ -10,6 +10,7 @@ let catCode: string;
 let unitCode: string;
 let whId: number;
 let deptId: number;
+let mainWhId: number;
 let requesterId: number;
 let approverId: number;
 let consumableId: number;
@@ -19,12 +20,13 @@ let projectId: number;
 beforeAll(async () => {
   catCode = await seedCategory();
   unitCode = await seedUnit();
-  whId = await seedWarehouse();
   deptId = await seedDepartment();
+  whId = await seedWarehouse({ department_id: deptId });
+  mainWhId = await seedWarehouse({ department_id: deptId, is_main: true });
   requesterId = await seedUser();
   approverId = await seedUser();
-  consumableId = await seedItem(catCode, unitCode, whId, 500, { is_consumable: true });
-  durableId = await seedItem(catCode, unitCode, whId, 500, { is_consumable: false });
+  consumableId = await seedItem(catCode, unitCode, mainWhId, 500, { is_consumable: true });
+  durableId = await seedItem(catCode, unitCode, mainWhId, 500, { is_consumable: false });
   const supervisorId = await seedUser();
   projectId = (await projectsService.create(approverId, {
     name: `${prefix}Project`,
@@ -42,6 +44,8 @@ async function issueFlow(items: Array<{ item_id: number; quantity: number; unit_
     project_id: opts.project_id ?? null,
     items,
   });
+  await materialRequestsService.approveRequest(created.id, approverId);
+  await materialRequestsService.forwardRequest(created.id, approverId);
   await materialRequestsService.approveRequest(created.id, approverId);
   return materialRequestsService.issueRequest(created.id, approverId);
 }

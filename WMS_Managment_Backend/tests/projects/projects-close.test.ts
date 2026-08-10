@@ -10,6 +10,7 @@ let catCode: string;
 let unitCode: string;
 let whId: number;
 let deptId: number;
+let mainWhId: number;
 let requesterId: number;
 let approverId: number;
 let durableId: number;
@@ -19,11 +20,12 @@ let custodyId: number;
 beforeAll(async () => {
   catCode = await seedCategory();
   unitCode = await seedUnit();
-  whId = await seedWarehouse();
   deptId = await seedDepartment();
+  whId = await seedWarehouse({ department_id: deptId });
+  mainWhId = await seedWarehouse({ department_id: deptId, is_main: true });
   requesterId = await seedUser();
   approverId = await seedUser();
-  durableId = await seedItem(catCode, unitCode, whId, 500, { is_consumable: false });
+  durableId = await seedItem(catCode, unitCode, mainWhId, 500, { is_consumable: false });
   const supervisorId = await seedUser();
 
   projectId = (await projectsService.create(approverId, {
@@ -39,6 +41,8 @@ beforeAll(async () => {
     project_id: projectId,
     items: [{ item_id: durableId, quantity: 1, unit_code: unitCode }],
   });
+  await materialRequestsService.approveRequest(created.id, approverId);
+  await materialRequestsService.forwardRequest(created.id, approverId);
   await materialRequestsService.approveRequest(created.id, approverId);
   await materialRequestsService.issueRequest(created.id, approverId);
 

@@ -89,16 +89,38 @@ export class TransactionsRepository {
   }
 
   async findHeaderById(id: number): Promise<TransactionHeader | null> {
-    const res = await pool.query('SELECT id, transaction_no, type, status, transaction_date, supplier_id, department_id, warehouse_id, to_warehouse_id, created_by, approved_by, notes FROM transactions WHERE id = $1', [id]);
+    const res = await pool.query(
+      `SELECT t.id, t.transaction_no, t.type, t.status, t.transaction_date,
+              t.supplier_id, t.department_id, t.warehouse_id, t.to_warehouse_id,
+              t.created_by, t.approved_by, t.notes, t.created_at, t.updated_at,
+              w.code AS warehouse_code, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
+              tw.code AS to_warehouse_code, tw.name_ar AS to_warehouse_name_ar, tw.name_en AS to_warehouse_name_en,
+              d.name_ar AS department_name_ar, d.name_en AS department_name_en,
+              s.name_ar AS supplier_name_ar, s.name_en AS supplier_name_en,
+              cu.username AS created_by_username, cu.full_name AS created_by_name,
+              au.username AS approved_by_username, au.full_name AS approved_by_name
+       FROM transactions t
+       LEFT JOIN warehouses w ON w.id = t.warehouse_id
+       LEFT JOIN warehouses tw ON tw.id = t.to_warehouse_id
+       LEFT JOIN departments d ON d.id = t.department_id
+       LEFT JOIN suppliers s ON s.id = t.supplier_id
+       LEFT JOIN users cu ON cu.id = t.created_by
+       LEFT JOIN users au ON au.id = t.approved_by
+       WHERE t.id = $1`,
+      [id]
+    );
     if (res.rows.length === 0) return null;
     return res.rows[0];
   }
 
   async findDetailsByTransactionId(transactionId: number): Promise<TransactionDetail[]> {
     const res = await pool.query(
-      `SELECT id, transaction_id, item_id, quantity, unit_code, unit_price, total_price, unit_cost, total_value,
-              batch_number, production_date, expiry_date, expiry_tracking_enabled
-       FROM transaction_details WHERE transaction_id = $1`, [transactionId]
+      `SELECT td.id, td.transaction_id, td.item_id, td.quantity, td.unit_code, td.unit_price, td.total_price, td.unit_cost, td.total_value,
+              td.batch_number, td.production_date, td.expiry_date, td.expiry_tracking_enabled,
+              i.item_code, i.name_ar AS item_name_ar, i.name_en AS item_name_en
+       FROM transaction_details td
+       LEFT JOIN items i ON i.id = td.item_id
+       WHERE td.transaction_id = $1`, [transactionId]
     );
     return res.rows;
   }

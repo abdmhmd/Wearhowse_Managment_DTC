@@ -16,7 +16,7 @@
  * Run:      npm run seed:demo:full
  *          (or) npx ts-node scripts/seed-demo.ts
  * Creds:    admin / Admin@123   (existing admin, untouched)
- *           wh_manager / Admin@123, storekeeper / Admin@123, ...
+ *           wh_manager / Admin@123, dept_manager / Admin@123, ...
  * ------------------------------------------------------------------
  */
 
@@ -90,10 +90,8 @@ const CATEGORIES = [
 
 const DEMO_USERS = [
   { username: 'wh_manager', full_name: 'Warehouse Manager', role: 'warehouse_manager', department: 'PROC' },
-  { username: 'storekeeper', full_name: 'Storekeeper', role: 'storekeeper', department: 'PROD' },
-  { username: 'accountant', full_name: 'Accountant', role: 'accountant', department: 'PROC' },
   { username: 'dept_manager', full_name: 'Department Manager', role: 'department_manager', department: 'ENG' },
-  { username: 'viewer', full_name: 'Viewer', role: 'viewer', department: 'ENG' },
+  { username: 'dept_manager2', full_name: 'Production Manager', role: 'department_manager', department: 'PROD' },
 ];
 
 // ─── Items ──────────────────────────────────────────────────────────────
@@ -189,7 +187,7 @@ const TXNS: TxnDef[] = [
   {
     type: 'RV', status: 'approved',
     supplier: 'ABC Industries', warehouse: 'WH-A',
-    created_by: 'storekeeper', approved_by: 'wh_manager',
+    created_by: 'admin', approved_by: 'admin',
     notes: 'استلام مشتريات إلكترونيات وقطع من شركة ABC للصناعات',
     days_ago: 21,
     details: [
@@ -202,7 +200,7 @@ const TXNS: TxnDef[] = [
   {
     type: 'RV', status: 'approved',
     supplier: 'Global Supply Co.', warehouse: 'WH-B',
-    created_by: 'storekeeper', approved_by: 'wh_manager',
+    created_by: 'admin', approved_by: 'admin',
     notes: 'استلام مواد خام من شركة الإمداد العالمية',
     days_ago: 14,
     details: [
@@ -214,7 +212,7 @@ const TXNS: TxnDef[] = [
   {
     type: 'LN', status: 'approved',
     department: 'PROD', warehouse: 'WH-A',
-    created_by: 'storekeeper', approved_by: 'wh_manager',
+    created_by: 'admin', approved_by: 'admin',
     notes: 'صرف مواد لقسم الإنتاج - خط الإنتاج 3',
     days_ago: 7,
     details: [
@@ -226,7 +224,7 @@ const TXNS: TxnDef[] = [
   {
     type: 'TRF', status: 'approved',
     warehouse: 'WH-B', to_warehouse: 'WH-A',
-    created_by: 'storekeeper', approved_by: 'wh_manager',
+    created_by: 'admin', approved_by: 'admin',
     notes: 'تحويل داخلي لألواح الألمنيوم من المواد الخام إلى الرئيسي',
     days_ago: 3,
     details: [
@@ -236,7 +234,7 @@ const TXNS: TxnDef[] = [
   {
     type: 'LN', status: 'approved',
     department: 'ENG', warehouse: 'WH-A',
-    created_by: 'storekeeper', approved_by: 'wh_manager',
+    created_by: 'admin', approved_by: 'admin',
     notes: 'صرف عهدة لوحة أردوينو لقسم الهندسة',
     days_ago: 2,
     details: [
@@ -247,7 +245,7 @@ const TXNS: TxnDef[] = [
   {
     type: 'RV', status: 'draft',
     supplier: 'Local Materials Ltd.', warehouse: 'WH-C',
-    created_by: 'storekeeper',
+    created_by: 'admin',
     notes: 'استلام عبوات تغليف من شركة المواد المحلية (مسودة)',
     days_ago: 1,
     details: [
@@ -265,7 +263,7 @@ const PROJECTS = [
 
 const MATERIAL_REQUESTS = [
   {
-    request_no: 'REQ-1', department: 'PROD', warehouse: 'WH-A', requested_by: 'storekeeper',
+    request_no: 'REQ-1', department: 'PROD', warehouse: 'WH-A', requested_by: 'dept_manager2',
     status: 'pending', priority: 'high', request_type: 'project', project_no: 'PRJ-1',
     needed_in_days: 7, notes: 'طلب مواد لإنتاج خط الإنتاج 3',
     details: [
@@ -275,8 +273,8 @@ const MATERIAL_REQUESTS = [
   },
   {
     request_no: 'REQ-2', department: 'ENG', warehouse: 'WH-C', requested_by: 'dept_manager',
-    status: 'approved', priority: 'normal', request_type: 'project', project_no: 'PRJ-2',
-    needed_in_days: 3, notes: 'طلب مواد تغليف لمشروع الأتمتة', approved_by: 'wh_manager',
+    status: 'admin_approved', priority: 'normal', request_type: 'project', project_no: 'PRJ-2',
+    needed_in_days: 3, notes: 'طلب مواد تغليف لمشروع الأتمتة', approved_by: 'admin',
     details: [
       { item_code: 'PACKAGING-BOX-30X20', quantity: 100, unit_code: 'BOX' },
       { item_code: 'STRETCH-WRAP-ROLL', quantity: 40, unit_code: 'MTR' },
@@ -455,7 +453,6 @@ async function seedDemo(): Promise<void> {
     for (const r of supRows.rows) supId[r.name_en] = r.id;
 
     const adminId = userId['admin'];
-    const storekeeperId = userId['storekeeper'];
 
     const itemUnit: Record<string, string> = {};
     for (const i of ITEMS) itemUnit[i.item_code] = i.unit_code;
@@ -509,7 +506,7 @@ async function seedDemo(): Promise<void> {
       }
 
       // Stock movements (only for approved)
-      const userApprover = t.approved_by ? userId[t.approved_by] ?? storekeeperId : storekeeperId;
+      const userApprover = t.approved_by ? userId[t.approved_by] ?? adminId : adminId;
       for (const d of t.details) {
         if (t.status === 'draft') continue;
         const fromWh = d.from_warehouse ?? t.warehouse;
@@ -853,10 +850,8 @@ async function seedDemo(): Promise<void> {
     log('  ├──────────────┼────────────┼─────────────────────┤');
     log('  │ admin        │ Admin@123  │ system_admin        │');
     log('  │ wh_manager   │ Admin@123  │ warehouse_manager   │');
-    log('  │ storekeeper  │ Admin@123  │ storekeeper         │');
-    log('  │ accountant   │ Admin@123  │ accountant          │');
     log('  │ dept_manager │ Admin@123  │ department_manager  │');
-    log('  │ viewer       │ Admin@123  │ viewer              │');
+    log('  │ dept_manager2│ Admin@123  │ department_manager  │');
     log('  └──────────────┴────────────┴─────────────────────┘');
     log('');
 

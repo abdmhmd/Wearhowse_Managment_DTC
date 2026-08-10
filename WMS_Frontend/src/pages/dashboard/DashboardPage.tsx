@@ -4,6 +4,7 @@ import { getLocalizedName } from '@/i18n/helpers';
 import { itemsApi } from '@/api/items.api';
 import { transactionsApi } from '@/api/transactions.api';
 import { stockMovementsApi } from '@/api/stock-movements.api';
+import { useAuthStore } from '@/store/auth.store';
 import { PageHeader, LoadingSpinner, Badge } from '@/components/ui';
 import { CubeIcon, ExclamationTriangleIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { formatDateTime, formatNumber } from '@/utils';
@@ -12,6 +13,8 @@ import type { TransactionType, MovementType } from '@/types';
 
 export default function DashboardPage() {
   const { t } = useTranslation();
+  const { canAny } = useAuthStore();
+  const canViewAllMovements = canAny('stock-movements:view-all');
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
     queryKey: ['items', 'dashboard'],
     queryFn: async () => {
@@ -34,6 +37,7 @@ export default function DashboardPage() {
       const res = await stockMovementsApi.getAll(1, 10);
       return res.data.data;
     },
+    enabled: canViewAllMovements,
   });
 
   const isLoading = itemsLoading || txLoading || movLoading;
@@ -86,55 +90,57 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="bg-white rounded-xl shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">{t('dashboard.recentMovements')}</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.date')}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.item')}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.type')}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.quantityChange')}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.before')}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.after')}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.transaction')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {movements.length === 0 ? (
+      {canViewAllMovements && (
+        <div className="bg-white rounded-xl shadow">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">{t('dashboard.recentMovements')}</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
-                    {t('stockMovements.noMovements')}
-                  </td>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.date')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.item')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.type')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.quantityChange')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.before')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.after')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-600 uppercase">{t('stockMovements.transaction')}</th>
                 </tr>
-              ) : (
-                movements.map((mov: any) => (
-                  <tr key={mov.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-700">{formatDateTime(mov.movement_date)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {getLocalizedName(mov) || mov.item_code || `Item #${mov.item_id}`}
-                    </td>
-                    <td className="px-4 py-3 text-sm">{getMovementBadge(mov.movement_type)}</td>
-                    <td className="px-4 py-3 text-sm font-medium">
-                      <span className={mov.quantity_change >= 0 ? 'text-green-600' : 'text-red-600'}>
-                        {mov.quantity_change >= 0 ? '+' : ''}{formatNumber(mov.quantity_change)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{formatNumber(mov.quantity_before)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{formatNumber(mov.quantity_after)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {mov.transaction_no || `#${mov.transaction_id}`}
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {movements.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                      {t('stockMovements.noMovements')}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  movements.map((mov: any) => (
+                    <tr key={mov.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-700">{formatDateTime(mov.movement_date)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {getLocalizedName(mov) || mov.item_code || `Item #${mov.item_id}`}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{getMovementBadge(mov.movement_type)}</td>
+                      <td className="px-4 py-3 text-sm font-medium">
+                        <span className={mov.quantity_change >= 0 ? 'text-green-600' : 'text-red-600'}>
+                          {mov.quantity_change >= 0 ? '+' : ''}{formatNumber(mov.quantity_change)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{formatNumber(mov.quantity_before)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{formatNumber(mov.quantity_after)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {mov.transaction_no || `#${mov.transaction_id}`}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

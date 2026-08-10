@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
-import type { UserRole } from '@/types';
+import type { Permission } from '@/types';
 import { LoadingSpinner } from '@/components/ui';
 
 interface ProtectedRouteProps {
-  allowedRoles?: UserRole[];
+  allowedPermissions?: Permission[];
 }
 
-export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
+export default function ProtectedRoute({ allowedPermissions }: ProtectedRouteProps) {
   const { isAuthenticated, user, isLoading, validateToken } = useAuthStore();
 
   useEffect(() => {
@@ -29,7 +29,11 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+  if (
+    allowedPermissions &&
+    user &&
+    !allowedPermissions.some((p) => (user.permissions ?? []).includes(p))
+  ) {
     return <Navigate to="/" replace />;
   }
 

@@ -4,9 +4,10 @@ import { itemsService } from '../items/items.service';
 import { sendData, sendPaginated } from '../../utils/response';
 import { inventoryReportQuerySchema, itemCardParamsSchema } from './reports.validator';
 import { ValidationError } from '../../utils/AppError';
+import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
 
 export class ReportsController {
-  async getInventoryReport(req: Request, res: Response, next: NextFunction) {
+  async getInventoryReport(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const parsed = inventoryReportQuerySchema.safeParse(req.query);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
@@ -18,17 +19,18 @@ export class ReportsController {
         low_stock: rest.low_stock === 'true' || undefined,
         overstock: rest.overstock === 'true' || undefined,
         page, limit,
+        user: req.user,
       };
       const { items, pagination } = await inventoryReportService.getInventoryReport(filters);
       sendPaginated(res, items, pagination);
     } catch (e) { next(e); }
   }
 
-  async getItemCard(req: Request, res: Response, next: NextFunction) {
+  async getItemCard(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const parsed = itemCardParamsSchema.safeParse(req.params);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
-      const data = await itemsService.getItemCard(parsed.data.id);
+      const data = await itemsService.getItemCard(parsed.data.id, req.user);
       sendData(res, data);
     } catch (e) { next(e); }
   }

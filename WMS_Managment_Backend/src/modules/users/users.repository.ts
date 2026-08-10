@@ -1,13 +1,16 @@
 import { pool } from '../../config/database';
 
-// All valid roles in the system
+// All active roles in the system (storekeeper/accountant/viewer were
+// deactivated in migration 019; legacy users keep their role value for data
+// continuity but cannot log in until reassigned).
 export type UserRole =
   | 'system_admin'
   | 'warehouse_manager'
-  | 'storekeeper'
-  | 'accountant'
-  | 'department_manager'
-  | 'viewer';
+  | 'department_manager';
+
+/** Roles that may log in. Legacy roles (storekeeper/accountant/viewer) were
+ *  deactivated in migration 019; users holding them must be reassigned. */
+export const ACTIVE_ROLES: readonly string[] = ['system_admin', 'warehouse_manager', 'department_manager'];
 
 // Private row type — includes password_hash for auth operations
 export interface UserRowPrivate {
@@ -18,6 +21,7 @@ export interface UserRowPrivate {
   role: UserRole;
   department_id?: number | null;  // For department_manager role scoping
   is_active: boolean;
+  token_version: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -55,12 +59,12 @@ export class UsersRepository {
   }
 
   async findByUsername(username: string): Promise<UserRowPrivate | null> {
-    const res = await pool.query('SELECT id, username, password_hash, full_name, role, is_active, created_at, updated_at FROM users WHERE username = $1', [username]);
+    const res = await pool.query('SELECT id, username, password_hash, full_name, role, department_id, is_active, token_version, created_at, updated_at FROM users WHERE username = $1', [username]);
     return res.rows[0] || null;
   }
 
   async findById(id: number): Promise<UserRowPublic | null> {
-    const res = await pool.query('SELECT id, username, full_name, role, is_active, created_at, updated_at FROM users WHERE id = $1 AND is_active = true', [id]);
+    const res = await pool.query('SELECT id, username, full_name, role, department_id, is_active, token_version, created_at, updated_at FROM users WHERE id = $1 AND is_active = true', [id]);
     return res.rows[0] || null;
   }
 
@@ -104,6 +108,25 @@ export class UsersRepository {
       [department_id]
     );
     return res.rows;
+  }
+
+  /** Supervisors = department managers + warehouse managers (for request approval flows). */
+  async findSupervisors(): Promise<UserRowPublic[]> {
+    const res = await pool.query(
+      `SELECT id, username, full_name, role, department_id, is_active, created_at, updated_at
+         FROM users
+        WHERE is_active = true AND role IN ('department_manager', 'warehouse_manager')
+        ORDER BY full_name`
+    );
+    return res.rows;
+  }
+
+  async getWarehouseAssignments(userId: number): Promise<number[]> {
+    const res = await pool.query(
+      'SELECT warehouse_id FROM user_warehouses WHERE user_id = $1 ORDER BY warehouse_id',
+      [userId]
+    );
+    return res.rows.map((r) => r.warehouse_id as number);
   }
 }
 

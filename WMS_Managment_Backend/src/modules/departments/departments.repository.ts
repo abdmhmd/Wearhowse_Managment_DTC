@@ -1,23 +1,88 @@
 import { pool } from '../../config/database';
+import { scopeForUser } from '../authorization/scope';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
 export class DepartmentsRepository {
-  findAll(limit?: number, offset?: number) {
-    let query = 'SELECT id, code, name_ar, name_en, created_at, updated_at FROM departments WHERE is_active = true ORDER BY code';
+  /**
+   * Builds a scope fragment (without leading AND) restricting `departments` to
+   * the rows the user may see. Mirrors the logic used by `findAll`/`countAll`:
+   * GLOBAL = all, DEPARTMENT = own department, WAREHOUSE = departments owning
+   * one of the user's assigned warehouses, NONE = nothing.
+   */
+  private scopeClause(user: AuthUserContext, startIndex: number): { sql: string; params: any[] } {
+    const scope = scopeForUser(user);
+    if (scope === 'GLOBAL') return { sql: 'TRUE', params: [] };
+    if (scope === 'DEPARTMENT' && user.department_id != null) {
+      return { sql: `id = $${startIndex}`, params: [user.department_id] };
+    }
+    if (scope === 'WAREHOUSE') {
+      if (user.warehouse_ids.length === 0) return { sql: 'FALSE', params: [] };
+      return {
+        sql: `id IN (SELECT DISTINCT department_id FROM warehouses WHERE id = ANY($${startIndex}) AND department_id IS NOT NULL AND is_active = true)`,
+        params: [user.warehouse_ids],
+      };
+    }
+    return { sql: 'FALSE', params: [] };
+  }
+
+  findAll(limit?: number, offset?: number, user?: AuthUserContext) {
+    let query = 'SELECT id, code, name_ar, name_en, created_at, updated_at FROM departments WHERE is_active = true';
     const params: any[] = [];
+    let paramIndex = 1;
+
+    if (user) {
+      const scope = this.scopeClause(user, paramIndex);
+      if (scope.sql !== 'TRUE') {
+        query += ` AND ${scope.sql}`;
+        params.push(...scope.params);
+        paramIndex += scope.params.length;
+      }
+    }
+
+    query += ' ORDER BY code';
     if (limit !== undefined && offset !== undefined) {
-      query += ' LIMIT $1 OFFSET $2';
+      query += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
       params.push(limit, offset);
     }
-    return (params.length ? pool.query(query, params) : pool.query(query)).then(r => r.rows);
+    return pool.query(query, params).then(r => r.rows);
   }
 
-  countAll() {
-    return pool.query('SELECT COUNT(*)::int AS total FROM departments WHERE is_active = true').then(r => r.rows[0].total);
+  countAll(user?: AuthUserContext) {
+    let query = 'SELECT COUNT(*)::int AS total FROM departments WHERE is_active = true';
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (user) {
+      const scope = this.scopeClause(user, paramIndex);
+      if (scope.sql !== 'TRUE') {
+        query += ` AND ${scope.sql}`;
+        params.push(...scope.params);
+        paramIndex += scope.params.length;
+      }
+    }
+
+    return pool.query(query, params).then(r => r.rows[0].total);
   }
 
-  findByCode(code: string) {
-    return pool.query('SELECT id, code, name_ar, name_en, created_at, updated_at FROM departments WHERE code = $1 AND is_active = true', [code])
-      .then(r => r.rows[0] || null);
+  /**
+   * Fetches a department by code restricted to the user's scope. A user
+   * outside the scope gets `null` (treated as 404 by the controller), so a
+   * department_manager / warehouse_manager cannot read another department.
+   */
+  async findByCode(code: string, user?: AuthUserContext) {
+    let query = 'SELECT id, code, name_ar, name_en, created_at, updated_at FROM departments WHERE code = $1 AND is_active = true';
+    const params: any[] = [code];
+
+    if (user) {
+      const scope = this.scopeClause(user, 2);
+      if (scope.sql !== 'TRUE') {
+        query += ` AND ${scope.sql}`;
+        params.push(...scope.params);
+      }
+    }
+
+    const res = await pool.query(query, params);
+    return res.rows[0] || null;
   }
 
   create(data: { code: string; name_ar: string; name_en?: string }) {

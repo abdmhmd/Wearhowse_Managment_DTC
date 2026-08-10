@@ -1,5 +1,7 @@
 import { PaginationMeta } from '../../utils/response';
 import { pool } from '../../config/database';
+import { warehouseAccessClause, scopeForUser, type DataScope } from '../authorization/scope';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
 export interface InventoryReportFilters {
   warehouse_id?: number;
@@ -10,6 +12,10 @@ export interface InventoryReportFilters {
   search?: string;
   page?: number;
   limit?: number;
+  /** Current authenticated user — restricts the report to the user's
+   *  accessible warehouses (warehouse_manager -> assigned, department_manager
+   *  -> department-owned warehouses). */
+  user?: AuthUserContext;
 }
 
 export class InventoryReportService {
@@ -64,6 +70,15 @@ export class InventoryReportService {
       paramIndex++;
     }
 
+    if (filters.user) {
+      const scope = warehouseAccessClause(filters.user, 'i.warehouse_id', paramIndex);
+      if (scope.clause !== 'TRUE') {
+        query += ` AND ${scope.clause}`;
+        params.push(...scope.params);
+        paramIndex += scope.params.length;
+      }
+    }
+
     query += ` ORDER BY w.code, i.item_code`;
 
     if (filters.limit !== undefined && filters.page !== undefined) {
@@ -99,6 +114,13 @@ export class InventoryReportService {
       countParams.push(`%${filters.search}%`);
       countIdx++;
     }
+    if (filters.user) {
+      const scope = warehouseAccessClause(filters.user, 'i.warehouse_id', countIdx);
+      if (scope.clause !== 'TRUE') {
+        countQuery += ` AND ${scope.clause}`;
+        countParams.push(...scope.params);
+      }
+    }
 
     const [itemsRes, countRes] = await Promise.all([
       pool.query(query, params),
@@ -111,15 +133,50 @@ export class InventoryReportService {
     const itemIds = items.map((r: any) => r.id);
     let movements: any[] = [];
     if (itemIds.length > 0) {
+      // The stock summary must include ONLY movements from warehouses the
+      // current user may access (system_admin = all). Otherwise a
+      // warehouse/department manager would leak other warehouses' movement
+      // totals through the aggregated counters.
+      const movementParams: any[] = [itemIds];
+      let movementWh = '';
+      if (filters.user) {
+        const scope: DataScope = scopeForUser(filters.user);
+        if (scope === 'WAREHOUSE' && filters.user.warehouse_ids.length > 0) {
+          movementWh = ` AND sm.warehouse_id = ANY($${movementParams.length + 1})`;
+          movementParams.push(filters.user.warehouse_ids);
+        } else if (scope === 'DEPARTMENT') {
+          const parts: string[] = [];
+          let idx = movementParams.length + 1;
+          if (filters.user.department_id != null) {
+            parts.push(
+              `sm.warehouse_id IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${idx} AND w.is_active = true)`
+            );
+            movementParams.push(filters.user.department_id);
+            idx++;
+          }
+          if (filters.user.warehouse_ids.length > 0) {
+            parts.push(`sm.warehouse_id = ANY($${idx})`);
+            movementParams.push(filters.user.warehouse_ids);
+          }
+          if (parts.length === 0) {
+            movementWh = ' AND FALSE';
+          } else {
+            movementWh = ` AND (${parts.join(' OR ')})`;
+          }
+        } else if (scope === 'NONE') {
+          movementWh = ' AND FALSE';
+        }
+      }
+
       const movRes = await pool.query(
-        `SELECT item_id,
+        `SELECT sm.item_id,
                 COUNT(*)::int AS total_movements,
-                COALESCE(SUM(CASE WHEN movement_type = 'IN' THEN quantity_change ELSE 0 END), 0) AS total_in,
-                COALESCE(SUM(CASE WHEN movement_type = 'OUT' THEN quantity_change ELSE 0 END), 0) AS total_out
-         FROM stock_movements
-         WHERE item_id = ANY($1::int[])
-         GROUP BY item_id`,
-        [itemIds]
+                COALESCE(SUM(CASE WHEN sm.movement_type = 'IN' THEN sm.quantity_change ELSE 0 END), 0) AS total_in,
+                COALESCE(SUM(CASE WHEN sm.movement_type = 'OUT' THEN sm.quantity_change ELSE 0 END), 0) AS total_out
+         FROM stock_movements sm
+         WHERE sm.item_id = ANY($1::int[])${movementWh}
+         GROUP BY sm.item_id`,
+        movementParams
       );
       movements = movRes.rows;
     }
