@@ -28,6 +28,7 @@ import inventoryRoutes from './modules/inventory/inventory.routes';
 import batchesRoutes from './modules/batches/batches.routes';
 import projectsRoutes from './modules/projects/projects.routes';
 import custodiesRoutes from './modules/custodies/custodies.routes';
+import supervisorsRoutes from './modules/supervisors/supervisors.routes';
 
 const app: Application = express();
 
@@ -66,6 +67,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/batches', batchesRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/custodies', custodiesRoutes);
+app.use('/api/supervisors', supervisorsRoutes);
 
 import { testConnection } from './config/database';
 

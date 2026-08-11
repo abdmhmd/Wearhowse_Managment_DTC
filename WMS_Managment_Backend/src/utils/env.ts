@@ -9,6 +9,12 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   CORS_ORIGINS: z.string().min(1, 'CORS_ORIGINS is required'),
+  LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+  LOGIN_RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .default(() => (process.env.NODE_ENV === 'production' ? 15 * 60 * 1000 : 10 * 1000)),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -93,5 +99,11 @@ export const env = {
   },
   get CORS_ORIGINS(): string[] {
     return (parsedEnv || validateEnv()).CORS_ORIGINS.split(',').map((origin) => origin.trim());
+  },
+  get LOGIN_RATE_LIMIT_MAX(): number {
+    return (parsedEnv || validateEnv()).LOGIN_RATE_LIMIT_MAX;
+  },
+  get LOGIN_RATE_LIMIT_WINDOW_MS(): number {
+    return (parsedEnv || validateEnv()).LOGIN_RATE_LIMIT_WINDOW_MS;
   },
 };

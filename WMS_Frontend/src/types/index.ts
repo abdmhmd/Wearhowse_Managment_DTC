@@ -16,6 +16,7 @@ export type Permission =
   | 'departments:view' | 'departments:create' | 'departments:update' | 'departments:delete'
   | 'warehouses:view' | 'warehouses:create' | 'warehouses:update' | 'warehouses:delete'
   | 'users:view' | 'users:create' | 'users:update' | 'users:delete'
+  | 'supervisors:view' | 'supervisors:create' | 'supervisors:update' | 'supervisors:delete'
   | 'items:view' | 'items:create' | 'items:update' | 'items:delete'
   | 'unit-conversions:view' | 'unit-conversions:create' | 'unit-conversions:update' | 'unit-conversions:delete'
   | 'transactions:view' | 'transactions:create' | 'transactions:approve'
@@ -26,7 +27,7 @@ export type Permission =
   | 'alerts:view' | 'alerts:acknowledge'
   | 'inventory:session:open' | 'inventory:session:view' | 'inventory:count:record' | 'inventory:session:close'
   | 'batches:view'
-  | 'projects:view' | 'projects:create' | 'projects:update' | 'projects:close' | 'projects:delete'
+  | 'projects:view' | 'projects:create' | 'projects:update' | 'projects:close' | 'projects:delete' | 'projects:supervisors'
   | 'custodies:view' | 'custodies:return';
 
 export type TransactionType = 'RV' | 'LN' | 'RTV' | 'RTI' | 'ADJ' | 'TRF';
@@ -45,6 +46,20 @@ export interface User {
   username: string;
   full_name: string;
   role: UserRole;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A supervisor is a user with role `department_manager` (management page shape). */
+export interface Supervisor {
+  id: number;
+  username: string;
+  full_name: string;
+  role: 'department_manager';
+  department_id: number | null;
+  department_name_ar: string | null;
+  department_name_en: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

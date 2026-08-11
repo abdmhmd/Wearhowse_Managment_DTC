@@ -47,6 +47,7 @@ const navItems: NavItem[] = [
   { labelKey: 'nav.reports', path: '/reports', icon: ChartBarIcon, permissions: ['reports:view'] },
   { labelKey: 'nav.settings', path: '/settings', icon: Cog6ToothIcon, permissions: ['settings:view'] },
   { labelKey: 'nav.users', path: '/users', icon: UserGroupIcon, permissions: ['users:view'] },
+  { labelKey: 'nav.supervisors', path: '/supervisors', icon: UserGroupIcon, permissions: ['supervisors:view'] },
 ];
 
 interface SidebarProps {

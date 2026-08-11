@@ -2,12 +2,13 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { authController } from './auth.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
+import { env } from '../../utils/env';
 
 const router = Router();
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: env.LOGIN_RATE_LIMIT_WINDOW_MS,
+  max: env.LOGIN_RATE_LIMIT_MAX,
   message: {
     success: false,
     error: {

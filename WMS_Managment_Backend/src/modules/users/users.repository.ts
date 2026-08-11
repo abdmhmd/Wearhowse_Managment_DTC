@@ -6,11 +6,17 @@ import { pool } from '../../config/database';
 export type UserRole =
   | 'system_admin'
   | 'warehouse_manager'
-  | 'department_manager';
+  | 'department_manager'
+  | 'supervisor';
 
 /** Roles that may log in. Legacy roles (storekeeper/accountant/viewer) were
  *  deactivated in migration 019; users holding them must be reassigned. */
-export const ACTIVE_ROLES: readonly string[] = ['system_admin', 'warehouse_manager', 'department_manager'];
+export const ACTIVE_ROLES: readonly string[] = [
+  'system_admin',
+  'warehouse_manager',
+  'department_manager',
+  'supervisor',
+];
 
 // Private row type — includes password_hash for auth operations
 export interface UserRowPrivate {
@@ -110,13 +116,17 @@ export class UsersRepository {
     return res.rows;
   }
 
-  /** Supervisors = department managers + warehouse managers (for request approval flows). */
-  async findSupervisors(): Promise<UserRowPublic[]> {
+  /** Candidate project supervisors (role = 'supervisor'), for the project
+   *  create/edit form. Pass `departmentId` to scope the lookup to a single
+   *  department. */
+  async findSupervisors(departmentId?: number): Promise<UserRowPublic[]> {
     const res = await pool.query(
       `SELECT id, username, full_name, role, department_id, is_active, created_at, updated_at
          FROM users
-        WHERE is_active = true AND role IN ('department_manager', 'warehouse_manager')
-        ORDER BY full_name`
+        WHERE is_active = true AND role = 'supervisor'
+        ${departmentId !== undefined ? 'AND department_id = $1' : ''}
+        ORDER BY full_name`,
+      departmentId !== undefined ? [departmentId] : []
     );
     return res.rows;
   }

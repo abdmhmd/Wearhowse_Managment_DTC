@@ -44,7 +44,7 @@ export default function ProjectsPage() {
   const { data } = useProjects(page, 20, statusFilter ? { status: statusFilter as any } : undefined);
   const { data: departmentsData } = useDepartments(1, 200);
   const { data: warehousesData } = useAllWarehouses();
-  const { can } = useAuthStore();
+  const { can, user } = useAuthStore();
   const needsSupervisors = can('projects:create') || can('projects:update');
   const { data: supervisorsData } = useSupervisors(needsSupervisors);
   const createMutation = useCreateProject();
@@ -57,12 +57,26 @@ export default function ProjectsPage() {
   const warehouses = warehousesData?.items || [];
   const supervisors = (supervisorsData || []).filter((u: any) => u.role === 'department_manager');
 
-  const createForm = useForm<CreateProjectFormData>({ resolver: zodResolver(createProjectSchema), defaultValues: { students: [] } });
+  const isWarehouseManager = user?.role === 'warehouse_manager';
+  const isDepartmentManager = user?.role === 'department_manager';
+
+  const createForm = useForm<CreateProjectFormData>({
+    resolver: zodResolver(createProjectSchema),
+    defaultValues: {
+      students: [],
+      department_id: isWarehouseManager && user?.department_id ? user.department_id : undefined,
+    },
+  });
   const updateForm = useForm<UpdateProjectFormData>({ resolver: zodResolver(updateProjectSchema) });
   const createStudents = useFieldArray({ control: createForm.control, name: 'students' });
 
-  const warehousesForDept = (deptId: number) =>
-    warehouses.filter((w: any) => w.department_id === deptId);
+  const warehousesForDept = (deptId: number) => {
+    let list = warehouses.filter((w: any) => w.department_id === deptId);
+    if (isWarehouseManager && Array.isArray(user?.warehouse_ids)) {
+      list = list.filter((w: any) => user.warehouse_ids.includes(w.id));
+    }
+    return list;
+  };
 
   const handleCreate = async (formData: CreateProjectFormData) => {
     const payload = cleanOptional({ ...formData });
@@ -194,7 +208,7 @@ export default function ProjectsPage() {
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <Input label={t('pages.projects.name')} {...form.register('name')} error={form.formState.errors.name?.message} />
       <div className="grid grid-cols-2 gap-4">
-        {!isEdit && (
+        {!isEdit && !isWarehouseManager && (
           <Select
             label={t('pages.projects.department')}
             {...form.register('department_id')}
@@ -202,6 +216,17 @@ export default function ProjectsPage() {
             placeholder={t('pages.projects.selectDepartment')}
             options={departments.map((d: any) => ({ value: d.id, label: getLocalizedName(d) }))}
           />
+        )}
+        {!isEdit && isWarehouseManager && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">{t('pages.projects.department')}</label>
+            <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              {(() => {
+                const dept = departments.find((d: any) => d.id === user?.department_id);
+                return dept ? getLocalizedName(dept) : (user?.department_id ?? '-');
+              })()}
+            </div>
+          </div>
         )}
         <Select
           label={t('pages.projects.supervisor')}
@@ -217,6 +242,7 @@ export default function ProjectsPage() {
           {...form.register('warehouse_id')}
           error={form.formState.errors.warehouse_id?.message}
           placeholder={t('pages.projects.selectWarehouse')}
+          disabled={isEdit && isDepartmentManager}
           options={warehousesForDept(Number(form.watch('department_id')) || (editingProject?.department_id ?? 0))
             .map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
         />

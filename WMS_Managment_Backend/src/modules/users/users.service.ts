@@ -2,10 +2,11 @@ import { usersRepository } from './users.repository';
 import { pool } from '../../config/database';
 import { PaginationMeta } from '../../utils/response';
 import { ValidationError } from '../../utils/AppError';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
 interface User {
   username: string; password_hash: string; full_name: string;
-  role: 'system_admin' | 'warehouse_manager' | 'department_manager';
+  role: 'system_admin' | 'warehouse_manager' | 'department_manager' | 'supervisor';
   department_id?: number | null;
   warehouse_ids?: number[];
 }
@@ -179,7 +180,20 @@ export class UsersService {
     return usersRepository.delete(id);
   }
 
-  async getSupervisors() {
+  /**
+   * Supervisors for the project create/edit form, scoped to the caller.
+   *
+   *   * warehouse_manager -> only supervisors in THEIR OWN department; a manager
+   *     with no department_id gets an empty list (fail-closed).
+   *   * system_admin      -> all supervisors (GLOBAL, unchanged).
+   * Other roles never reach this endpoint (route is guarded by
+   * `projects:supervisors`).
+   */
+  async getSupervisors(actor?: AuthUserContext) {
+    if (actor?.role === 'warehouse_manager') {
+      if (!actor.department_id) return [];
+      return usersRepository.findSupervisors(actor.department_id);
+    }
     return usersRepository.findSupervisors();
   }
 }

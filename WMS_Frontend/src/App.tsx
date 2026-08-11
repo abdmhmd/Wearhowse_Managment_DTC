@@ -19,6 +19,7 @@ import TransactionDetailPage from '@/pages/transactions/TransactionDetailPage';
 import StockMovementsPage from '@/pages/stock-movements/StockMovementsPage';
 import ReportsPage from '@/pages/reports/ReportsPage';
 import UsersPage from '@/pages/users/UsersPage';
+import SupervisorsPage from '@/pages/supervisors/SupervisorsPage';
 import SettingsPage from '@/pages/settings/SettingsPage';
 import ProjectsPage from '@/pages/projects/ProjectsPage';
 import ProjectDetailPage from '@/pages/projects/ProjectDetailPage';
@@ -111,6 +112,10 @@ export default function App() {
 
               <Route element={<ProtectedRoute allowedPermissions={['users:view']} />}>
                 <Route path="/users" element={<UsersPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedPermissions={['supervisors:view']} />}>
+                <Route path="/supervisors" element={<SupervisorsPage />} />
               </Route>
 
               <Route element={<ProtectedRoute allowedPermissions={['settings:view']} />}>

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const userRoleEnum = z.enum(['system_admin', 'warehouse_manager', 'department_manager']);
+const userRoleEnum = z.enum(['system_admin', 'warehouse_manager', 'department_manager', 'supervisor']);
 
 export const createUserSchema = z
   .object({
@@ -12,10 +12,13 @@ export const createUserSchema = z
     warehouse_ids: z.array(z.number().int().positive()).optional().default([]),
   })
   .superRefine((data, ctx) => {
-    if (data.role === 'department_manager' && (data.department_id === undefined || data.department_id === null)) {
+    if (
+      (data.role === 'department_manager' || data.role === 'supervisor') &&
+      (data.department_id === undefined || data.department_id === null)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'department_id is required for department_manager role',
+        message: 'department_id is required for this role',
         path: ['department_id'],
       });
     }
@@ -33,7 +36,7 @@ export const updateUserSchema = z
     username: z.string().min(1).max(100).optional(),
     password: z.string().min(6).max(255).optional(),
     full_name: z.string().min(1).max(255).optional(),
-    role: userRoleEnum.optional(),
+    role: z.enum(['system_admin', 'warehouse_manager', 'department_manager', 'supervisor']).optional(),
     is_active: z.boolean().optional(),
     department_id: z.number().int().positive().optional().nullable(),
     warehouse_ids: z.array(z.number().int().positive()).optional(),
@@ -49,10 +52,13 @@ export const updateUserSchema = z
         path: ['warehouse_ids'],
       });
     }
-    if (data.role === 'department_manager' && data.department_id !== undefined && data.department_id === null) {
+    if (
+      (data.role === 'department_manager' || data.role === 'supervisor') &&
+      data.department_id !== undefined && data.department_id === null
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'department_id is required for department_manager role',
+        message: 'department_id is required for this role',
         path: ['department_id'],
       });
     }

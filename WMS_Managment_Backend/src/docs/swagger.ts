@@ -29,7 +29,7 @@ const swaggerDocument = {
       },
       UserRole: {
         type: 'string',
-        enum: ['system_admin', 'warehouse_manager', 'department_manager'],
+        enum: ['system_admin', 'warehouse_manager', 'department_manager', 'supervisor'],
       },
       RequestStatus: {
         type: 'string',

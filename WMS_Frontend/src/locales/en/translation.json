@@ -16,6 +16,7 @@
     "stockMovements": "Stock Movements",
     "reports": "Reports",
     "users": "Users",
+    "supervisors": "Supervisors",
     "settings": "Settings",
     "projects": "Projects",
     "custodies": "Custodies",
@@ -351,6 +352,16 @@
       "subtitle": "Manage system users",
       "create": "Create User",
       "edit": "Edit User"
+    },
+    "supervisors": {
+      "title": "Supervisors",
+      "subtitle": "Manage department supervisors",
+      "create": "Create Supervisor",
+      "edit": "Edit Supervisor",
+      "department": "Department",
+      "selectDepartment": "Select department",
+      "deactivateConfirm": "Are you sure you want to deactivate \"{{name}}\"? They will no longer be able to log in.",
+      "activateConfirm": "Are you sure you want to activate \"{{name}}\"?"
     },
     "settings": {
       "title": "Settings",

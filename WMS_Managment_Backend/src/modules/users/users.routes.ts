@@ -6,7 +6,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', authorize('users:view'), usersController.getAll);
-router.get('/supervisors', authorize('users:view'), usersController.getSupervisors);
+router.get('/supervisors', authorize('projects:supervisors'), usersController.getSupervisors);
 router.get('/:id', authorize('users:view'), usersController.getById);
 router.post('/', authorize('users:create'), usersController.create);
 router.put('/:id', authorize('users:update'), usersController.update);

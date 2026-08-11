@@ -38,6 +38,11 @@ export const PERMISSIONS = {
   USERS_UPDATE: 'users:update',
   USERS_DELETE: 'users:delete',
 
+  SUPERVISORS_VIEW: 'supervisors:view',
+  SUPERVISORS_CREATE: 'supervisors:create',
+  SUPERVISORS_UPDATE: 'supervisors:update',
+  SUPERVISORS_DELETE: 'supervisors:delete',
+
   ITEMS_VIEW: 'items:view',
   ITEMS_CREATE: 'items:create',
   ITEMS_UPDATE: 'items:update',
@@ -84,6 +89,8 @@ export const PERMISSIONS = {
   PROJECTS_UPDATE: 'projects:update',
   PROJECTS_CLOSE: 'projects:close',
   PROJECTS_DELETE: 'projects:delete',
+  /** Look up candidate supervisors for a project (scoped to the caller's department). */
+  PROJECTS_SUPERVISORS: 'projects:supervisors',
 
   CUSTODIES_VIEW: 'custodies:view',
   CUSTODIES_RETURN: 'custodies:return',

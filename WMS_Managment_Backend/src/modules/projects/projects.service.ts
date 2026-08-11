@@ -2,7 +2,7 @@ import { runInTransaction, pool } from '../../config/database';
 import { projectsRepository, ProjectStatus, ProjectStudent } from './projects.repository';
 import { custodiesRepository } from '../custodies/custodies.repository';
 import { warehousesRepository } from '../warehouses/warehouses.repository';
-import { NotFoundError, ValidationError, AppError } from '../../utils/AppError';
+import { NotFoundError, ValidationError, AppError, ForbiddenError } from '../../utils/AppError';
 import { PaginationMeta } from '../../utils/response';
 import { scopeForUser, type DataScope } from '../authorization/scope';
 import type { AuthUserContext } from '../authorization/authorization.service';
@@ -25,8 +25,22 @@ export class ProjectsService {
     user?: AuthUserContext
   ) {
     return runInTransaction(async (client) => {
+      // A warehouse manager can only create a project for their own
+      // department — the department is derived from the authenticated user,
+      // never from the client-supplied payload.
+      const scope = user ? scopeForUser(user) : 'GLOBAL';
+      let departmentId = data.department_id;
+      if (scope === 'WAREHOUSE') {
+        if (!user || user.department_id == null) {
+          throw new ValidationError(
+            'A warehouse manager must be assigned to a department before creating a project.'
+          );
+        }
+        departmentId = user.department_id;
+      }
+
       const warehouse_id = await this.resolveAndValidateWarehouse(
-        data.department_id,
+        departmentId,
         data.warehouse_id,
         user
       );
@@ -36,7 +50,7 @@ export class ProjectsService {
         {
           project_no,
           name: data.name,
-          department_id: data.department_id,
+          department_id: departmentId,
           warehouse_id,
           supervisor_id: data.supervisor_id,
           created_by: createdBy,
@@ -125,6 +139,17 @@ export class ProjectsService {
     user?: AuthUserContext
   ): Promise<number> {
     let id = warehouseId;
+    const scope = user ? scopeForUser(user) : 'GLOBAL';
+    if (!id && scope === 'WAREHOUSE' && user && user.warehouse_ids.length > 0) {
+      // Warehouse managers default to one of their assigned warehouses in the
+      // department (preferring the department main warehouse when assigned) —
+      // never to a warehouse they are not assigned to.
+      const assigned = await this.findAssignedWarehouseForDepartment(
+        user.warehouse_ids,
+        departmentId
+      );
+      if (assigned) id = assigned;
+    }
     if (!id) {
       const main = await warehousesRepository.findMainByDepartment(departmentId);
       if (main) id = main.id;
@@ -156,6 +181,21 @@ export class ProjectsService {
       });
     }
     return id;
+  }
+
+  /** Returns the manager's assigned warehouse for a department (prefers the main warehouse). */
+  private async findAssignedWarehouseForDepartment(
+    warehouseIds: number[],
+    departmentId: number
+  ): Promise<number | null> {
+    const res = await pool.query(
+      `SELECT id FROM warehouses
+        WHERE id = ANY($1) AND department_id = $2 AND is_active = true
+        ORDER BY is_main DESC, id ASC
+        LIMIT 1`,
+      [warehouseIds, departmentId]
+    );
+    return res.rows[0]?.id ?? null;
   }
 
   async getById(id: number, user?: AuthUserContext) {
@@ -199,6 +239,12 @@ export class ProjectsService {
 
     const updateData: any = { ...data };
     if (data.warehouse_id !== undefined && data.warehouse_id !== project.warehouse_id) {
+      // Department managers stay view-only on the project's department/warehouse
+      // assignment — their projects:update permission only covers metadata and
+      // the student roster, never warehouse moves.
+      if (user && scopeForUser(user) === 'DEPARTMENT') {
+        throw new ForbiddenError('Department managers cannot change the project warehouse.');
+      }
       const resolved = await this.resolveAndValidateWarehouse(project.department_id, data.warehouse_id, user);
       updateData.warehouse_id = resolved;
     } else {
@@ -262,7 +308,7 @@ export class ProjectsService {
     }
     return runInTransaction(async (client) => {
       await projectsRepository.setStudents(client, id, students);
-      return projectsRepository.findStudents(id);
+      return projectsRepository.findStudents(id, client);
     });
   }
 

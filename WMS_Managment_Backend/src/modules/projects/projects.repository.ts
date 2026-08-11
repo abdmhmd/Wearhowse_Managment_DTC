@@ -247,8 +247,9 @@ export class ProjectsRepository {
     }
   }
 
-  async findStudents(projectId: number): Promise<ProjectStudent[]> {
-    const res = await pool.query(
+  async findStudents(projectId: number, client?: PoolClient): Promise<ProjectStudent[]> {
+    const q = client ?? pool;
+    const res = await q.query(
       `SELECT id, full_name, student_id, role
        FROM project_students
        WHERE project_id = $1

@@ -1,74 +1,73 @@
 import { Request, Response, NextFunction } from 'express';
-import { usersService } from './users.service';
+import { supervisorsService } from './supervisors.service';
 import { sendData, sendPaginated } from '../../utils/response';
 import { hashPassword } from '../../utils/crypto';
-import { createUserSchema, updateUserSchema } from './users.validator';
+import { createSupervisorSchema, updateSupervisorSchema } from './supervisors.validator';
 import { NotFoundError, ValidationError } from '../../utils/AppError';
 import { writeAudit } from '../authorization/audit.service';
 
-export class UsersController {
+export class SupervisorsController {
   async getAll(req: Request, res: Response, next: NextFunction) {
     try {
       const page = Math.max(1, Number(req.query.page) || 1);
       const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-      const { items, pagination } = await usersService.getAll(page, limit);
+      const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+      const { items, pagination } = await supervisorsService.getAll((req as any).user, page, limit, search);
       sendPaginated(res, items, pagination);
     } catch (e) { next(e); }
   }
+
   async getById(req: Request, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id);
-      if (isNaN(id)) throw new ValidationError('Invalid user ID');
-      const data = await usersService.getById(id);
-      if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id: req.params.id });
+      if (isNaN(id)) throw new ValidationError('Invalid supervisor ID');
+      const data = await supervisorsService.getById((req as any).user, id);
       sendData(res, data);
     } catch (e) { next(e); }
   }
+
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const parsed = createUserSchema.safeParse(req.body);
+      const parsed = createSupervisorSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
-      const password_hash = await hashPassword(parsed.data.password);
-      const data = await usersService.create({ ...parsed.data, password_hash });
+      const { password, ...rest } = parsed.data;
+      const password_hash = await hashPassword(password);
+      const data = await supervisorsService.create((req as any).user, { ...rest, password_hash });
       await writeAudit({
         user_id: (req as any).user?.userId ?? null,
-        action: 'USER_CREATED',
-        resource: 'users',
+        action: 'SUPERVISOR_CREATED',
+        resource: 'supervisors',
         resource_id: data.id,
-        details: { username: data.username, role: data.role },
+        details: { username: data.username, department_id: data.department_id },
         ip_address: req.ip,
         user_agent: req.headers?.['user-agent'] ?? null,
       });
       sendData(res, data, { statusCode: 201 });
     } catch (e) { next(e); }
   }
+
   async update(req: Request, res: Response, next: NextFunction) {
     try {
-      const parsed = updateUserSchema.safeParse(req.body);
+      const parsed = updateSupervisorSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
       const id = Number(req.params.id);
-      if (isNaN(id)) throw new ValidationError('Invalid user ID');
+      if (isNaN(id)) throw new ValidationError('Invalid supervisor ID');
 
-      // Build updateData safely — never spread raw password into the object
       const { password, ...restData } = parsed.data;
       const updateData: any = { ...restData };
       if (password) {
         updateData.password_hash = await hashPassword(password);
       }
 
-      const data = await usersService.update(id, updateData);
-      if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id });
+      const data = await supervisorsService.update((req as any).user, id, updateData);
 
-      const actor = (req as any).user;
       const details: Record<string, unknown> = {};
-      if (updateData.role !== undefined) details.role = updateData.role;
       if (updateData.is_active !== undefined) details.is_active = updateData.is_active;
       if (updateData.password_hash !== undefined) details.password_changed = true;
-      if (updateData.warehouse_ids !== undefined) details.warehouse_ids = updateData.warehouse_ids;
       await writeAudit({
-        user_id: actor?.userId ?? null,
-        action: updateData.password_hash !== undefined ? 'USER_PASSWORD_CHANGED' : 'USER_UPDATED',
-        resource: 'users',
+        user_id: (req as any).user?.userId ?? null,
+        action: updateData.is_active !== undefined ? 'SUPERVISOR_STATUS_CHANGED' : 'SUPERVISOR_UPDATED',
+        resource: 'supervisors',
         resource_id: id,
         details,
         ip_address: req.ip,
@@ -77,16 +76,16 @@ export class UsersController {
       sendData(res, data);
     } catch (e) { next(e); }
   }
+
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id);
-      if (isNaN(id)) throw new ValidationError('Invalid user ID');
-      const data = await usersService.delete(id);
-      if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id: req.params.id });
+      if (isNaN(id)) throw new ValidationError('Invalid supervisor ID');
+      const data = await supervisorsService.remove((req as any).user, id);
       await writeAudit({
         user_id: (req as any).user?.userId ?? null,
-        action: 'USER_DELETED',
-        resource: 'users',
+        action: 'SUPERVISOR_DELETED',
+        resource: 'supervisors',
         resource_id: id,
         details: { username: data.username },
         ip_address: req.ip,
@@ -95,11 +94,6 @@ export class UsersController {
       sendData(res, data);
     } catch (e) { next(e); }
   }
-  async getSupervisors(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await usersService.getSupervisors((req as any).user);
-      sendData(res, data);
-    } catch (e) { next(e); }
-  }
 }
-export const usersController = new UsersController();
+
+export const supervisorsController = new SupervisorsController();

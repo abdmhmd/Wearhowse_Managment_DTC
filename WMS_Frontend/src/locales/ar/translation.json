@@ -16,6 +16,7 @@
     "stockMovements": "حركات المخزون",
     "reports": "التقارير",
     "users": "المستخدمون",
+    "supervisors": "المشرفون",
     "settings": "الإعدادات",
     "projects": "المشاريع",
     "custodies": "العهد",
@@ -351,6 +352,16 @@
       "subtitle": "إدارة مستخدمي النظام",
       "create": "إنشاء مستخدم",
       "edit": "تعديل المستخدم"
+    },
+    "supervisors": {
+      "title": "المشرفون",
+      "subtitle": "إدارة مشرفي القسم",
+      "create": "إنشاء مشرف",
+      "edit": "تعديل المشرف",
+      "department": "القسم",
+      "selectDepartment": "اختر القسم",
+      "deactivateConfirm": "هل أنت متأكد من إلغاء تفعيل \"{{name}}\"؟ لن يتمكن من تسجيل الدخول بعد الآن.",
+      "activateConfirm": "هل أنت متأكد من تفعيل \"{{name}}\"؟"
     },
     "settings": {
       "title": "الإعدادات",
