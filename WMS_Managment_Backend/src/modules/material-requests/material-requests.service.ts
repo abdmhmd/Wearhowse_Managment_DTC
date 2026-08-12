@@ -6,9 +6,10 @@ import { itemsRepository } from '../items/items.repository';
 import { stockMovementsRepository } from '../stock-movements/stock-movements.repository';
 import { warehousesRepository } from '../warehouses/warehouses.repository';
 import { custodiesRepository } from '../custodies/custodies.repository';
-import { NotFoundError, ValidationError, AppError } from '../../utils/AppError';
-import { scopeForUser, type DataScope } from '../authorization/scope';
+import { NotFoundError, ValidationError, ConflictError, AppError } from '../../utils/AppError';
+import { scopeForUser, isWarehouseFallbackUser, type DataScope } from '../authorization/scope';
 import { PERMISSIONS } from '../authorization/permissions';
+import { logger } from '../../utils/logger';
 import type { AuthUserContext } from '../authorization/authorization.service';
 
 /**
@@ -30,8 +31,8 @@ export class MaterialRequestsService {
   async createRequest(
     requestedBy: number,
     data: {
-      department_id: number;
-      warehouse_id: number;
+      department_id?: number | null;
+      warehouse_id?: number | null;
       request_type?: RequestType;
       project_id?: number | null;
       priority?: 'low' | 'normal' | 'high' | 'urgent';
@@ -45,8 +46,8 @@ export class MaterialRequestsService {
       throw new ValidationError('Request must have at least one item', {});
     }
 
+    const scope: DataScope | null = user ? scopeForUser(user) : null;
     if (user) {
-      const scope: DataScope = scopeForUser(user);
       // A department_manager is the APPROVAL layer, never the creator: the
       // intended creator is the warehouse_manager of the department warehouse
       // (or the system_admin). Enforced server-side so a hand-crafted payload
@@ -54,38 +55,102 @@ export class MaterialRequestsService {
       if (scope === 'DEPARTMENT') {
         throw new ValidationError('Only warehouse managers or system administrators can create material requests', {});
       }
-      if (scope === 'WAREHOUSE' && !user.warehouse_ids.includes(data.warehouse_id)) {
-        throw new ValidationError('You can only create requests against a warehouse you are assigned to', { warehouse_id: data.warehouse_id });
-      }
-      // Fail closed: a user with no resolvable department/warehouse scope
-      // (e.g. a warehouse_manager with zero warehouse assignments) may not
-      // create material requests at all.
-      if (scope === 'NONE') {
+      // Fail closed for every NONE-scope user EXCEPT a warehouse_manager with
+      // zero assignments, who resolves to NONE but is allowed through to the
+      // zero-assignment fallback below (they may pick a destination warehouse).
+      if (scope === 'NONE' && !isWarehouseFallbackUser(user)) {
         throw new ValidationError('You are not authorized to create material requests', {});
       }
     }
 
-    // The destination warehouse must belong to the request's department. This is
-    // enforced server-side so a department_manager (or warehouse_manager) can
-    // never reference another department's warehouse, even with a hand-crafted
-    // payload. system_admin may reference any warehouse of the chosen department.
-    if (user && scopeForUser(user) !== 'GLOBAL') {
-      const wh = await warehousesRepository.findById(data.warehouse_id);
-      if (!wh || wh.department_id !== data.department_id) {
-        throw new ValidationError(
-          'The selected warehouse does not belong to the request department',
-          { warehouse_id: data.warehouse_id, department_id: data.department_id }
-        );
+    // ── Resolve the destination warehouse from the AUTHENTICATED USER ───────
+    let warehouseId: number;
+
+    if (user && scope !== 'GLOBAL') {
+      if (user.warehouse_ids.length > 0) {
+        // ── Case A: the user HAS assigned warehouses ─────────────────────────
+        // Strict spoofing protection: the payload `warehouse_id` is IGNORED and
+        // the first eligible (active, non-main) assigned warehouse is used.
+        const assigned = await warehousesRepository.findAssignedNonMainByUser(user.id);
+        if (assigned.length === 0) {
+          // Assignments exist but none is an eligible destination (e.g. only the
+          // department MAIN warehouse or only inactive warehouses).
+          throw new ValidationError('Your assigned warehouses are not eligible request destinations. Contact your administrator.', {});
+        }
+        // Multiple assignments currently fall back to the FIRST one in a
+        // deterministic order (warehouse_id ASC). The frontend shows which
+        // warehouse will be used so the outcome is never surprising.
+        // TODO(multi-warehouse): once the workflow needs per-warehouse targeting
+        // for non-admin creators, surface a picker restricted to the assigned set
+        // instead of silently choosing the lowest warehouse id.
+        if (assigned.length > 1) {
+          logger.warn(
+            `User ${user.id} has ${assigned.length} assigned warehouses; auto-assigning the first one`,
+            'material-requests',
+            { user_id: user.id, assigned_ids: assigned.map((w) => w.id), selected_id: assigned[0].id }
+          );
+        }
+        warehouseId = assigned[0].id;
+      } else {
+        // ── Case B: ZERO assigned warehouses (fallback) ──────────────────────
+        // The payload `warehouse_id` is now MANDATORY and validated (exists,
+        // active, non-main, linked to a department). This fallback NEVER
+        // applies when the user has assignments — those stay strictly Case A.
+        if (data.warehouse_id == null) {
+          throw new ValidationError('You have no assigned warehouses. Please select a valid warehouse to proceed.', {});
+        }
+        const eligible = await warehousesRepository.findEligibleDestination(data.warehouse_id);
+        if (!eligible) {
+          throw new ValidationError('You have no assigned warehouses. Please select a valid warehouse to proceed.', {});
+        }
+        warehouseId = data.warehouse_id;
       }
+    } else if (data.warehouse_id != null) {
+      // system_admin (GLOBAL scope) or an internal caller without a user context
+      // may pick an explicit warehouse; it is still validated below.
+      warehouseId = data.warehouse_id;
+    } else {
+      const first = await warehousesRepository.findFirstActiveNonMain();
+      if (!first) {
+        throw new ValidationError('No warehouse available. Contact your administrator.', {});
+      }
+      warehouseId = first.id;
     }
+
+    // ── Validate the resolved warehouse and derive the department ───────────
+    const wh = await warehousesRepository.findById(warehouseId);
+    if (!wh) {
+      throw new ValidationError('The selected warehouse does not exist', { warehouse_id: warehouseId });
+    }
+    if (wh.department_id == null) {
+      throw new ValidationError('The selected warehouse is not linked to a department', { warehouse_id: warehouseId });
+    }
+    if (wh.is_main) {
+      // The routing trigger (migration 020) forbids targeting a department's
+      // MAIN warehouse as the request destination; reject cleanly instead of a
+      // raw 500 from the database constraint.
+      throw new ValidationError('The selected warehouse is the department main warehouse and cannot be a request destination', { warehouse_id: warehouseId });
+    }
+
+    // The request department is DERIVED from the destination warehouse
+    // (warehouses.department_id). A client-supplied department_id that
+    // contradicts the warehouse is a conflict and is rejected outright.
+    if (data.department_id != null && data.department_id !== wh.department_id) {
+      throw new ConflictError(
+        'The warehouse belongs to a different department than the one submitted',
+        'DEPARTMENT_WAREHOUSE_MISMATCH',
+        { warehouse_id: warehouseId, department_id: data.department_id }
+      );
+    }
+    const resolvedDepartmentId = wh.department_id;
 
     return runInTransaction(async (client) => {
       const request_no = await materialRequestsRepository.generateRequestNo();
 
       const header = await materialRequestsRepository.create(client, {
         request_no,
-        department_id: data.department_id,
-        warehouse_id: data.warehouse_id,
+        department_id: resolvedDepartmentId,
+        warehouse_id: warehouseId,
         requested_by: requestedBy,
         status: 'pending',
         priority: data.priority ?? 'normal',

@@ -1,6 +1,6 @@
 import { PoolClient } from 'pg';
 import { pool } from '../../config/database';
-import { warehouseAccessClause } from '../authorization/scope';
+import { warehouseAccessClause, isWarehouseFallbackUser } from '../authorization/scope';
 import type { AuthUserContext } from '../authorization/authorization.service';
 
 export interface ItemsFilter {
@@ -59,12 +59,16 @@ export class ItemsRepository {
       paramIndex++;
     }
     if (filter?.user) {
-      const scope = warehouseAccessClause(filter.user, 'i.warehouse_id', paramIndex);
-      if (scope.clause !== 'TRUE') {
-        query += ` AND ${scope.clause}`;
-        params.push(...scope.params);
-        paramIndex += scope.params.length;
+      if (!isWarehouseFallbackUser(filter.user)) {
+        const scope = warehouseAccessClause(filter.user, 'i.warehouse_id', paramIndex);
+        if (scope.clause !== 'TRUE') {
+          query += ` AND ${scope.clause}`;
+          params.push(...scope.params);
+          paramIndex += scope.params.length;
+        }
       }
+      // Zero-assignment warehouse_manager: no scope clause -> the full active
+      // item catalog is exposed so the create-request fallback can be used.
     }
 
     query += ' ORDER BY i.id';
@@ -105,11 +109,13 @@ export class ItemsRepository {
       paramIndex++;
     }
     if (filter?.user) {
-      const scope = warehouseAccessClause(filter.user, 'warehouse_id', paramIndex);
-      if (scope.clause !== 'TRUE') {
-        query += ` AND ${scope.clause}`;
-        params.push(...scope.params);
-        paramIndex += scope.params.length;
+      if (!isWarehouseFallbackUser(filter.user)) {
+        const scope = warehouseAccessClause(filter.user, 'warehouse_id', paramIndex);
+        if (scope.clause !== 'TRUE') {
+          query += ` AND ${scope.clause}`;
+          params.push(...scope.params);
+          paramIndex += scope.params.length;
+        }
       }
     }
 

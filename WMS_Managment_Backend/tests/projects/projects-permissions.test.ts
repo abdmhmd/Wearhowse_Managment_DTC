@@ -12,9 +12,12 @@ import { shortId, TEST_PREFIX, seedWarehouse, seedDepartment, cleanup } from '..
  *   WM-3  a warehouse_manager omitting the warehouse defaults to one of their
  *         assigned warehouses of the department (preferring the main warehouse)
  *   WM-4  a warehouse_manager list/read is scoped to their assigned department
- *   DM-1  a department_manager can add/edit the student roster (projects:update)
- *   DM-2  a department_manager cannot change the project warehouse
+ *   DM-1  a department_manager is VIEW-ONLY: cannot edit the student roster or
+ *         project metadata (projects:update revoked by migration 028 -> 403)
+ *   DM-2  a department_manager cannot change the project warehouse (403)
  *   DM-3  a department_manager cannot create/close/cancel projects
+ *   DM-4  a department_manager list/read is scoped to their own department;
+ *         without a department the list is empty (fail-closed)
  *   G-1   system_admin is unchanged (GLOBAL scope)
  */
 const prefix = `${TEST_PREFIX}projperm_`;
@@ -64,6 +67,7 @@ describe('Project & warehouse manager permissions', () => {
   let wmB: SeedRoleUser;
   let wmNoDept: SeedRoleUser;
   let dmA: SeedRoleUser;
+  let dmNoDept: SeedRoleUser;
   let supervisorA: SeedRoleUser;
 
   let deptA: number;
@@ -89,6 +93,7 @@ describe('Project & warehouse manager permissions', () => {
     wmB = await seedRoleUser('warehouse_manager', { department_id: deptB, warehouse_ids: [whBMain] });
     wmNoDept = await seedRoleUser('warehouse_manager', { warehouse_ids: [whAMain] });
     dmA = await seedRoleUser('department_manager', { department_id: deptA });
+    dmNoDept = await seedRoleUser('department_manager');
     supervisorA = await seedRoleUser('system_admin', { department_id: deptA });
 
     admin.token = await login(admin);
@@ -96,6 +101,7 @@ describe('Project & warehouse manager permissions', () => {
     wmB.token = await login(wmB);
     wmNoDept.token = await login(wmNoDept);
     dmA.token = await login(dmA);
+    dmNoDept.token = await login(dmNoDept);
 
     // Control data created by the system admin (GLOBAL scope, unchanged).
     const pA = await request(app)
@@ -114,7 +120,7 @@ describe('Project & warehouse manager permissions', () => {
   });
 
   afterAll(async () => {
-    const userIds = [admin, wmA, wmB, wmNoDept, dmA, supervisorA].map((u) => u.id);
+    const userIds = [admin, wmA, wmB, wmNoDept, dmA, dmNoDept, supervisorA].map((u) => u.id);
     await pool.query(
       `DELETE FROM audit_logs WHERE user_id = ANY($1)`,
       [userIds]
@@ -204,18 +210,18 @@ describe('Project & warehouse manager permissions', () => {
     });
   });
 
-  describe('DM-1: department manager can add/edit the student roster', () => {
-    test('department manager can PUT students on their own department project', async () => {
+  describe('DM-1: department manager is view-only (projects:update revoked)', () => {
+    test('department manager cannot PUT students on their own department project (403)', async () => {
       const res = await request(app)
         .put(`/api/projects/${deptAProject}/students`)
         .set('Authorization', `Bearer ${dmA.token}`)
         .send({ students: [{ full_name: 'Student One' }, { full_name: 'Student Two' }] });
-      expect(res.status).toBe(200);
-      expect(res.body.data.students).toHaveLength(2);
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
     });
   });
 
-  describe('DM-2: department manager cannot change the project warehouse', () => {
+  describe('DM-2: department manager cannot edit any project field', () => {
     test('PATCH /projects/:id with a different warehouse_id returns 403', async () => {
       const res = await request(app)
         .patch(`/api/projects/${deptAProject}`)
@@ -225,13 +231,13 @@ describe('Project & warehouse manager permissions', () => {
       expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
     });
 
-    test('PATCH /projects/:id metadata (name) succeeds for the department manager', async () => {
+    test('PATCH /projects/:id metadata (name) also returns 403', async () => {
       const res = await request(app)
         .patch(`/api/projects/${deptAProject}`)
         .set('Authorization', `Bearer ${dmA.token}`)
         .send({ name: `${prefix}A renamed` });
-      expect(res.status).toBe(200);
-      expect(res.body.data.name).toBe(`${prefix}A renamed`);
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
     });
   });
 
@@ -256,6 +262,33 @@ describe('Project & warehouse manager permissions', () => {
         .patch(`/api/projects/${deptAProject}/cancel`)
         .set('Authorization', `Bearer ${dmA.token}`);
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe('DM-4: department manager view is scoped to their own department', () => {
+    test('list only contains projects of their own department', async () => {
+      const res = await request(app)
+        .get('/api/projects?limit=200')
+        .set('Authorization', `Bearer ${dmA.token}`);
+      expect(res.status).toBe(200);
+      const ids = res.body.data.items.map((x: any) => x.id);
+      expect(ids).toContain(deptAProject);
+      expect(ids).not.toContain(deptBProject);
+    });
+
+    test('getById of a foreign-department project returns 404', async () => {
+      const res = await request(app)
+        .get(`/api/projects/${deptBProject}`)
+        .set('Authorization', `Bearer ${dmA.token}`);
+      expect(res.status).toBe(404);
+    });
+
+    test('department manager without a department gets an empty list (fail-closed)', async () => {
+      const res = await request(app)
+        .get('/api/projects?limit=200')
+        .set('Authorization', `Bearer ${dmNoDept.token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.items).toEqual([]);
     });
   });
 

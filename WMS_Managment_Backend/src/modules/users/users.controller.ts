@@ -81,7 +81,7 @@ export class UsersController {
     try {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid user ID');
-      const data = await usersService.delete(id);
+      const data = await usersService.delete(id, (req as any).user?.userId ?? undefined);
       if (!data) throw new NotFoundError('User', 'USER_NOT_FOUND', { id: req.params.id });
       await writeAudit({
         user_id: (req as any).user?.userId ?? null,

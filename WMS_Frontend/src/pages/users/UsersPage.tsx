@@ -37,6 +37,7 @@ export default function UsersPage() {
   const warehouseOptions = warehousesData?.items || [];
 
   const isWarehouseRole = (role?: string) => role === 'warehouse_manager';
+  const isDepartmentRole = (role?: string) => role === 'department_manager' || role === 'supervisor';
 
   const toggleWarehouse = (id: number) => {
     setWarehouseIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -70,12 +71,16 @@ export default function UsersPage() {
     setDeletingUser(null);
   };
 
-  const roleOptions = (['system_admin', 'warehouse_manager', 'department_manager'] as UserRole[]).map((value) => ({ value, label: getLocalizedRoleLabel(value) }));
+  const roleOptions = (['system_admin', 'warehouse_manager', 'department_manager', 'supervisor'] as UserRole[]).map((value) => ({ value, label: getLocalizedRoleLabel(value) }));
 
   const columns = [
     { key: 'id', header: t('table.id') },
     { key: 'username', header: t('table.username') },
     { key: 'full_name', header: t('table.fullName') },
+    {
+      key: 'department', header: t('table.department'),
+      render: (item: User) => item.department_name_en || item.department_name_ar || <span className="text-gray-400">—</span>,
+    },
     {
       key: 'role', header: t('table.role'),
       render: (item: User) => {
@@ -83,6 +88,7 @@ export default function UsersPage() {
           system_admin: 'bg-red-100 text-red-800',
           warehouse_manager: 'bg-blue-100 text-blue-800',
           department_manager: 'bg-amber-100 text-amber-800',
+          supervisor: 'bg-purple-100 text-purple-800',
         };
         return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colors[item.role] || 'bg-gray-100 text-gray-700'}`}>{getLocalizedRoleLabel(item.role)}</span>;
       },
@@ -100,8 +106,8 @@ export default function UsersPage() {
             <Button variant="ghost" size="sm" onClick={(e) => {
               e.stopPropagation();
               setEditingUser(item);
-              setWarehouseIds((item as any).warehouse_ids ?? []);
-              updateForm.reset({ username: item.username, full_name: item.full_name, role: item.role, is_active: item.is_active, department_id: (item as any).department_id ?? undefined });
+              setWarehouseIds(item.warehouse_ids ?? []);
+              updateForm.reset({ username: item.username, full_name: item.full_name, role: item.role, is_active: item.is_active, department_id: item.department_id ?? undefined });
             }}>
               <PencilIcon className="h-4 w-4" />
             </Button>
@@ -123,7 +129,7 @@ export default function UsersPage() {
       {isEdit && <Input label={t('form.newPassword')} type="password" {...form.register('password')} />}
       <Input label={t('form.fullName')} {...form.register('full_name')} error={form.formState.errors.full_name?.message} />
       <Select label={t('form.role')} {...form.register('role')} error={form.formState.errors.role?.message} options={roleOptions} placeholder={t('form.selectRole')} />
-      {form.watch('role') === 'department_manager' && (
+      {isDepartmentRole(form.watch('role')) && (
         <Select label={t('form.department')} {...form.register('department_id')} error={form.formState.errors.department_id?.message} options={departmentOptions} placeholder={t('form.selectDepartment')} />
       )}
       {isWarehouseRole(form.watch('role')) && (

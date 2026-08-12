@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { ConflictError } from '../../utils/AppError';
 
 // All active roles in the system (storekeeper/accountant/viewer were
 // deactivated in migration 019; legacy users keep their role value for data
@@ -49,7 +50,14 @@ const ALLOWED_USER_UPDATE_FIELDS: (keyof UpdateUserData)[] = [
 
 export class UsersRepository {
   async findAll(limit?: number, offset?: number): Promise<UserRowPublic[]> {
-    let query = 'SELECT id, username, full_name, role, is_active, created_at, updated_at FROM users WHERE is_active = true ORDER BY id';
+    let query = `SELECT u.id, u.username, u.full_name, u.role, u.department_id,
+                        u.is_active, u.created_at, u.updated_at,
+                        d.name_ar AS department_name_ar,
+                        d.name_en AS department_name_en
+                   FROM users u
+                   LEFT JOIN departments d ON d.id = u.department_id
+                  WHERE u.is_active = true
+                  ORDER BY u.id`;
     const params: any[] = [];
     if (limit !== undefined && offset !== undefined) {
       query += ' LIMIT $1 OFFSET $2';
@@ -99,12 +107,39 @@ export class UsersRepository {
     return res.rows[0] || null;
   }
 
+  /**
+   * Physically deletes the user row. Referential integrity is preserved by the
+   * existing schema constraints:
+   *
+   *   * ON DELETE CASCADE  -> refresh_tokens, user_warehouses
+   *   * ON DELETE SET NULL -> audit_logs (audit trail is preserved, actor id
+   *                           is nulled), transactions.approved_by, and the
+   *                           other optional actor references
+   *   * RESTRICT / NO ACTION -> transactions.created_by, stock_movements.user_id,
+   *                           material_requests.requested_by,
+   *                           projects.created_by / supervisor_id,
+   *                           custodies.assigned_to
+   *
+   * When the user is referenced by one of those business tables Postgres
+   * rejects the DELETE (error 23503); we surface it as a 409 Conflict so the
+   * caller can deactivate the user instead of deleting.
+   */
   async delete(id: number): Promise<UserRowPublic | null> {
-    const res = await pool.query(
-      'UPDATE users SET is_active = false WHERE id = $1 AND is_active = true RETURNING id, username, full_name, role, department_id, is_active, created_at, updated_at',
-      [id]
-    );
-    return res.rows[0] || null;
+    try {
+      const res = await pool.query(
+        'DELETE FROM users WHERE id = $1 RETURNING id, username, full_name, role, department_id, is_active, created_at, updated_at',
+        [id]
+      );
+      return res.rows[0] || null;
+    } catch (error: any) {
+      if (error?.code === '23503') {
+        throw new ConflictError(
+          'Cannot delete this user: they are referenced by existing business records (requests, projects, custodies, transactions or stock movements). Deactivate the user instead.',
+          'USER_HAS_REFERENCES'
+        );
+      }
+      throw error;
+    }
   }
 
   /** Find all users belonging to a specific department (for department_manager scoping) */
@@ -133,10 +168,26 @@ export class UsersRepository {
 
   async getWarehouseAssignments(userId: number): Promise<number[]> {
     const res = await pool.query(
-      'SELECT warehouse_id FROM user_warehouses WHERE user_id = $1 ORDER BY warehouse_id',
+      'SELECT warehouse_id FROM user_warehouses WHERE user_id = $1',
       [userId]
     );
-    return res.rows.map((r) => r.warehouse_id as number);
+    return res.rows.map((r) => r.warehouse_id);
+  }
+
+  /** warehouse assignment map for a batch of user ids (list endpoint). */
+  async getWarehouseAssignmentsMap(userIds: number[]): Promise<Map<number, number[]>> {
+    if (userIds.length === 0) return new Map();
+    const res = await pool.query(
+      'SELECT user_id, warehouse_id FROM user_warehouses WHERE user_id = ANY($1) ORDER BY warehouse_id',
+      [userIds]
+    );
+    const map = new Map<number, number[]>();
+    for (const row of res.rows) {
+      const arr = map.get(row.user_id) || [];
+      arr.push(row.warehouse_id);
+      map.set(row.user_id, arr);
+    }
+    return map;
   }
 }
 

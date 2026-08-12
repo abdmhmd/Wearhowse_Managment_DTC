@@ -25,7 +25,8 @@
   "roles": {
     "system_admin": "مدير النظام",
     "warehouse_manager": "مدير المستودع",
-    "department_manager": "مدير القسم / الأستاذ"
+    "department_manager": "مدير القسم / الأستاذ",
+    "supervisor": "مشرف"
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -500,7 +501,10 @@
       "item": "الغرض",
       "quantity": "الكمية",
       "unit": "الوحدة",
-      "noDetails": "لا توجد أصناف في هذا الطلب"
+      "noDetails": "لا توجد أصناف في هذا الطلب",
+      "selectWarehouseFirst": "اختر المستودع أولاً",
+      "destination": "وجهة الطلب",
+      "noWarehouseAvailable": "لا يوجد مستودع متاح لك. تواصل مع المسؤول لتخصيص مستودع."
     }
   },
   "toast": {

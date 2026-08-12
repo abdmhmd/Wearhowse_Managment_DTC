@@ -12,7 +12,9 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *   HIGH-2  inventory report must scope to the caller's warehouses.
  *   HIGH-3  item card sub-queries (movements / summary / last RV / last LN /
  *           per-warehouse stock) must scope by movement warehouse.
- *   HIGH-4  material request creation must be rejected for NONE scope.
+ *   HIGH-4  material request creation for a zero-assignment warehouse manager:
+ *           requires an explicit, eligible warehouse_id (fallback); without it
+ *           the request is rejected.
  *   WM      warehouse_manager must always keep >= 1 warehouse assignment.
  */
 const prefix = `${TEST_PREFIX}scope_reg_`;
@@ -314,14 +316,30 @@ describe('Scope regressions (audit remediation)', () => {
     });
   });
 
-  describe('HIGH-4: material request creation rejected for NONE scope', () => {
-    test('zero-assignment WM cannot create a request', async () => {
+  describe('HIGH-4: material request creation for a zero-assignment warehouse manager (fallback)', () => {
+    test('zero-assignment WM can create a request by selecting a valid warehouse (201)', async () => {
       const res = await request(app)
         .post('/api/requests')
         .set('Authorization', `Bearer ${wmZero.token}`)
         .send({
           department_id: deptA,
           warehouse_id: whA,
+          request_type: 'experiment',
+          priority: 'normal',
+          notes: `${prefix}fallback`,
+          items: [{ item_id: itemA, quantity: 1, unit_code: unitCode }],
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.data.warehouse_id).toBe(whA);
+      expect(res.body.data.department_id).toBe(deptA);
+    });
+
+    test('zero-assignment WM without a warehouse_id is rejected (400)', async () => {
+      const res = await request(app)
+        .post('/api/requests')
+        .set('Authorization', `Bearer ${wmZero.token}`)
+        .send({
+          department_id: deptA,
           request_type: 'experiment',
           priority: 'normal',
           notes: `${prefix}blocked`,

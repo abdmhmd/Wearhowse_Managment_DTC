@@ -1,7 +1,8 @@
 export type UserRole =
   | 'system_admin'
   | 'warehouse_manager'
-  | 'department_manager';
+  | 'department_manager'
+  | 'supervisor';
 
 /**
  * Canonical permission codes. Mirrors the backend catalog
@@ -47,6 +48,10 @@ export interface User {
   full_name: string;
   role: UserRole;
   is_active: boolean;
+  department_id?: number | null;
+  department_name_ar?: string | null;
+  department_name_en?: string | null;
+  warehouse_ids?: number[];
   created_at: string;
   updated_at: string;
 }
@@ -485,6 +490,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   system_admin: 'System Admin',
   warehouse_manager: 'Warehouse Manager',
   department_manager: 'Department Manager',
+  supervisor: 'Supervisor',
 };
 
 export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {

@@ -18,7 +18,9 @@ export class UsersService {
       usersRepository.findAll(limit, offset),
       usersRepository.countAll(),
     ]);
-    return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    const warehouseMap = await usersRepository.getWarehouseAssignmentsMap(items.map((i) => i.id));
+    const enriched = items.map((i) => ({ ...i, warehouse_ids: warehouseMap.get(i.id) || [] }));
+    return { items: enriched, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async getById(id: number) {
@@ -35,6 +37,7 @@ export class UsersService {
     if (data.role === 'warehouse_manager' && (!data.warehouse_ids || data.warehouse_ids.length === 0)) {
       throw new ValidationError('warehouse_manager must be assigned at least one warehouse', { role: data.role });
     }
+    await this.validateDepartment(data.department_id);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -83,6 +86,7 @@ export class UsersService {
     }
 
     const { warehouse_ids, ...restData } = data;
+    await this.validateDepartment((restData as any).department_id);
 
     // Service-level enforcement: a warehouse_manager must keep at least one
     // warehouse assignment. Checked against the FINAL state of the user (the
@@ -162,7 +166,11 @@ export class UsersService {
     }
   }
 
-  async delete(id: number) {
+  async delete(id: number, actorId?: number) {
+    // Guard: prevent an administrator from deleting their own active session.
+    if (actorId !== undefined && id === actorId) {
+      throw new ValidationError('You cannot delete your own account.', { user_id: id });
+    }
     // Guard: prevent deleting the last active system_admin
     const currentRes = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
     const current = currentRes.rows[0];
@@ -178,6 +186,25 @@ export class UsersService {
       }
     }
     return usersRepository.delete(id);
+  }
+
+  /**
+   * Validates that a selected department exists and is active. Runs on both
+   * create and update whenever a department_id is provided — an unknown or
+   * inactive department is rejected with a clean 400 instead of a raw
+   * foreign-key failure from the database.
+   */
+  private async validateDepartment(departmentId: number | null | undefined): Promise<void> {
+    if (departmentId == null) return;
+    const res = await pool.query(
+      'SELECT id FROM departments WHERE id = $1 AND is_active = true',
+      [departmentId]
+    );
+    if (res.rows.length === 0) {
+      throw new ValidationError('The selected department does not exist or is inactive.', {
+        department_id: departmentId,
+      });
+    }
   }
 
   /**

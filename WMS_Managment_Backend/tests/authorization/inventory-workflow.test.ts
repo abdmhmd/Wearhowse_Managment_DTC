@@ -595,9 +595,14 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
   });
 
   describe('Request scoping', () => {
-    test('warehouse_manager cannot create a request against an unassigned warehouse (400)', async () => {
+    test('warehouse_manager payload warehouse is ignored; the assigned warehouse is used (201)', async () => {
+      // A WM has one warehouse assignment. A spoofed/conflicting warehouse_id in
+      // the payload must NOT escalate: the request is created against the
+      // auto-derived assigned warehouse instead.
       const res = await createRequest(whManager.token, deptA, whB, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(201);
+      expect(res.body.data.warehouse_id).toBe(whA);
+      expect(res.body.data.department_id).toBe(deptA);
     });
 
     test('department_manager cannot create a material request (403 AUTH_FORBIDDEN)', async () => {

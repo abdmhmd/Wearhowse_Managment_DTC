@@ -55,7 +55,7 @@ export default function ProjectsPage() {
 
   const departments = departmentsData?.items || [];
   const warehouses = warehousesData?.items || [];
-  const supervisors = (supervisorsData || []).filter((u: any) => u.role === 'department_manager');
+  const supervisors = (supervisorsData || []).filter((u: any) => u.role === 'supervisor');
 
   const isWarehouseManager = user?.role === 'warehouse_manager';
   const isDepartmentManager = user?.role === 'department_manager';

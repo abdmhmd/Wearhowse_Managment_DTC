@@ -21,6 +21,18 @@ export function scopeForUser(user: AuthUserContext): DataScope {
 }
 
 /**
+ * True when the user is a creator role (warehouse_manager) holding NO explicit
+ * warehouse assignments. Such users use the zero-assignment fallback: they may
+ * pick a destination warehouse from the eligible pool instead of being locked
+ * out until an admin seeds `user_warehouses`. (storekeeper is a legacy role
+ * deactivated in migration 019 and cannot log in.) Users WITH assignments
+ * always fall into the strict auto-assignment path.
+ */
+export function isWarehouseFallbackUser(user: AuthUserContext): boolean {
+  return user.role === 'warehouse_manager' && user.warehouse_ids.length === 0;
+}
+
+/**
  * Builds a SQL WHERE fragment restricting a row to the current user's scope.
  *
  * Both `departmentCol` and `warehouseCol` may be `null` when the table has no

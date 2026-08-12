@@ -1,5 +1,5 @@
 import { pool } from '../../config/database';
-import { warehouseAccessClause } from '../authorization/scope';
+import { warehouseAccessClause, isWarehouseFallbackUser } from '../authorization/scope';
 import type { AuthUserContext } from '../authorization/authorization.service';
 
 export class WarehousesRepository {
@@ -9,11 +9,17 @@ export class WarehousesRepository {
     let paramIndex = 1;
 
     if (user) {
-      const scope = warehouseAccessClause(user, 'id', paramIndex);
-      if (scope.clause !== 'TRUE') {
-        query += ` AND ${scope.clause}`;
-        params.push(...scope.params);
-        paramIndex += scope.params.length;
+      if (isWarehouseFallbackUser(user)) {
+        // Zero-assignment warehouse_manager: expose the eligible destination
+        // pool (active, non-main) so the create-request fallback can list them.
+        query += ' AND is_main = false';
+      } else {
+        const scope = warehouseAccessClause(user, 'id', paramIndex);
+        if (scope.clause !== 'TRUE') {
+          query += ` AND ${scope.clause}`;
+          params.push(...scope.params);
+          paramIndex += scope.params.length;
+        }
       }
     }
 
@@ -29,10 +35,14 @@ export class WarehousesRepository {
     let query = 'SELECT COUNT(*)::int AS total FROM warehouses WHERE is_active = true';
     const params: any[] = [];
     if (user) {
-      const scope = warehouseAccessClause(user, 'id', 1);
-      if (scope.clause !== 'TRUE') {
-        query += ` AND ${scope.clause}`;
-        params.push(...scope.params);
+      if (isWarehouseFallbackUser(user)) {
+        query += ' AND is_main = false';
+      } else {
+        const scope = warehouseAccessClause(user, 'id', 1);
+        if (scope.clause !== 'TRUE') {
+          query += ` AND ${scope.clause}`;
+          params.push(...scope.params);
+        }
       }
     }
     return pool.query(query, params).then(r => r.rows[0].total);
@@ -118,6 +128,48 @@ export class WarehousesRepository {
     }
     query += ' ORDER BY id LIMIT 1';
     const res = await pool.query(query, params);
+    return res.rows[0] || null;
+  }
+
+  /**
+   * Active, non-main warehouses explicitly assigned to a user via
+   * `user_warehouses`, ordered deterministically by id. Main warehouses are
+   * excluded because they are the STOCK SOURCE — a material request must never
+   * target the department's main warehouse (migration 020 trigger).
+   */
+  async findAssignedNonMainByUser(userId: number) {
+    const res = await pool.query(
+      `SELECT w.id, w.code, w.name_ar, w.name_en, w.department_id, w.is_main, w.is_active
+         FROM warehouses w
+         JOIN user_warehouses uw ON uw.warehouse_id = w.id
+        WHERE uw.user_id = $1 AND w.is_active = true AND w.is_main = false
+        ORDER BY w.id`,
+      [userId]
+    );
+    return res.rows;
+  }
+
+  /** First active, non-main warehouse in the system (system_admin default). */
+  async findFirstActiveNonMain() {
+    const res = await pool.query(
+      'SELECT id, code, name_ar, name_en, department_id, is_main, is_active FROM warehouses WHERE is_active = true AND is_main = false ORDER BY id LIMIT 1'
+    );
+    return res.rows[0] || null;
+  }
+
+  /**
+   * A valid request destination for the zero-assignment fallback: the warehouse
+   * must exist, be active, NOT be the department MAIN warehouse (which is the
+   * stock source and can never be a request destination), and be linked to a
+   * department (the request department is derived from it).
+   */
+  async findEligibleDestination(id: number) {
+    const res = await pool.query(
+      `SELECT id, code, name_ar, name_en, department_id, is_main, is_active
+         FROM warehouses
+        WHERE id = $1 AND is_active = true AND is_main = false AND department_id IS NOT NULL`,
+      [id]
+    );
     return res.rows[0] || null;
   }
 }

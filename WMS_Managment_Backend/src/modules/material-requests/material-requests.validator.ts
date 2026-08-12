@@ -9,8 +9,16 @@ const materialRequestItemSchema = z.object({
 
 export const createMaterialRequestSchema = z
   .object({
-    department_id: z.number({ message: 'department_id is required' }).int().positive(),
-    warehouse_id: z.number({ message: 'warehouse_id is required' }).int().positive(),
+    // department_id is OPTIONAL from the client: the service derives it from the
+    // selected warehouse (warehouses.department_id) and rejects any client value
+    // that contradicts it, so a hand-crafted payload cannot create a request
+    // under an arbitrary department.
+    department_id: z.number().int().positive().optional().nullable(),
+    // warehouse_id is OPTIONAL at the schema level: users WITH warehouse
+    // assignments never need it (the service auto-assigns and ignores any
+    // payload value), and the zero-assignment fallback validates presence and
+    // eligibility inside the service so it can return a specific message.
+    warehouse_id: z.number({ message: 'warehouse_id is required' }).int().positive().optional().nullable(),
     request_type: z.enum(['experiment', 'semester', 'project']).optional().default('experiment'),
     project_id: z.number().int().positive().optional().nullable(),
     priority: z.enum(['low', 'normal', 'high', 'urgent']).optional().default('normal'),

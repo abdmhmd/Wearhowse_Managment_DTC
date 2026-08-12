@@ -25,7 +25,8 @@
   "roles": {
     "system_admin": "System Admin",
     "warehouse_manager": "Warehouse Manager",
-    "department_manager": "Department Manager"
+    "department_manager": "Department Manager",
+    "supervisor": "Supervisor"
   },
   "auth": {
     "login": "Sign in",
@@ -500,7 +501,10 @@
       "item": "Item",
       "quantity": "Quantity",
       "unit": "Unit",
-      "noDetails": "No items in this request"
+      "noDetails": "No items in this request",
+      "selectWarehouseFirst": "Select a warehouse first",
+      "destination": "Request Destination",
+      "noWarehouseAvailable": "No valid warehouse is available for you. Contact the administrator to assign a warehouse."
     }
   },
   "toast": {
