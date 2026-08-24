@@ -2,6 +2,7 @@ import { PaginationMeta } from '../../utils/response';
 import { pool } from '../../config/database';
 import { warehouseAccessClause, scopeForUser, type DataScope } from '../authorization/scope';
 import type { AuthUserContext } from '../authorization/authorization.service';
+import { OPEN_ALLOCATIONS_CTE } from '../purchase-orders/stock-availability';
 
 export interface InventoryReportFilters {
   warehouse_id?: number;
@@ -21,10 +22,14 @@ export interface InventoryReportFilters {
 export class InventoryReportService {
   async getInventoryReport(filters: InventoryReportFilters) {
     let query = `
+      WITH ${OPEN_ALLOCATIONS_CTE}
       SELECT
         i.id, i.item_code, i.name_ar, i.description,
         i.warehouse_id, i.category_code,
-        COALESCE(iws.current_balance, i.current_balance) AS current_balance, 
+        COALESCE(iws.current_balance, i.current_balance) AS current_balance,
+        COALESCE(iws.current_balance, i.current_balance) AS physical_stock,
+        COALESCE(oa.allocated_qty, 0) AS allocated_stock,
+        GREATEST(COALESCE(iws.current_balance, i.current_balance) - COALESCE(oa.allocated_qty, 0), 0) AS available_stock,
         iws.min_stock_level, iws.max_stock_level,
         i.location, i.is_active,
         c.name_ar AS category_name,
@@ -32,6 +37,7 @@ export class InventoryReportService {
         w.name_ar AS warehouse_name, w.code AS warehouse_code
       FROM items i
       LEFT JOIN item_warehouse_stock iws ON iws.item_id = i.id AND (iws.warehouse_id = i.warehouse_id)
+      LEFT JOIN open_allocations oa ON oa.item_id = i.id AND oa.source_warehouse_id = (iws.warehouse_id)
       LEFT JOIN categories c ON c.code = i.category_code
       LEFT JOIN units u ON u.code = i.unit_code
       LEFT JOIN warehouses w ON w.id = i.warehouse_id

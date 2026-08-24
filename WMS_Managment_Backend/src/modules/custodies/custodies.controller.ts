@@ -65,6 +65,26 @@ export class CustodiesController {
       next(err);
     }
   }
+
+  async receiveReturn(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid custody ID');
+      const result = await custodiesService.receiveReturn(id, req.user!.id, req.user);
+      await writeAudit({
+        user_id: req.user!.id,
+        action: 'CUSTODY_RECEIVED',
+        resource: 'custodies',
+        resource_id: id,
+        details: { action: 'receive_return' },
+        ip_address: req.ip,
+        user_agent: req.headers?.['user-agent'] ?? null,
+      });
+      sendData(res, result, { message: 'تم تأكيد استلام الإرجاع بنجاح' });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const custodiesController = new CustodiesController();

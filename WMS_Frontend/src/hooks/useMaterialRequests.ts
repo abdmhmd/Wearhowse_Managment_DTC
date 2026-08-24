@@ -13,6 +13,20 @@ export function useMaterialRequests(page = 1, limit = 20, filter?: MaterialReque
   });
 }
 
+/** Request-creation catalog, pre-scoped to the caller's authority on the server.
+ *  Only enabled for users holding requests:create — for everyone else it is
+ *  left dormant so no unauthorized request is ever fired. */
+export function useRequestCatalog(enabled = true) {
+  return useQuery({
+    queryKey: ['material-requests', 'catalog'],
+    queryFn: async () => {
+      const res = await materialRequestsApi.getCatalog();
+      return res.data.data;
+    },
+    enabled,
+  });
+}
+
 export function useMaterialRequest(id: number) {
   return useQuery({
     queryKey: ['material-requests', id],

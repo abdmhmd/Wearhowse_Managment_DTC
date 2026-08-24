@@ -21,11 +21,26 @@ export function useReturnCustody() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['custodies'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      const txnNo = data.data?.data?.transaction_no;
-      showSuccess(txnNo ? `Item returned successfully - RTI #${txnNo}` : 'Item returned successfully');
+      const msg = data.data?.data?.message || 'Action completed';
+      showSuccess(msg);
     },
     onError: (error: Error) => {
       showError(getErrorMessage(error, 'Failed to return item'));
+    },
+  });
+}
+
+export function useReceiveReturn() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => custodiesApi.receiveReturn(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['custodies'] });
+      const txnNo = data.data?.data?.transaction_no;
+      showSuccess(txnNo ? `Return confirmed - RTI #${txnNo}` : 'Return confirmed');
+    },
+    onError: (error: Error) => {
+      showError(getErrorMessage(error, 'Failed to confirm return'));
     },
   });
 }

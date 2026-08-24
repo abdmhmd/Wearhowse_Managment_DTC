@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useUnits, useCreateUnit, useUpdateUnit, useDeleteUnit } from '@/hooks/useUnits';
+import { useUnits, useCreateUnit, useUpdateUnit } from '@/hooks/useUnits';
 import { createUnitSchema, updateUnitSchema, type CreateUnitFormData, type UpdateUnitFormData } from '@/schemas/units.schema';
-import { PageHeader, Button, DataTable, Modal, Input, ConfirmDialog } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PageHeader, Button, DataTable, Modal, Input } from '@/components/ui';
+import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { useAuthStore } from '@/store/auth.store';
 import type { Unit } from '@/types';
@@ -17,12 +17,10 @@ export default function UnitsPage() {
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
-  const [deletingUnit, setDeletingUnit] = useState<Unit | null>(null);
 
   const { data, isLoading } = useUnits(page);
   const createMutation = useCreateUnit();
   const updateMutation = useUpdateUnit();
-  const deleteMutation = useDeleteUnit();
 
   const createForm = useForm<CreateUnitFormData>({ resolver: zodResolver(createUnitSchema) });
   const updateForm = useForm<UpdateUnitFormData>({ resolver: zodResolver(updateUnitSchema) });
@@ -40,12 +38,6 @@ export default function UnitsPage() {
     updateForm.reset();
   };
 
-  const handleDelete = async () => {
-    if (!deletingUnit) return;
-    await deleteMutation.mutateAsync(deletingUnit.code);
-    setDeletingUnit(null);
-  };
-
   const columns = [
     { key: 'code', header: t('table.code') },
     { key: 'name_ar', header: t('table.nameAr'), render: (item: Unit) => getLocalizedName(item) },
@@ -58,11 +50,6 @@ export default function UnitsPage() {
           {can('units:update') && (
             <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingUnit(item); updateForm.reset({ name_ar: item.name_ar, name_en: item.name_en }); }}>
               <PencilIcon className="h-4 w-4" />
-            </Button>
-          )}
-          {can('units:delete') && (
-            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingUnit(item); }}>
-              <TrashIcon className="h-4 w-4 text-red-500" />
             </Button>
           )}
         </div>
@@ -97,8 +84,6 @@ export default function UnitsPage() {
           </div>
         </form>
       </Modal>
-
-      <ConfirmDialog isOpen={!!deletingUnit} onClose={() => setDeletingUnit(null)} onConfirm={handleDelete} title={t('common.confirmDelete')} message={t('common.confirmDeleteMessage', { name: getLocalizedName(deletingUnit || {}) })} isLoading={deleteMutation.isPending} />
     </div>
   );
 }

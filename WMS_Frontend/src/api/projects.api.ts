@@ -17,8 +17,6 @@ export interface CreateProjectPayload {
   supervisor_id: number;
   academic_year?: string | null;
   description?: string | null;
-  start_date?: string | null;
-  expected_completion_date?: string | null;
   notes?: string | null;
   students?: ProjectStudent[];
 }

@@ -23,5 +23,8 @@ export const custodiesApi = {
     api.get<ApiResponse<Custody>>(`/custodies/${id}`),
 
   returnItem: (id: number, payload: ReturnItemPayload = {}) =>
-    api.post<ApiResponse<{ message: string; transaction_id: number; transaction_no: string }>>(`/custodies/${id}/return`, payload),
+    api.post<ApiResponse<{ message: string; transaction_id?: number; transaction_no?: string; pending_return_quantity?: number }>>(`/custodies/${id}/return`, payload),
+
+  receiveReturn: (id: number) =>
+    api.post<ApiResponse<{ message: string; transaction_id: number; transaction_no: string }>>(`/custodies/${id}/receive`),
 };

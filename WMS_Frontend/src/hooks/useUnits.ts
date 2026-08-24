@@ -25,13 +25,14 @@ export function useUnit(code: string) {
   });
 }
 
-export function useAllUnits() {
+export function useAllUnits(enabled = true) {
   return useQuery({
     queryKey: ['units', 'all'],
     queryFn: async () => {
       const res = await unitsApi.getAll(1, 200);
       return res.data.data;
     },
+    enabled,
   });
 }
 

@@ -27,6 +27,10 @@ async function custodyInScope(
     );
     return assigned.rows[0]?.department_id === user.department_id;
   }
+  // NONE scope: user can only see custodies assigned to them directly
+  if (user.id) {
+    return custody.assigned_to === user.id;
+  }
   return false;
 }
 
@@ -67,7 +71,7 @@ export class CustodiesService {
   async getById(id: number, user?: AuthUserContext) {
     const custody = await custodiesRepository.findById(id);
     if (!custody) throw new NotFoundError('Custody', 'CUSTODY_NOT_FOUND', { id });
-    if (user && !custodyInScope(custody, user)) {
+    if (user && !await custodyInScope(custody, user)) {
       throw new NotFoundError('Custody', 'CUSTODY_NOT_FOUND', { id });
     }
     return custody;
@@ -76,6 +80,11 @@ export class CustodiesService {
   /**
    * Return a borrowed/assigned material.
    *
+   * For supervisors (NONE scope): initiates a return request, setting the
+   * custody status to 'return_pending'. The warehouse manager must then
+   * confirm receipt via `receiveReturn` before stock is restored.
+   *
+   * For warehouse managers / admins: immediate return (existing behavior).
    * - condition 'good' (default): an RTI (Return To Inventory) transaction is
    *   created + approved, restoring the returned quantity to inventory. A full
    *   return closes the custody; a partial one keeps it active with the
@@ -125,6 +134,28 @@ export class CustodiesService {
         );
       }
 
+      // Supervisor / department_manager (NONE scope): request return instead
+      // of immediately restoring stock. The warehouse manager confirms.
+      if (user) {
+        const scope: DataScope = scopeForUser(user);
+        if (scope === 'NONE' && user.id) {
+          await client.query(
+            `UPDATE custodies
+               SET status = 'return_pending',
+                   pending_return_quantity = $1,
+                   return_notes = $2,
+                   updated_at = NOW()
+             WHERE id = $3`,
+            [returnedQty, opts.notes ?? null, id]
+          );
+          return {
+            message: 'Return request submitted; awaiting warehouse manager confirmation',
+            custody_id: id,
+            pending_return_quantity: returnedQty,
+          };
+        }
+      }
+
       // Damaged / lost: no stock restoration; preserve the record.
       if (condition !== 'good') {
         await custodiesRepository.markUnrestored(client, id, condition, opts.notes ?? null);
@@ -172,6 +203,85 @@ export class CustodiesService {
       await custodiesRepository.markReturned(client, id, txnId, opts.notes ?? null);
       return {
         message: 'Item returned successfully',
+        transaction_id: txnId,
+        transaction_no: transaction.transaction_no,
+      };
+    });
+  }
+
+  /**
+   * Warehouse manager confirms receipt of a return_pending custody.
+   * Creates the RTI transaction and restores stock.
+   */
+  async receiveReturn(
+    id: number,
+    receivedBy: number,
+    user?: AuthUserContext
+  ) {
+    return runInTransaction(async (client) => {
+      const custody = await custodiesRepository.findById(id);
+      if (!custody) throw new NotFoundError('Custody', 'CUSTODY_NOT_FOUND', { id });
+      if (user && !(await custodyInScope(custody, user))) {
+        throw new NotFoundError('Custody', 'CUSTODY_NOT_FOUND', { id });
+      }
+
+      if (custody.status !== 'return_pending') {
+        throw new ValidationError(
+          `Cannot receive a custody with status '${custody.status}'. It must be 'return_pending'.`,
+          { id, status: custody.status }
+        );
+      }
+
+      const borrowedQty = Number(custody.quantity) || 0;
+      const pendingQty = Number(custody.pending_return_quantity) || borrowedQty;
+      const condition = custody.condition ?? 'good';
+
+      // Damaged / lost: no stock restoration; preserve the record.
+      if (condition !== 'good') {
+        await custodiesRepository.markUnrestored(client, id, condition, custody.return_notes ?? null);
+        return {
+          message: `Material received as ${condition}`,
+          status: condition,
+          custody_id: id,
+        };
+      }
+
+      // Good condition: restore the returned quantity through the RTI workflow.
+      const transaction = await transactionsService.createDraft(
+        {
+          type: 'RTI',
+          warehouse_id: custody.warehouse_id,
+          department_id: null,
+          created_by: receivedBy,
+          notes: `Return to inventory from custody #${id}${custody.return_notes ? ` - ${custody.return_notes}` : ''}`,
+        },
+        [
+          {
+            item_id: custody.item_id,
+            quantity: pendingQty,
+            unit_code: custody.unit_code,
+            unit_price: 0,
+          },
+        ],
+        client
+      );
+
+      const txnId = transaction.id!;
+      await transactionsService.approveTransaction(txnId, receivedBy, client);
+
+      if (pendingQty < borrowedQty) {
+        await custodiesRepository.reduceQuantity(client, id, pendingQty, txnId, custody.return_notes ?? null);
+        return {
+          message: 'Partial return confirmed; remaining quantity still outstanding',
+          transaction_id: txnId,
+          transaction_no: transaction.transaction_no,
+          custody_id: id,
+        };
+      }
+
+      await custodiesRepository.markReturned(client, id, txnId, custody.return_notes ?? null);
+      return {
+        message: 'Return confirmed and stock restored',
         transaction_id: txnId,
         transaction_no: transaction.transaction_no,
       };

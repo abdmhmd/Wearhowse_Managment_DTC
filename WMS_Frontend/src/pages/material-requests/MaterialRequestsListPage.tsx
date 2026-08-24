@@ -66,6 +66,7 @@ export default function MaterialRequestsListPage() {
     const variants: Record<RequestStatus, any> = {
       pending: 'warning',
       dept_approved: 'info',
+      wm_approved: 'info',
       forwarded: 'info',
       admin_approved: 'success',
       admin_rejected: 'danger',
@@ -129,7 +130,7 @@ export default function MaterialRequestsListPage() {
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
         >
           <option value="">{t('common.all')}</option>
-          {(['pending', 'dept_approved', 'forwarded', 'admin_approved', 'admin_rejected', 'issued', 'cancelled'] as RequestStatus[]).map((s) => (
+          {(['pending', 'dept_approved', 'wm_approved', 'forwarded', 'admin_approved', 'admin_rejected', 'issued', 'cancelled'] as RequestStatus[]).map((s) => (
             <option key={s} value={s}>{t(`pages.materialRequests.statuses.${s}`)}</option>
           ))}
         </select>

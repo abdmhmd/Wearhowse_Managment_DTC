@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { Layout, ProtectedRoute } from '@/components/layout';
-import { useLanguage } from '@/i18n/helpers';
+import { useLanguage, setDocumentDirection } from '@/i18n/helpers';
 import LoginPage from '@/pages/auth/LoginPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import CategoriesPage from '@/pages/categories/CategoriesPage';
@@ -24,9 +25,13 @@ import SettingsPage from '@/pages/settings/SettingsPage';
 import ProjectsPage from '@/pages/projects/ProjectsPage';
 import ProjectDetailPage from '@/pages/projects/ProjectDetailPage';
 import CustodiesPage from '@/pages/custodies/CustodiesPage';
+import MyCustodyPage from '@/pages/custodies/MyCustodyPage';
 import MaterialRequestsListPage from '@/pages/material-requests/MaterialRequestsListPage';
 import CreateMaterialRequestPage from '@/pages/material-requests/CreateMaterialRequestPage';
 import MaterialRequestDetailPage from '@/pages/material-requests/MaterialRequestDetailPage';
+import PurchaseOrdersListPage from '@/pages/purchase-orders/PurchaseOrdersListPage';
+import CreatePurchaseOrderPage from '@/pages/purchase-orders/CreatePurchaseOrderPage';
+import PurchaseOrderDetailPage from '@/pages/purchase-orders/PurchaseOrderDetailPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,10 +55,23 @@ function AppToaster() {
   );
 }
 
+/**
+ * Keeps <html lang> and <html dir> in sync with the active locale so Tailwind
+ * rtl:/ltr: variants, text alignment and layout direction follow Arabic mode.
+ */
+function DocumentDirection() {
+  const lang = useLanguage();
+  useEffect(() => {
+    setDocumentDirection(lang);
+  }, [lang]);
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <DocumentDirection />
         <AppToaster />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -94,7 +112,11 @@ export default function App() {
                 <Route path="/custodies" element={<CustodiesPage />} />
               </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['requests:view']} />}>
+              <Route element={<ProtectedRoute allowedPermissions={['custodies:view_own']} />}>
+                <Route path="/my-custody" element={<MyCustodyPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedPermissions={['requests:view', 'requests:view_own']} />}>
                 <Route path="/requests" element={<MaterialRequestsListPage />} />
               </Route>
 
@@ -104,6 +126,18 @@ export default function App() {
 
               <Route element={<ProtectedRoute allowedPermissions={['requests:view', 'requests:view_own']} />}>
                 <Route path="/requests/:id" element={<MaterialRequestDetailPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:view']} />}>
+                <Route path="/purchase-orders" element={<PurchaseOrdersListPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:create']} />}>
+                <Route path="/purchase-orders/new" element={<CreatePurchaseOrderPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:view']} />}>
+                <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
               </Route>
 
               <Route element={<ProtectedRoute allowedPermissions={['reports:view']} />}>

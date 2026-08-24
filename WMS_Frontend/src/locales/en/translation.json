@@ -20,6 +20,8 @@
     "settings": "Settings",
     "projects": "Projects",
     "custodies": "Custodies",
+    "myCustody": "My Custody",
+    "purchaseOrders": "Purchase Orders",
     "materialRequests": "Requests"
   },
   "roles": {
@@ -38,7 +40,6 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
-    "delete": "Delete",
     "edit": "Edit",
     "create": "Create",
     "approve": "Approve",
@@ -58,14 +59,16 @@
     "allCategories": "All Categories",
     "allWarehouses": "All Warehouses",
     "back": "Back",
-    "yesDelete": "Yes, delete",
     "areYouSure": "Are you sure?",
-    "deleteConfirm": "This action cannot be undone.",
-    "confirmDelete": "Confirm Delete",
-    "confirmDeleteMessage": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
     "logout": "Logout",
     "close": "Close",
-    "selectRole": "Select role"
+    "selectRole": "Select role",
+    "select": "Select",
+    "status": "Status",
+    "view": "View",
+    "notes": "Notes",
+    "saving": "Saving…",
+    "delete": "Delete"
   },
   "table": {
     "id": "ID",
@@ -119,7 +122,11 @@
     "totalValue": "Total Value",
     "lastPurchasePrice": "Last Purchase Price",
     "subcategory": "Subcategory",
-    "parentCategory": "Parent Category"
+    "parentCategory": "Parent Category",
+    "department": "Department",
+    "physicalStock": "Physical Stock",
+    "allocatedStock": "Allocated Stock",
+    "availableStock": "Available Stock"
   },
   "form": {
     "code": "Code",
@@ -174,7 +181,8 @@
     "selectCategoryFirst": "Select a category first",
     "selectItemFirst": "Select an item first",
     "parentCategory": "Parent Category",
-    "selectParentCategory": "Select parent category"
+    "selectParentCategory": "Select parent category",
+    "warehouses": "Warehouses"
   },
   "transaction": {
     "types": {
@@ -335,8 +343,6 @@
       "subtitle": "Manage conversion factors between units",
       "create": "Create Unit Conversion",
       "edit": "Edit Unit Conversion",
-      "delete": "Delete Unit Conversion",
-      "deleteMessage": "Are you sure you want to delete this unit conversion?",
       "addConversion": "Add Conversion",
       "item": "Item",
       "itemId": "Item ID",
@@ -389,6 +395,7 @@
       "department": "Department",
       "warehouse": "Warehouse",
       "selectWarehouse": "Select warehouse",
+      "warehouseAuto": "Assigned automatically to your department's default warehouse",
       "supervisor": "Supervisor",
       "status": "Status",
       "open": "Open",
@@ -397,6 +404,7 @@
       "academicYear": "Academic Year",
       "description": "Description",
       "startDate": "Start Date",
+      "endDate": "End Date",
       "expectedCompletion": "Expected Completion",
       "close": "Close Project",
       "cancelProject": "Cancel Project",
@@ -418,7 +426,8 @@
       "addStudent": "Add Student",
       "editStudents": "Edit Students",
       "view": "View",
-      "deleteConfirm": "Are you sure you want to delete this project?"
+      "delete": "Delete Project",
+      "deleteConfirm": "Are you sure you want to delete this project? This cannot be undone."
     },
     "custodies": {
       "title": "Custodies",
@@ -446,7 +455,123 @@
       "return": "Return Item",
       "returnConfirm": "Record the return of this item. A good-condition return creates and approves an RTI transaction; damaged/lost returns keep the record without restoring stock.",
       "returnNotes": "Return notes (optional)",
-      "noData": "No custodies found"
+      "noData": "No custodies found",
+      "returnPending": "Return Pending",
+      "confirmReturn": "Confirm Receipt",
+      "confirmReturnConfirm": "Confirm that the item has been received back in good condition? This will restore stock.",
+      "requestReturn": "Request Return",
+      "requestReturnConfirm": "Submit a return request? The warehouse manager will need to confirm receipt before stock is restored."
+    },
+    "purchaseOrders": {
+      "title": "Purchase Orders",
+      "subtitle": "Supplier procurement and stock allocation",
+      "new": "New Purchase Order",
+      "createTitle": "Create Purchase Order",
+      "empty": "No purchase orders found",
+      "poNumber": "PO Number",
+      "supplier": "Supplier",
+      "receivingWarehouse": "Receiving Warehouse",
+      "orderDate": "Order Date",
+      "expectedDate": "Expected Date",
+      "createdBy": "Created By",
+      "approvedAt": "Approved At",
+      "lines": "Order Lines",
+      "allocations": "Allocations",
+      "noAllocations": "No allocations yet",
+      "quantityOrdered": "Ordered",
+      "quantityReceived": "Received",
+      "remainingToReceive": "Remaining",
+      "quantityAllocated": "Allocated",
+      "quantityTransferred": "Transferred",
+      "remainingToTransfer": "Remaining",
+      "unitPrice": "Unit Price",
+      "unit": "Unit",
+      "destination": "Destination Warehouse",
+      "statuses": {
+        "draft": "Draft",
+        "approved": "Approved",
+        "partially_received": "Partially Received",
+        "received": "Received",
+        "closed": "Closed",
+        "cancelled": "Cancelled"
+      },
+      "allocStatuses": {
+        "allocated": "Allocated",
+        "partially_transferred": "Partially Transferred",
+        "transferred": "Transferred",
+        "cancelled": "Cancelled"
+      },
+      "actions": {
+        "approve": "Approve",
+        "cancel": "Cancel PO",
+        "receive": "Receive",
+        "allocate": "Allocate",
+        "transfer": "Transfer",
+        "close": "Close",
+        "editDraft": "Edit"
+      },
+      "receiveTitle": "Receive Stock (RV)",
+      "receiveQuantity": "Receive Quantity",
+      "receiveProgress": "Received {{received}} of {{ordered}} — remaining {{remaining}}",
+      "allocateTitle": "Allocate Stock",
+      "allocateQuantity": "Allocate Quantity",
+      "allocatableHint": "Allocatable remaining: {{value}}",
+      "transferTitle": "Transfer Allocated Stock",
+      "transferQuantity": "Transfer Quantity",
+      "transferableHint": "Maximum transferable: {{value}}",
+      "receiveIntoHint": "Stock will be received into main warehouse: {{warehouse}}",
+      "confirm": {
+        "approve": {
+          "title": "Approve Purchase Order",
+          "message": "Approve this purchase order? It will no longer be editable."
+        },
+        "cancel": {
+          "title": "Cancel Purchase Order",
+          "message": "Cancel this purchase order? This cannot be undone."
+        },
+        "close": {
+          "title": "Close Purchase Order",
+          "message": "Close this fully received purchase order? Unallocated stock stays in the main warehouse as general stock."
+        }
+      },
+      "validation": {
+        "warehouseRequired": "Receiving warehouse is required",
+        "warehouseNotEligible": "The selected receiving warehouse is not an eligible main warehouse",
+        "itemRequired": "Every line needs an item",
+        "quantityPositive": "Quantities must be greater than zero",
+        "unitRequired": "Unit is required",
+        "duplicateItem": "Duplicate item lines are not allowed"
+      },
+      "requestTitle": "Create Purchase Request",
+      "requestInfoSection": "Request Information",
+      "orderInfo": "Order Information",
+      "departmentLabel": "Department",
+      "warehouseAutoHint": "The receiving warehouse is automatically determined based on the user’s department.",
+      "requestedItems": "Requested Items",
+      "itemLabel": "Item",
+      "quantityRequested": "Requested Quantity",
+      "addItem": "Add Item",
+      "removeItem": "Remove",
+      "submitRequest": "Submit Request",
+      "noValidWarehouseWarning": "No valid main warehouse could be determined for your account. Please contact your administrator.",
+      "ambiguousWarehouseWarning": "Multiple main warehouses are assigned to your account; contact your administrator.",
+      "errors": {
+        "insufficientAllocation": "Insufficient quantity available for allocation.",
+        "insufficientAllocationWithQty": "Only {{available}} is available for allocation, but {{requested}} was requested.",
+        "exceedsReceived": "Cannot allocate more than the received quantity.",
+        "exceedsAllocated": "Cannot transfer more than the allocated quantity.",
+        "exceedsOrdered": "Cannot receive more than the ordered quantity.",
+        "allocationTransferred": "The full allocated quantity has already been transferred.",
+        "notFound": "Purchase order not found.",
+        "invalidStatus": "This action cannot be performed in the current purchase order status.",
+        "forbidden": "You do not have permission to perform this purchase order action.",
+        "warehouseScope": "You cannot perform this action for this warehouse.",
+        "mainWarehouseRequired": "The receiving warehouse must be a main warehouse.",
+        "invalidDestination": "The destination must be an active department warehouse of the same department.",
+        "cannotCancel": "A purchase order cannot be cancelled after items have been received.",
+        "cannotClose": "The purchase order cannot be closed until the required allocation and transfer operations are completed.",
+        "receiveFailed": "Could not receive the items. Please check the quantities and try again."
+      }
     },
     "materialRequests": {
       "title": "Material Requests",
@@ -463,6 +588,7 @@
       "statuses": {
         "pending": "Pending",
         "dept_approved": "Dept Approved",
+        "wm_approved": "WM Approved",
         "forwarded": "Forwarded",
         "admin_approved": "Admin Approved",
         "admin_rejected": "Admin Rejected",
@@ -504,7 +630,19 @@
       "noDetails": "No items in this request",
       "selectWarehouseFirst": "Select a warehouse first",
       "destination": "Request Destination",
-      "noWarehouseAvailable": "No valid warehouse is available for you. Contact the administrator to assign a warehouse."
+      "noWarehouseAvailable": "No valid warehouse is available for you. Contact the administrator to assign a warehouse.",
+      "errors": {
+        "insufficientStock": "Insufficient stock for the requested item.",
+        "insufficientStockWithQty": "Insufficient stock. Available: {{available}}, requested: {{requested}}.",
+        "invalidItem": "The selected item does not exist or is not available.",
+        "invalidUnit": "The selected unit is not valid for this item.",
+        "notFound": "Material request not found.",
+        "invalidStatus": "This action cannot be performed in the current request status.",
+        "forbidden": "You do not have permission to perform this action.",
+        "warehouseScope": "You cannot perform this action for this warehouse.",
+        "mainWarehouseDestination": "Items cannot be issued directly to the main warehouse. A department warehouse must be used.",
+        "noMainWarehouse": "No main warehouse is configured for this department."
+      }
     }
   },
   "toast": {
@@ -531,6 +669,10 @@
     "TRANSACTION_NOT_FOUND": "Transaction not found",
     "INSUFFICIENT_STOCK": "Insufficient stock for item {{itemCode}}",
     "CONVERSION_NOT_FOUND": "Unit conversion not found",
-    "INTERNAL_ERROR": "An internal error occurred. Please try again."
+    "INTERNAL_ERROR": "An internal error occurred. Please try again.",
+    "unexpected": "An unexpected error occurred. Please try again.",
+    "notFound": "The requested item was not found.",
+    "forbidden": "You do not have permission to perform this action.",
+    "unauthorized": "Please sign in to continue."
   }
 }

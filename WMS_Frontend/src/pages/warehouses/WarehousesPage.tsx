@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useWarehouses, useCreateWarehouse, useUpdateWarehouse, useDeleteWarehouse } from '@/hooks/useWarehouses';
+import { useWarehouses, useCreateWarehouse, useUpdateWarehouse } from '@/hooks/useWarehouses';
 import { createWarehouseSchema, updateWarehouseSchema, type CreateWarehouseFormData, type UpdateWarehouseFormData } from '@/schemas/warehouses.schema';
-import { PageHeader, Button, DataTable, Modal, Input, ConfirmDialog } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PageHeader, Button, DataTable, Modal, Input } from '@/components/ui';
+import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import type { Warehouse } from '@/types';
 
@@ -15,12 +15,10 @@ export default function WarehousesPage() {
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingWH, setEditingWH] = useState<Warehouse | null>(null);
-  const [deletingWH, setDeletingWH] = useState<Warehouse | null>(null);
 
   const { data } = useWarehouses(page);
   const createMutation = useCreateWarehouse();
   const updateMutation = useUpdateWarehouse();
-  const deleteMutation = useDeleteWarehouse();
 
   const createForm = useForm<CreateWarehouseFormData>({ resolver: zodResolver(createWarehouseSchema) });
   const updateForm = useForm<UpdateWarehouseFormData>({ resolver: zodResolver(updateWarehouseSchema) });
@@ -38,12 +36,6 @@ export default function WarehousesPage() {
     updateForm.reset();
   };
 
-  const handleDelete = async () => {
-    if (!deletingWH) return;
-    await deleteMutation.mutateAsync(deletingWH.id);
-    setDeletingWH(null);
-  };
-
   const columns = [
     { key: 'code', header: t('table.code') },
     { key: 'name_ar', header: t('table.name'), render: (item: Warehouse) => getLocalizedName(item) },
@@ -55,9 +47,6 @@ export default function WarehousesPage() {
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingWH(item); updateForm.reset({ code: item.code, name_ar: item.name_ar, location: item.location || '' }); }}>
             <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingWH(item); }}>
-            <TrashIcon className="h-4 w-4 text-red-500" />
           </Button>
         </div>
       ),
@@ -88,8 +77,6 @@ export default function WarehousesPage() {
       <Modal isOpen={!!editingWH} onClose={() => { setEditingWH(null); updateForm.reset(); }} title={t('pages.warehouses.edit')}>
         {renderForm(updateForm, handleUpdate)}
       </Modal>
-
-      <ConfirmDialog isOpen={!!deletingWH} onClose={() => setDeletingWH(null)} onConfirm={handleDelete} title={t('common.confirmDelete')} message={t('common.confirmDeleteMessage', { name: getLocalizedName(deletingWH || {}) })} isLoading={deleteMutation.isPending} />
     </div>
   );
 }

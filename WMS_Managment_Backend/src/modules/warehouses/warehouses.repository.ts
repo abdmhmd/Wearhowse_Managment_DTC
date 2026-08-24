@@ -158,6 +158,24 @@ export class WarehousesRepository {
   }
 
   /**
+   * Active, non-main warehouses of a department — the ONLY valid request
+   * destinations for a `supervisor` of that department (e.g. academic staff).
+   * Main warehouses are excluded because they are the STOCK SOURCE (migration
+   * 020 trigger); the request department is derived from the authenticated
+   * user, so a supervisor may never target another department's warehouse.
+   */
+  async findByDepartmentEligible(departmentId: number) {
+    const res = await pool.query(
+      `SELECT id, code, name_ar, name_en, department_id, is_main, is_active
+         FROM warehouses
+        WHERE department_id = $1 AND is_active = true AND is_main = false
+        ORDER BY id`,
+      [departmentId]
+    );
+    return res.rows;
+  }
+
+  /**
    * A valid request destination for the zero-assignment fallback: the warehouse
    * must exist, be active, NOT be the department MAIN warehouse (which is the
    * stock source and can never be a request destination), and be linked to a

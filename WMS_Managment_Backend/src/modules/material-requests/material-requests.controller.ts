@@ -28,6 +28,16 @@ export class MaterialRequestsController {
     }
   }
 
+  /** Request-creation catalog, pre-scoped to the caller's authority (see service). */
+  async getCatalog(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await materialRequestsService.getRequestCatalog(req.user!);
+      sendData(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { status, department_id, warehouse_id, request_type, page, limit } = req.query;

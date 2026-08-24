@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useItems, useCreateItem, useUpdateItem, useDeleteItem, useGenerateItemCode } from '@/hooks/useItems';
+import { useItems, useCreateItem, useUpdateItem, useGenerateItemCode } from '@/hooks/useItems';
 import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useAllUnits } from '@/hooks/useUnits';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { createItemSchema, updateItemSchema, type CreateItemFormData, type UpdateItemFormData } from '@/schemas/items.schema';
-import { PageHeader, Button, DataTable, Modal, Input, Select, ConfirmDialog, Badge } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { PageHeader, Button, DataTable, Modal, Input, Select, Badge } from '@/components/ui';
+import { PlusIcon, PencilIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { formatNumber } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useAuthStore } from '@/store/auth.store';
@@ -25,7 +25,6 @@ export default function ItemsPage() {
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
-  const [deletingItem, setDeletingItem] = useState<Item | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('');
 
   const { data } = useItems(page, 20, { ...filter, search: search || undefined });
@@ -34,7 +33,6 @@ export default function ItemsPage() {
   const { data: warehousesData } = useAllWarehouses();
   const createMutation = useCreateItem();
   const updateMutation = useUpdateItem();
-  const deleteMutation = useDeleteItem();
   const { data: generatedCode } = useGenerateItemCode(selectedCategory);
 
   const categories = categoriesData?.items || [];
@@ -59,12 +57,6 @@ export default function ItemsPage() {
     await updateMutation.mutateAsync({ id: editingItem.id, data: formData });
     setEditingItem(null);
     updateForm.reset();
-  };
-
-  const handleDelete = async () => {
-    if (!deletingItem) return;
-    await deleteMutation.mutateAsync(deletingItem.id);
-    setDeletingItem(null);
   };
 
   const columns = [
@@ -127,11 +119,6 @@ export default function ItemsPage() {
               });
             }}>
               <PencilIcon className="h-4 w-4" />
-            </Button>
-          )}
-          {can('items:delete') && (
-            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingItem(item); }}>
-              <TrashIcon className="h-4 w-4 text-red-500" />
             </Button>
           )}
         </div>
@@ -332,8 +319,6 @@ export default function ItemsPage() {
       <Modal isOpen={!!editingItem} onClose={() => { setEditingItem(null); updateForm.reset(); }} title={t('pages.items.edit')} size="lg">
         <EditItemForm form={updateForm} onSubmit={handleUpdate} isLoading={updateMutation.isPending} />
       </Modal>
-
-      <ConfirmDialog isOpen={!!deletingItem} onClose={() => setDeletingItem(null)} onConfirm={handleDelete} title={t('common.delete')} message={`${t('common.confirmDelete')} "${getLocalizedName(deletingItem)}"?`} isLoading={deleteMutation.isPending} />
     </div>
   );
 }

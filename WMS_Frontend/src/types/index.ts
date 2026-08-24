@@ -29,7 +29,83 @@ export type Permission =
   | 'inventory:session:open' | 'inventory:session:view' | 'inventory:count:record' | 'inventory:session:close'
   | 'batches:view'
   | 'projects:view' | 'projects:create' | 'projects:update' | 'projects:close' | 'projects:delete' | 'projects:supervisors'
-  | 'custodies:view' | 'custodies:return';
+  | 'custodies:view' | 'custodies:view_own' | 'custodies:return'
+  | 'purchase-orders:view' | 'purchase-orders:create' | 'purchase-orders:update' | 'purchase-orders:approve' | 'purchase-orders:cancel' | 'purchase-orders:receive' | 'purchase-orders:allocate' | 'purchase-orders:transfer';
+
+export type PurchaseOrderStatus = 'draft' | 'approved' | 'partially_received' | 'received' | 'closed' | 'cancelled';
+export type AllocationStatus = 'allocated' | 'partially_transferred' | 'transferred' | 'cancelled';
+
+export interface PurchaseOrderLine {
+  id: number;
+  po_id: number;
+  item_id: number;
+  item_code?: string;
+  item_name_ar?: string;
+  item_name_en?: string;
+  quantity_ordered: number | string;
+  quantity_received: number | string;
+  quantity_allocated: number | string;
+  quantity_transferred: number | string;
+  unit_code: string;
+  unit_name_ar?: string;
+  unit_name_en?: string;
+  unit_price?: number | string;
+  notes?: string | null;
+}
+
+export interface PurchaseOrderAllocation {
+  id: number;
+  po_detail_id: number;
+  po_id: number;
+  source_warehouse_id: number;
+  dest_warehouse_id: number;
+  dest_warehouse_code?: string;
+  dest_warehouse_name_ar?: string;
+  dest_warehouse_name_en?: string;
+  item_id?: number;
+  item_code?: string;
+  item_name_ar?: string;
+  item_name_en?: string;
+  quantity_allocated: number | string;
+  quantity_transferred: number | string;
+  status: AllocationStatus;
+  allocated_by_name?: string | null;
+  transferred_by_name?: string | null;
+  transfer_transaction_no?: string | null;
+  created_at?: string;
+}
+
+export interface PurchaseOrder {
+  id: number;
+  po_number: string;
+  supplier_id?: number | null;
+  supplier_name_ar?: string | null;
+  supplier_name_en?: string | null;
+  warehouse_id: number;
+  warehouse_code?: string;
+  warehouse_name_ar?: string;
+  warehouse_name_en?: string;
+  department_id?: number | null;
+  department_name_ar?: string | null;
+  department_name_en?: string | null;
+  status: PurchaseOrderStatus;
+  order_date?: string;
+  expected_date?: string | null;
+  notes?: string | null;
+  created_by?: number;
+  created_by_name?: string | null;
+  approved_by_name?: string | null;
+  cancelled_by_name?: string | null;
+  approved_at?: string | null;
+  lines_count?: number;
+  quantity_ordered?: number | string;
+  quantity_received?: number | string;
+  quantity_allocated?: number | string;
+  quantity_transferred?: number | string;
+  details?: PurchaseOrderLine[];
+  allocations?: PurchaseOrderAllocation[];
+  created_at?: string;
+}
 
 export type TransactionType = 'RV' | 'LN' | 'RTV' | 'RTI' | 'ADJ' | 'TRF';
 export type TransactionStatus = 'draft' | 'approved';
@@ -37,9 +113,9 @@ export type MovementType = 'IN' | 'OUT';
 
 export type RequestType = 'experiment' | 'semester' | 'project';
 export type RequestPriority = 'low' | 'normal' | 'high' | 'urgent';
-export type RequestStatus = 'pending' | 'dept_approved' | 'forwarded' | 'admin_approved' | 'admin_rejected' | 'issued' | 'cancelled';
+export type RequestStatus = 'pending' | 'dept_approved' | 'wm_approved' | 'forwarded' | 'admin_approved' | 'admin_rejected' | 'issued' | 'cancelled';
 export type ProjectStatus = 'open' | 'closed' | 'cancelled';
-export type CustodyStatus = 'active' | 'returned' | 'damaged' | 'lost';
+export type CustodyStatus = 'active' | 'returned' | 'damaged' | 'lost' | 'return_pending';
 export type CustodyCondition = 'good' | 'damaged' | 'lost';
 
 export interface User {
@@ -299,6 +375,8 @@ export interface AuthUser {
   full_name: string;
   role: UserRole;
   department_id: number | null;
+  department_name_ar?: string | null;
+  department_name_en?: string | null;
   permissions: Permission[];
   warehouses: Warehouse[];
   warehouse_ids: number[];
@@ -386,6 +464,7 @@ export interface Project {
   academic_year: string | null;
   description: string | null;
   start_date: string | null;
+  end_date: string | null;
   expected_completion_date: string | null;
   notes: string | null;
   closed_by: number | null;
@@ -431,6 +510,8 @@ export interface Custody {
   condition?: CustodyCondition | null;
   expected_return_at?: string | null;
   returned_quantity?: number | null;
+  pending_return_quantity?: number | null;
+  return_notes?: string | null;
   notes: string | null;
   returned_at: string | null;
   is_active: boolean;
@@ -502,6 +583,7 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   pending: 'Pending',
   dept_approved: 'Dept Approved',
+  wm_approved: 'WM Approved',
   forwarded: 'Forwarded',
   admin_approved: 'Admin Approved',
   admin_rejected: 'Admin Rejected',
@@ -518,6 +600,7 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
 export const CUSTODY_STATUS_LABELS: Record<CustodyStatus, string> = {
   active: 'Active',
   returned: 'Returned',
+  return_pending: 'Return Pending',
   damaged: 'Damaged',
   lost: 'Lost',
 };

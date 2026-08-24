@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useProjectDetail, useCloseProject, useCancelProject, useSetStudents, useDeleteProject } from '@/hooks/useProjects';
+import { useProjectDetail, useCloseProject, useCancelProject, useSetStudents } from '@/hooks/useProjects';
 import ReturnCustodyModal from '@/components/custodies/ReturnCustodyModal';
 import { useAuthStore } from '@/store/auth.store';
 import { Button, Badge, Modal, Input, DataTable, ConfirmDialog, LoadingSpinner } from '@/components/ui';
-import { ArrowLeftIcon, LockClosedIcon, XCircleIcon, PencilIcon, PlusIcon, XMarkIcon, TrashIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, LockClosedIcon, XCircleIcon, PencilIcon, PlusIcon, XMarkIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
 import type { Custody, ProjectStudent } from '@/types';
@@ -22,12 +22,10 @@ export default function ProjectDetailPage() {
   const closeMutation = useCloseProject();
   const cancelMutation = useCancelProject();
   const studentsMutation = useSetStudents();
-  const deleteMutation = useDeleteProject();
 
   const [studentsOpen, setStudentsOpen] = useState(false);
   const [closingProject, setClosingProject] = useState(false);
   const [cancellingProject, setCancellingProject] = useState(false);
-  const [deletingProject, setDeletingProject] = useState(false);
   const [returningCustody, setReturningCustody] = useState<Custody | null>(null);
 
   const studentsForm = useForm<{ students: ProjectStudent[] }>({
@@ -116,11 +114,6 @@ export default function ProjectDetailPage() {
               </Button>
             </>
           )}
-          {can('projects:delete') && (
-            <Button variant="ghost" size="sm" onClick={() => setDeletingProject(true)}>
-              <TrashIcon className="h-4 w-4 text-red-500" />
-            </Button>
-          )}
         </div>
       </div>
 
@@ -133,7 +126,7 @@ export default function ProjectDetailPage() {
           {infoRow(t('pages.projects.supervisor'), project.supervisor_name)}
           {infoRow(t('pages.projects.academicYear'), project.academic_year)}
           {infoRow(t('pages.projects.startDate'), project.start_date ? formatDate(project.start_date) : '-')}
-          {infoRow(t('pages.projects.expectedCompletion'), project.expected_completion_date ? formatDate(project.expected_completion_date) : '-')}
+          {infoRow(t('pages.projects.endDate'), project.end_date ? formatDate(project.end_date) : '-')}
           {infoRow(t('pages.projects.requests'), project.request_count ?? 0)}
           {infoRow(t('pages.custodies.active'), project.active_custodies ?? 0)}
           {infoRow(t('pages.projects.notes'), project.notes)}
@@ -233,15 +226,6 @@ export default function ProjectDetailPage() {
         message={t('pages.projects.cancelConfirm')}
         confirmLabel={t('pages.projects.cancelProject')}
         isLoading={cancelMutation.isPending}
-      />
-
-      <ConfirmDialog
-        isOpen={deletingProject}
-        onClose={() => setDeletingProject(false)}
-        onConfirm={async () => { await deleteMutation.mutateAsync(projectId); navigate('/projects'); }}
-        title={t('common.delete')}
-        message={t('pages.projects.deleteConfirm')}
-        isLoading={deleteMutation.isPending}
       />
 
       <ReturnCustodyModal custody={returningCustody} onClose={() => setReturningCustody(null)} />

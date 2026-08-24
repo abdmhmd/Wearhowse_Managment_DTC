@@ -3,7 +3,10 @@ import { z } from 'zod';
 const materialRequestItemSchema = z.object({
   item_id: z.number({ message: 'item_id is required' }).int().positive('item_id must be a positive integer'),
   quantity: z.number({ message: 'quantity is required' }).positive('quantity must be greater than 0'),
-  unit_code: z.string().min(1).max(50),
+  // unit_code is OPTIONAL: the unit is a SERVER-DERIVED property of the item
+  // (its base unit). Any client value is ignored by the service, which always
+  // persists the item's authoritative base unit.
+  unit_code: z.string().max(50).optional(),
   notes: z.string().max(500).optional(),
 });
 
@@ -26,8 +29,16 @@ export const createMaterialRequestSchema = z
       .string()
       .optional()
       .refine(
-        (val) => !val || new Date(val) > new Date(),
-        { message: 'needed_by must be a future date' }
+        (val) => {
+          if (!val) return true;
+          const date = new Date(val);
+          if (Number.isNaN(date.getTime())) return false;
+          // Allow today (start of day) and any future date; block only past dates.
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          return date >= todayStart;
+        },
+        { message: 'needed_by must be today or a future date' }
       ),
     notes: z.string().max(1000).optional(),
     items: z

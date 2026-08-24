@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { getLocalizedName, getLocalizedRoleLabel } from '@/i18n/helpers';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/useUsers';
+import { useUsers, useCreateUser, useUpdateUser } from '@/hooks/useUsers';
 import { useDepartments } from '@/hooks/useDepartments';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useAuthStore } from '@/store/auth.store';
 import { createUserSchema, updateUserSchema, type CreateUserFormData, type UpdateUserFormData } from '@/schemas/users.schema';
-import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PageHeader, Button, DataTable, Modal, Input, Select, Badge } from '@/components/ui';
+import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { type UserRole } from '@/types';
 import type { User } from '@/types';
@@ -20,7 +20,6 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [warehouseIds, setWarehouseIds] = useState<number[]>([]);
 
   const { data } = useUsers(page);
@@ -28,7 +27,6 @@ export default function UsersPage() {
   const { data: warehousesData } = useAllWarehouses();
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
-  const deleteMutation = useDeleteUser();
 
   const createForm = useForm<CreateUserFormData>({ resolver: zodResolver(createUserSchema) });
   const updateForm = useForm<UpdateUserFormData>({ resolver: zodResolver(updateUserSchema) });
@@ -63,12 +61,6 @@ export default function UsersPage() {
     setEditingUser(null);
     updateForm.reset();
     setWarehouseIds([]);
-  };
-
-  const handleDelete = async () => {
-    if (!deletingUser) return;
-    await deleteMutation.mutateAsync(deletingUser.id);
-    setDeletingUser(null);
   };
 
   const roleOptions = (['system_admin', 'warehouse_manager', 'department_manager', 'supervisor'] as UserRole[]).map((value) => ({ value, label: getLocalizedRoleLabel(value) }));
@@ -110,11 +102,6 @@ export default function UsersPage() {
               updateForm.reset({ username: item.username, full_name: item.full_name, role: item.role, is_active: item.is_active, department_id: item.department_id ?? undefined });
             }}>
               <PencilIcon className="h-4 w-4" />
-            </Button>
-          )}
-          {can('users:delete') && (
-            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingUser(item); }}>
-              <TrashIcon className="h-4 w-4 text-red-500" />
             </Button>
           )}
         </div>
@@ -179,8 +166,6 @@ export default function UsersPage() {
       <Modal isOpen={!!editingUser} onClose={() => { setEditingUser(null); updateForm.reset(); setWarehouseIds([]); }} title={t('pages.users.edit')}>
         {renderForm(updateForm, handleUpdate, updateMutation.isPending, true)}
       </Modal>
-
-      <ConfirmDialog isOpen={!!deletingUser} onClose={() => setDeletingUser(null)} onConfirm={handleDelete} title={t('common.confirmDelete')} message={t('common.confirmDeleteMessage', { name: deletingUser?.username || '' })} isLoading={deleteMutation.isPending} />
     </div>
   );
 }

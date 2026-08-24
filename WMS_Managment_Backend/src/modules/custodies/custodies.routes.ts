@@ -27,4 +27,11 @@ router.post(
   custodiesController.returnItem.bind(custodiesController)
 );
 
+// POST /api/custodies/:id/receive — WM confirms receipt of a return_pending custody
+router.post(
+  '/:id/receive',
+  authorize('custodies:return'),
+  custodiesController.receiveReturn.bind(custodiesController)
+);
+
 export default router;

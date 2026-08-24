@@ -3,11 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCreateMaterialRequest } from '@/hooks/useMaterialRequests';
+import { useCreateMaterialRequest, useRequestCatalog } from '@/hooks/useMaterialRequests';
 import { useDepartments } from '@/hooks/useDepartments';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useAllItems } from '@/hooks/useItems';
-import { useAllUnits } from '@/hooks/useUnits';
 import { useAllProjects } from '@/hooks/useProjects';
 import { createMaterialRequestSchema, type CreateMaterialRequestFormData } from '@/schemas/material-requests.schema';
 import { PageHeader, Button, Input, Select, LoadingSpinner } from '@/components/ui';
@@ -21,18 +20,39 @@ export default function CreateMaterialRequestPage() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const { user } = useAuthStore();
+  const isSupervisor = user?.role === 'supervisor';
 
-  const { data: departmentsData } = useDepartments(1, 200);
-  const { data: warehousesData } = useAllWarehouses();
-  const { data: itemsData } = useAllItems();
-  const { data: unitsData } = useAllUnits();
+  // A supervisor reads the pre-scoped request catalog (department + own
+  // warehouses + department items + all active units) from /api/requests/catalog
+  // and NEVER touches the generic catalog endpoints — which the supervisor
+  // correctly has no permission to read (warehouses:view / items:view /
+  // units:view / departments:view). Everyone else keeps the generic hooks, so
+  // the disabled queries below never fire for them.
+  const { data: catalogData } = useRequestCatalog(isSupervisor);
+  const { data: departmentsData } = useDepartments(1, 200, !isSupervisor);
+  const { data: warehousesData } = useAllWarehouses(!isSupervisor);
+  const { data: itemsData } = useAllItems(!isSupervisor);
   const { data: projectsData } = useAllProjects();
   const createMutation = useCreateMaterialRequest();
 
-  const departments = departmentsData?.items || [];
-  const warehouses = warehousesData?.items || [];
-  const items = itemsData?.items || [];
-  const units = unitsData?.items || [];
+  const catalog = isSupervisor ? catalogData : undefined;
+  const departments = isSupervisor
+    ? (catalog?.department
+        ? [{ id: catalog.department.id, name_ar: catalog.department.name_ar ?? undefined, name_en: catalog.department.name_en ?? undefined }]
+        : [])
+    : (departmentsData?.items || []);
+  const warehouses = isSupervisor ? (catalog?.warehouses || []) : (warehousesData?.items || []);
+  const items = isSupervisor ? (catalog?.items || []) : (itemsData?.items || []);
+  // The unit is DERIVED from the selected item's base unit — never a free choice.
+  const unitOf = (itemId: any) => {
+    const it: any = items.find((x: any) => Number(x.id) === Number(itemId));
+    if (!it) return undefined;
+    return {
+      code: it.base_unit_code ?? it.unit_code,
+      nameAr: it.base_unit_name_ar ?? it.unit_name_ar,
+      nameEn: it.base_unit_name_en ?? it.unit_name_en,
+    };
+  };
   const projects = (projectsData?.items || []).filter((p: any) => p.status === 'open');
 
   // The destination warehouse is DERIVED server-side from the authenticated
@@ -45,7 +65,6 @@ export default function CreateMaterialRequestPage() {
   //    chosen warehouse_id is sent and validated server-side.
   const isSystemAdmin = user?.role === 'system_admin';
   const hasAssignedWarehouses = (user?.warehouse_ids?.length ?? 0) > 0;
-  const showWarehouseSelector = isSystemAdmin || !hasAssignedWarehouses;
 
   const form = useForm<CreateMaterialRequestFormData>({
     resolver: zodResolver(createMaterialRequestSchema),
@@ -67,10 +86,32 @@ export default function CreateMaterialRequestPage() {
     .filter((w: any) => !w.is_main && w.is_active !== false && w.department_id != null)
     .sort((a: any, b: any) => Number(a.id) - Number(b.id));
 
+  // Supervisor: the request department is DERIVED from the authenticated user
+  // (never a client choice) and the destination warehouse MUST belong to that
+  // department. Only the supervisor's own department warehouses are shown —
+  // other departments' warehouses are not even selectable.
+  const supervisorWarehouses = isSupervisor
+    ? availableWarehouses.filter((w: any) => Number(w.department_id) === Number(user?.department_id))
+    : [];
+  const warehouseOptions = isSupervisor ? supervisorWarehouses : availableWarehouses;
+
   // Auto-assignment mirrors the backend rule: the first assigned warehouse by
-  // id (deterministic) for non-admin creators WITH assignments.
-  const autoWarehouse = showWarehouseSelector ? undefined : availableWarehouses[0];
-  const autoDepartmentId = autoWarehouse ? Number(autoWarehouse.department_id) : undefined;
+  // id (deterministic) for non-admin creators WITH assignments. A supervisor
+  // sees a selector ONLY when their department has more than one eligible
+  // warehouse; a single warehouse is auto-selected and shown read-only.
+  const showWarehouseSelector = isSupervisor
+    ? supervisorWarehouses.length > 1
+    : isSystemAdmin || !hasAssignedWarehouses;
+
+  const autoWarehouse = showWarehouseSelector
+    ? undefined
+    : isSupervisor
+      ? supervisorWarehouses[0]
+      : availableWarehouses[0];
+
+  const autoDepartmentId = isSupervisor
+    ? (user?.department_id != null ? Number(user.department_id) : undefined)
+    : (autoWarehouse ? Number(autoWarehouse.department_id) : undefined);
 
   useEffect(() => {
     if (!showWarehouseSelector && autoWarehouse && !form.getValues('warehouse_id')) {
@@ -84,6 +125,11 @@ export default function CreateMaterialRequestPage() {
   // the user never types it and the backend re-derives and validates it.
   const selectedWarehouse = warehouses.find((w: any) => Number(w.id) === Number(selectedWarehouseId));
   const derivedDepartmentId = selectedWarehouse ? Number(selectedWarehouse.department_id) : undefined;
+  // For a supervisor the department is ALWAYS the authenticated user's own
+  // department (never derived from a warehouse they could not see).
+  const displayDepartmentId = isSupervisor && user?.department_id != null
+    ? Number(user.department_id)
+    : derivedDepartmentId;
 
   const handleWarehouseChange = (value: string) => {
     const wh = warehouses.find((w: any) => Number(w.id) === Number(value));
@@ -103,7 +149,13 @@ export default function CreateMaterialRequestPage() {
         priority: formData.priority,
         needed_by: formData.needed_by || undefined,
         notes: formData.notes || undefined,
-        items: formData.items.map((it) => ({ item_id: Number(it.item_id), quantity: Number(it.quantity), unit_code: it.unit_code })),
+        // unit_code is the DERIVED base unit of the selected item (the backend
+        // re-derives and ignores any client value anyway).
+        items: formData.items.map((it) => ({
+          item_id: Number(it.item_id),
+          quantity: Number(it.quantity),
+          unit_code: unitOf(it.item_id)?.code ?? '',
+        })),
       });
       navigate('/requests');
     } finally {
@@ -111,7 +163,7 @@ export default function CreateMaterialRequestPage() {
     }
   };
 
-  if (!departmentsData || !warehousesData) {
+  if (isSupervisor ? !catalogData : (!departmentsData || !warehousesData)) {
     return <div className="flex items-center justify-center h-64"><LoadingSpinner size="lg" /></div>;
   }
 
@@ -131,7 +183,7 @@ export default function CreateMaterialRequestPage() {
               <>
                 <Select
                   label={t('pages.materialRequests.department')}
-                  value={derivedDepartmentId ?? ''}
+                  value={displayDepartmentId ?? ''}
                   disabled
                   onChange={() => {}}
                   error={form.formState.errors.department_id?.message}
@@ -143,7 +195,7 @@ export default function CreateMaterialRequestPage() {
                   {...form.register('warehouse_id', { onChange: (e) => handleWarehouseChange(e.target.value) })}
                   error={form.formState.errors.warehouse_id?.message}
                   placeholder={t('form.selectWarehouse')}
-                  options={availableWarehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
+                  options={warehouseOptions.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
                 />
               </>
             ) : (
@@ -189,7 +241,7 @@ export default function CreateMaterialRequestPage() {
               {...form.register('priority')}
               options={(['low', 'normal', 'high', 'urgent'] as const).map((p) => ({ value: p, label: t(`pages.materialRequests.priorities.${p}`) }))}
             />
-            <Input label={t('pages.materialRequests.neededBy')} type="date" {...form.register('needed_by')} />
+            <Input label={t('pages.materialRequests.neededBy')} type="date" min={new Date().toISOString().slice(0, 10)} {...form.register('needed_by')} />
             <Input label={t('form.notes')} {...form.register('notes')} />
           </div>
 
@@ -212,7 +264,13 @@ export default function CreateMaterialRequestPage() {
                   <div className="col-span-6">
                     <Select
                       label={index === 0 ? t('pages.materialRequests.item') : undefined}
-                      {...form.register(`items.${index}.item_id`)}
+                      {...form.register(`items.${index}.item_id`, {
+                        onChange: (e) => {
+                          // Changing the item re-derives its base unit — no stale unit.
+                          const u = unitOf(e.target.value);
+                          form.setValue(`items.${index}.unit_code`, u?.code ?? '');
+                        },
+                      })}
                       error={form.formState.errors.items?.[index]?.item_id?.message}
                       placeholder={t('form.selectItem')}
                       options={items.map((it: any) => ({ value: it.id, label: `${it.item_code} - ${getLocalizedName(it)}` }))}
@@ -227,13 +285,19 @@ export default function CreateMaterialRequestPage() {
                     />
                   </div>
                   <div className="col-span-3">
-                    <Select
-                      label={index === 0 ? t('pages.materialRequests.unit') : undefined}
-                      {...form.register(`items.${index}.unit_code`)}
-                      error={form.formState.errors.items?.[index]?.unit_code?.message}
-                      placeholder={t('form.selectUnit')}
-                      options={units.map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }))}
-                    />
+                    {/* READ-ONLY: derived from the selected item's base unit */}
+                    {(() => {
+                      const u = unitOf(form.watch(`items.${index}.item_id`));
+                      return (
+                        <Select
+                          label={index === 0 ? t('pages.materialRequests.unit') : undefined}
+                          value={u?.code ?? ''}
+                          disabled
+                          onChange={() => undefined}
+                          options={[{ value: u?.code ?? '', label: u ? `${u.code}${u.nameEn || u.nameAr ? ` — ${getLocalizedName({ name_ar: u.nameAr, name_en: u.nameEn })}` : ''}` : t('form.selectItem') }]}
+                        />
+                      );
+                    })()}
                   </div>
                   <div className="col-span-1 pt-6">
                     <Button variant="ghost" size="sm" type="button" onClick={() => remove(index)} disabled={fields.length <= 1}>

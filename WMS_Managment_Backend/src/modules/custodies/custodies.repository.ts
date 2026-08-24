@@ -3,7 +3,7 @@ import { PoolClient } from 'pg';
 import { scopeForUser, type DataScope } from '../authorization/scope';
 import type { AuthUserContext } from '../authorization/authorization.service';
 
-export type CustodyStatus = 'active' | 'returned' | 'damaged' | 'lost';
+export type CustodyStatus = 'active' | 'returned' | 'damaged' | 'lost' | 'return_pending';
 export type CustodyCondition = 'good' | 'damaged' | 'lost';
 
 export function custodyScopeClause(user: AuthUserContext, startIndex = 1): { clause: string; params: any[] } {
@@ -20,6 +20,11 @@ export function custodyScopeClause(user: AuthUserContext, startIndex = 1): { cla
                 OR c.assigned_to IN (SELECT id FROM users u WHERE u.department_id = $${n}))`,
       params: [user.department_id],
     };
+  }
+  // NONE scope (supervisor, department_manager): show only custodies
+  // assigned to the current user.
+  if (user.id) {
+    return { clause: `c.assigned_to = $${n}`, params: [user.id] };
   }
   return { clause: 'FALSE', params: [] };
 }
@@ -40,6 +45,8 @@ export interface Custody {
   expected_return_at?: string | Date | null;
   notes?: string | null;
   returned_at?: Date | null;
+  pending_return_quantity?: number | null;
+  return_notes?: string | null;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
@@ -175,8 +182,10 @@ export class CustodiesRepository {
            condition = 'good',
            return_transaction_id = $2,
            returned_at = NOW(),
+           pending_return_quantity = NULL,
+           return_notes = NULL,
            notes = COALESCE($3, notes)
-       WHERE id = $1 AND is_active = true AND status = 'active'
+       WHERE id = $1 AND is_active = true AND status IN ('active', 'return_pending')
        RETURNING *`,
       [id, returnTransactionId, notes ?? null]
     );
@@ -198,10 +207,13 @@ export class CustodiesRepository {
     const res = await client.query(
       `UPDATE custodies
        SET quantity = quantity - $2,
+           status = 'active',
            condition = 'good',
            return_transaction_id = $3,
+           pending_return_quantity = NULL,
+           return_notes = NULL,
            notes = COALESCE($4, notes)
-       WHERE id = $1 AND is_active = true AND status = 'active' AND quantity >= $2
+       WHERE id = $1 AND is_active = true AND status IN ('active', 'return_pending') AND quantity >= $2
        RETURNING *`,
       [id, returnedQuantity, returnTransactionId, notes ?? null]
     );

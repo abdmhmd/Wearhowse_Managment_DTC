@@ -25,13 +25,14 @@ export function useItem(id: number) {
   });
 }
 
-export function useAllItems() {
+export function useAllItems(enabled = true) {
   return useQuery({
     queryKey: ['items', 'all'],
     queryFn: async () => {
       const res = await itemsApi.getAll(1, 500);
       return res.data.data;
     },
+    enabled,
   });
 }
 

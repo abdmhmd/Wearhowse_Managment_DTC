@@ -1,4 +1,4 @@
-import { runInTransaction } from '../../config/database';
+import { runInTransaction, pool } from '../../config/database';
 import { materialRequestsRepository, MaterialRequestDetail, RequestType } from './material-requests.repository';
 import { transactionsService } from '../transactions/transactions.service';
 import { transactionsRepository } from '../transactions/transactions.repository';
@@ -6,6 +6,7 @@ import { itemsRepository } from '../items/items.repository';
 import { stockMovementsRepository } from '../stock-movements/stock-movements.repository';
 import { warehousesRepository } from '../warehouses/warehouses.repository';
 import { custodiesRepository } from '../custodies/custodies.repository';
+import { projectsRepository } from '../projects/projects.repository';
 import { NotFoundError, ValidationError, ConflictError, AppError } from '../../utils/AppError';
 import { scopeForUser, isWarehouseFallbackUser, type DataScope } from '../authorization/scope';
 import { PERMISSIONS } from '../authorization/permissions';
@@ -38,7 +39,7 @@ export class MaterialRequestsService {
       priority?: 'low' | 'normal' | 'high' | 'urgent';
       needed_by?: string;
       notes?: string;
-      items: Array<{ item_id: number; quantity: number; unit_code: string; notes?: string }>;
+      items: Array<{ item_id: number; quantity: number; unit_code?: string; notes?: string }>;
     },
     user?: AuthUserContext
   ) {
@@ -49,24 +50,54 @@ export class MaterialRequestsService {
     const scope: DataScope | null = user ? scopeForUser(user) : null;
     if (user) {
       // A department_manager is the APPROVAL layer, never the creator: the
-      // intended creator is the warehouse_manager of the department warehouse
-      // (or the system_admin). Enforced server-side so a hand-crafted payload
-      // (or a future permission regrant) cannot bypass it.
+      // intended creator is the warehouse_manager of the department warehouse,
+      // a supervisor of the department, or the system_admin. Enforced
+      // server-side so a hand-crafted payload (or a future permission
+      // regrant) cannot bypass it.
       if (scope === 'DEPARTMENT') {
-        throw new ValidationError('Only warehouse managers or system administrators can create material requests', {});
+        throw new ValidationError('Only warehouse managers, supervisors or system administrators can create material requests', {});
       }
       // Fail closed for every NONE-scope user EXCEPT a warehouse_manager with
-      // zero assignments, who resolves to NONE but is allowed through to the
-      // zero-assignment fallback below (they may pick a destination warehouse).
-      if (scope === 'NONE' && !isWarehouseFallbackUser(user)) {
+      // zero assignments (who resolves to NONE but is allowed through to the
+      // zero-assignment fallback below) and a supervisor (handled in the
+      // dedicated supervisor branch further down).
+      const isSupervisor = user.role === 'supervisor';
+      if (scope === 'NONE' && !isWarehouseFallbackUser(user) && !isSupervisor) {
         throw new ValidationError('You are not authorized to create material requests', {});
       }
     }
 
     // ── Resolve the destination warehouse from the AUTHENTICATED USER ───────
     let warehouseId: number;
+    let departmentWarehouses: { id: number }[] = [];
 
-    if (user && scope !== 'GLOBAL') {
+    if (user?.role === 'supervisor') {
+      // ── Supervisor: department DERIVED from the authenticated user ─────────
+      // The supervisor's department is NEVER taken from the client payload. The
+      // destination warehouse MUST belong to that department — a payload
+      // `warehouse_id` of another department is rejected outright, so a
+      // supervisor cannot leak a request into a foreign department. When the
+      // department owns exactly one eligible (active, non-main) warehouse it is
+      // auto-selected, mirroring the frontend's single-warehouse behavior.
+      if (user.department_id == null) {
+        throw new ValidationError('Your account is not assigned to a department. Contact your administrator.', {});
+      }
+      departmentWarehouses = await warehousesRepository.findByDepartmentEligible(user.department_id);
+      if (data.warehouse_id == null) {
+        if (departmentWarehouses.length === 1) {
+          warehouseId = departmentWarehouses[0].id;
+        } else if (departmentWarehouses.length === 0) {
+          throw new ValidationError('Your department has no eligible warehouse to receive material requests. Contact your administrator.', {});
+        } else {
+          throw new ValidationError('Please select a warehouse belonging to your department.', {});
+        }
+      } else {
+        if (!departmentWarehouses.some((w) => w.id === data.warehouse_id)) {
+          throw new ValidationError('The selected warehouse does not belong to your department.', { warehouse_id: data.warehouse_id });
+        }
+        warehouseId = data.warehouse_id;
+      }
+    } else if (user && scope !== 'GLOBAL') {
       if (user.warehouse_ids.length > 0) {
         // ── Case A: the user HAS assigned warehouses ─────────────────────────
         // Strict spoofing protection: the payload `warehouse_id` is IGNORED and
@@ -132,6 +163,20 @@ export class MaterialRequestsService {
       throw new ValidationError('The selected warehouse is the department main warehouse and cannot be a request destination', { warehouse_id: warehouseId });
     }
 
+    // Guard: the department MUST have a main warehouse (stock source) or the
+    // request can never be issued.  Reject early at creation time instead of
+    // failing silently when the warehouse manager tries to issue later.
+    if (wh.department_id != null) {
+      const mainWh = await warehousesRepository.findMainByDepartment(wh.department_id);
+      if (!mainWh) {
+        throw new ValidationError(
+          'The department does not have a main warehouse configured. Contact your administrator to set up a main warehouse before creating requests.',
+          { warehouse_id: warehouseId, department_id: wh.department_id },
+          'NO_MAIN_WAREHOUSE'
+        );
+      }
+    }
+
     // The request department is DERIVED from the destination warehouse
     // (warehouses.department_id). A client-supplied department_id that
     // contradicts the warehouse is a conflict and is rejected outright.
@@ -143,6 +188,100 @@ export class MaterialRequestsService {
       );
     }
     const resolvedDepartmentId = wh.department_id;
+
+    // A request may target a project only when the project exists, is open for
+    // material requests, and belongs to the SAME department as the destination
+    // warehouse. Enforced server-side so a hand-crafted payload cannot attach a
+    // request to a project of another department.
+    if (data.project_id != null) {
+      const project = await projectsRepository.findById(data.project_id);
+      if (!project) {
+        throw new ValidationError('The selected project does not exist', { project_id: data.project_id });
+      }
+      if (project.status !== 'open') {
+        throw new ValidationError(
+          `The selected project is not open for material requests (status: ${project.status})`,
+          { project_id: data.project_id, status: project.status }
+        );
+      }
+      if (project.department_id !== resolvedDepartmentId) {
+        throw new ConflictError(
+          'The selected project belongs to a different department than the request warehouse',
+          'PROJECT_DEPARTMENT_MISMATCH',
+          { project_id: data.project_id, department_id: resolvedDepartmentId, project_department_id: project.department_id }
+        );
+      }
+      // A supervisor may attach a request ONLY to a project they personally
+      // supervise (their own department is already guaranteed above, since the
+      // warehouse is restricted to the supervisor's department). Enforced
+      // server-side so a hand-crafted payload cannot attach a request to a
+      // colleague's project.
+      if (user?.role === 'supervisor' && project.supervisor_id !== user.id) {
+        throw new ValidationError(
+          'You can only create material requests for a project you supervise',
+          { project_id: data.project_id, project_supervisor_id: project.supervisor_id }
+        );
+      }
+    }
+
+    // ── Item/unit invariant (ALL roles) ─────────────────────────────────────
+    // The unit is a SERVER-DERIVED property of the item: every line is
+    // persisted with the item's authoritative base unit (items.unit_code),
+    // regardless of what the client sent. A forged unit_code can never enter
+    // material_request_details. The transaction engine's unit validation
+    // remains as a final safety layer at issue time.
+    for (const line of data.items) {
+      const itemRow = await pool.query(
+        `SELECT i.id, i.item_code, i.unit_code FROM items i WHERE i.id = $1 AND i.is_active = true`,
+        [line.item_id]
+      );
+      const baseItem = itemRow.rows[0];
+      if (!baseItem) {
+        throw new ValidationError('The selected item does not exist or is inactive', { item_id: line.item_id });
+      }
+      if (!baseItem.unit_code) {
+        throw new ValidationError(
+          `Item '${baseItem.item_code}' has no base unit configured; contact your administrator`,
+          { item_id: line.item_id }
+        );
+      }
+      line.unit_code = baseItem.unit_code;
+    }
+
+    // ── Supervisor line-item hardening (server-side authority) ──────────────
+    // Every item_id / unit_code submitted by a supervisor must resolve to an
+    // ACTIVE item stored in one of the supervisor's department warehouses and
+    // to an ACTIVE unit. The client may only ever submit values from the
+    // /api/requests/catalog scope; this re-validation guarantees a hand-crafted
+    // payload cannot reference a foreign or deactivated item/unit.
+    if (user?.role === 'supervisor') {
+      const deptWarehouseIds = departmentWarehouses.map((w) => w.id);
+      for (const line of data.items) {
+        const itemRow = await pool.query(
+          `SELECT i.id, i.is_active, i.warehouse_id
+             FROM items i
+            WHERE i.id = $1`,
+          [line.item_id]
+        );
+        const item = itemRow.rows[0];
+        if (!item || !item.is_active) {
+          throw new ValidationError('The selected item does not exist or is inactive', { item_id: line.item_id });
+        }
+        if (!deptWarehouseIds.includes(item.warehouse_id)) {
+          throw new ValidationError(
+            'The selected item does not belong to your department',
+            { item_id: line.item_id, warehouse_id: item.warehouse_id }
+          );
+        }
+        const unitRow = await pool.query(
+          `SELECT 1 FROM units WHERE code = $1 AND is_active = true`,
+          [line.unit_code]
+        );
+        if (unitRow.rows.length === 0) {
+          throw new ValidationError('The selected unit is invalid or inactive', { unit_code: line.unit_code });
+        }
+      }
+    }
 
     return runInTransaction(async (client) => {
       const request_no = await materialRequestsRepository.generateRequestNo();
@@ -166,7 +305,7 @@ export class MaterialRequestsService {
           request_id: header.id,
           item_id: item.item_id,
           quantity: item.quantity,
-          unit_code: item.unit_code,
+          unit_code: item.unit_code!, // server-derived above — always set
           notes: item.notes ?? null,
         });
         details.push(detail);
@@ -174,6 +313,59 @@ export class MaterialRequestsService {
 
       return { ...header, details };
     });
+  }
+
+  /**
+   * Request-creation catalog for request creators (requests:create).
+   *
+   * Every value this endpoint returns is pre-scoped to the caller's authority,
+   * so the frontend never needs the generic catalog endpoints (warehouses /
+   * items / units / departments) — which a `supervisor` correctly does NOT
+   * have permission to read.
+   *
+   *  - department  : the caller's department (names resolved from the auth user)
+   *  - warehouses  : eligible (active, non-main) warehouses of that department
+   *  - items       : ACTIVE items stored in the department's eligible
+   *                  warehouses, each carrying its authoritative BASE unit
+   *                  (unit is derived from the item — never freely chosen)
+   *
+   * Callers without a department (e.g. a global system_admin) receive
+   * department=null and empty warehouse/item lists.
+   */
+  async getRequestCatalog(user: AuthUserContext) {
+    const departmentId = user.department_id;
+    const department =
+      departmentId == null
+        ? null
+        : {
+            id: departmentId,
+            name_ar: user.department_name_ar,
+            name_en: user.department_name_en,
+          };
+
+    const [warehouses, items] = await Promise.all([
+      departmentId == null ? Promise.resolve([]) : warehousesRepository.findByDepartmentEligible(departmentId),
+      departmentId == null
+        ? Promise.resolve([])
+        : pool.query(
+            `SELECT i.id, i.item_code, i.name_ar, i.name_en, i.unit_code,
+                    i.unit_code AS base_unit_code,
+                    u.name_ar   AS base_unit_name_ar,
+                    u.name_en   AS base_unit_name_en,
+                    i.category_code,
+                    i.current_balance, i.is_consumable
+               FROM items i
+               JOIN warehouses w ON w.id = i.warehouse_id
+               LEFT JOIN units u ON u.code = i.unit_code
+              WHERE i.is_active = true
+                AND w.is_active = true
+                AND w.department_id = $1
+              ORDER BY i.item_code`,
+            [departmentId]
+          ).then((r) => r.rows),
+    ]);
+
+    return { department, warehouses, items };
   }
 
   async getById(id: number, user?: AuthUserContext) {
@@ -241,7 +433,9 @@ export class MaterialRequestsService {
 
   /**
    * Department-level approval of a 'pending' request (department_manager /
-   * system_admin) OR admin approval of a 'forwarded' request (system_admin).
+   * system_admin) OR warehouse-manager approval of a 'pending' request from a
+   * supervisor (warehouse_manager) OR admin approval of a 'forwarded' request
+   * (system_admin).
    */
   async approveRequest(requestId: number, approvedBy: number, user?: AuthUserContext) {
     return runInTransaction(async (client) => {
@@ -265,6 +459,13 @@ export class MaterialRequestsService {
       }
 
       if (request.status === 'pending') {
+        // Warehouse manager approves a supervisor-originated request directly
+        // into wm_approved (skip dept manager / forward / admin-approve chain).
+        if (user?.role === 'warehouse_manager') {
+          return materialRequestsRepository.updateStatus(client, requestId, 'wm_approved', {
+            dept_approved_by: approvedBy,
+          });
+        }
         // Department manager approves their department's request. Separation of
         // duties: a department manager may never approve their OWN request —
         // the request must come from the warehouse manager of their department.
@@ -334,26 +535,56 @@ export class MaterialRequestsService {
       // Row-lock the request so two concurrent issues are serialized: the
       // second one blocks here and then observes status 'issued' below.
       const request = await materialRequestsRepository.findByIdForUpdate(client, requestId);
-      if (!request) throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
-      if (user && !this.inScope(request, user)) {
+      if (!request) {
+        logger.warn('[ISSUE_FAILED] Request not found', 'material-requests', { requestId, issuedBy });
         throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
       }
-      this.assertAdmin(user);
+      if (user && !this.inScope(request, user)) {
+        logger.warn('[ISSUE_FAILED] Request out of scope', 'material-requests', {
+          requestId, issuedBy, requestDept: request.department_id, requestWh: request.warehouse_id,
+        });
+        throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
+      }
 
-      if (request.status !== 'admin_approved') {
-        throw new ValidationError(
-          `Cannot issue a request with status '${request.status}'. It must be approved by the warehouse admin first.`,
-          { status: request.status }
-        );
+      // Admin can issue from admin_approved; warehouse manager can issue from
+      // wm_approved (supervisor-originated requests routed directly to them).
+      if (user?.role === 'warehouse_manager') {
+        if (request.status !== 'wm_approved') {
+          logger.warn('[ISSUE_FAILED] Invalid status for WM issue', 'material-requests', {
+            requestId, issuedBy, requestStatus: request.status, expectedStatus: 'wm_approved',
+          });
+          throw new ValidationError(
+            `Cannot issue a request with status '${request.status}'. Warehouse managers can only issue requests that have been approved for them (wm_approved).`,
+            { status: request.status },
+            'INVALID_REQUEST_STATUS'
+          );
+        }
+      } else {
+        this.assertAdmin(user);
+        if (request.status !== 'admin_approved') {
+          logger.warn('[ISSUE_FAILED] Invalid status for admin issue', 'material-requests', {
+            requestId, issuedBy, requestStatus: request.status, expectedStatus: 'admin_approved',
+          });
+          throw new ValidationError(
+            `Cannot issue a request with status '${request.status}'. It must be approved by the warehouse admin first.`,
+            { status: request.status },
+            'INVALID_REQUEST_STATUS'
+          );
+        }
       }
 
       // 1. The destination (department) warehouse must belong to the request's
       //    department — never issue into an unrelated warehouse.
       const destWarehouse = await warehousesRepository.findById(request.warehouse_id);
       if (!destWarehouse || destWarehouse.department_id !== request.department_id) {
+        logger.warn('[ISSUE_FAILED] Destination warehouse department mismatch', 'material-requests', {
+          requestId, issuedBy, warehouseId: request.warehouse_id, requestDept: request.department_id,
+          destDept: destWarehouse?.department_id ?? null,
+        });
         throw new ValidationError(
           'The destination warehouse does not belong to the request department',
-          { warehouse_id: request.warehouse_id, department_id: request.department_id }
+          { warehouse_id: request.warehouse_id, department_id: request.department_id },
+          'WAREHOUSE_SCOPE_ERROR'
         );
       }
 
@@ -361,15 +592,23 @@ export class MaterialRequestsService {
       //    request.warehouse_id directly.
       const mainWarehouse = await warehousesRepository.findMainByDepartment(request.department_id);
       if (!mainWarehouse) {
+        logger.warn('[ISSUE_FAILED] No main warehouse for department', 'material-requests', {
+          requestId, issuedBy, requestDept: request.department_id, requestWh: request.warehouse_id,
+        });
         throw new ValidationError(
           `Department #${request.department_id} has no main warehouse configured; cannot issue stock`,
-          { department_id: request.department_id }
+          { department_id: request.department_id },
+          'NO_MAIN_WAREHOUSE'
         );
       }
       if (mainWarehouse.id === request.warehouse_id) {
+        logger.warn('[ISSUE_FAILED] Request targets main warehouse', 'material-requests', {
+          requestId, issuedBy, mainWarehouseId: mainWarehouse.id, requestWh: request.warehouse_id,
+        });
         throw new ValidationError(
           'The request targets the main warehouse itself; choose a department warehouse to receive the stock',
-          { warehouse_id: request.warehouse_id }
+          { warehouse_id: request.warehouse_id },
+          'MAIN_WAREHOUSE_DESTINATION'
         );
       }
 
@@ -414,9 +653,14 @@ export class MaterialRequestsService {
           : (item.warehouse_id === mainWarehouse.id ? Number(item.current_balance) || 0 : 0);
 
         if (sourceBalance < quantity) {
+          logger.warn('[ISSUE_FAILED] Insufficient stock', 'material-requests', {
+            requestId, issuedBy, itemId: item.id, itemCode: item.item_code,
+            mainWarehouseId: mainWarehouse.id, available: sourceBalance, required: quantity,
+          });
           throw new ValidationError(
             `Insufficient stock in main warehouse '${mainWarehouse.name_ar || mainWarehouse.code}' for item ${item.item_code}. Available: ${sourceBalance}, Required: ${quantity}`,
-            { item_code: item.item_code, available: sourceBalance, required: quantity }
+            { item_code: item.item_code, available: sourceBalance, required: quantity },
+            'INSUFFICIENT_STOCK'
           );
         }
 
@@ -495,26 +739,20 @@ export class MaterialRequestsService {
     return runInTransaction(async (client) => {
       const request = await materialRequestsRepository.findByIdForUpdate(client, requestId);
       if (!request) throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
-      if (user && !this.inScope(request, user)) {
-        throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
-      }
-
       // State machine: cancellable until admin approval (admin_approved is only
       // cancellable by an admin, before the stock is actually issued).
-      const cancellableByOwner = ['pending', 'dept_approved', 'forwarded'].includes(request.status);
-      const cancellableByAdmin = ['pending', 'dept_approved', 'forwarded', 'admin_approved'].includes(request.status);
-      if (!cancellableByOwner && !cancellableByAdmin) {
-        throw new ValidationError(`Cannot cancel a request with status '${request.status}'`, { status: request.status });
-      }
+      const cancellableByOwner = ['pending', 'dept_approved', 'wm_approved', 'forwarded'].includes(request.status);
+      const cancellableByAdmin = ['pending', 'dept_approved', 'wm_approved', 'forwarded', 'admin_approved'].includes(request.status);
 
       // Ownership check: only system_admin may cancel someone else's request;
       // every other user may only cancel their own cancellable requests.
       const isAdmin = cancellerRole === 'system_admin';
       if (isAdmin) {
         if (!cancellableByAdmin) {
-          throw new ValidationError(`Cannot cancel a request with status '${request.status}'`, { status: request.status });
+          throw new ValidationError(`Cannot cancel a request with status '${request.status}'`, { status: request.status }, 'INVALID_REQUEST_STATUS');
         }
       } else {
+        // The owner can cancel their own request regardless of department scope.
         if (!cancellableByOwner || request.requested_by !== cancelledBy) {
           throw new AppError('You are not authorized to cancel this request', 403, 'AUTH_FORBIDDEN');
         }

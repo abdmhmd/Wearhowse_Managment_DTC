@@ -68,6 +68,8 @@ describe('Authorization (RBAC + Data Scope)', () => {
     unitCode = await seedUnit();
     deptA = await seedDepartment();
     deptB = await seedDepartment();
+    await seedWarehouse({ department_id: deptA, is_main: true });
+    await seedWarehouse({ department_id: deptB, is_main: true });
     whA = await seedWarehouse({ department_id: deptA });
     whB = await seedWarehouse({ department_id: deptB });
     itemId = await seedItem(catCode, unitCode, whA, 100);

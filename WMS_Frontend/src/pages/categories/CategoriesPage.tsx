@@ -8,11 +8,9 @@ import {
   useCategories,
   useCreateCategory,
   useUpdateCategory,
-  useDeleteCategory,
   useSubcategories,
   useCreateSubcategory,
   useUpdateSubcategory,
-  useDeleteSubcategory,
 } from '@/hooks/useCategories';
 import {
   createCategorySchema,
@@ -24,8 +22,8 @@ import {
   type CreateSubcategoryFormData,
   type UpdateSubcategoryFormData,
 } from '@/schemas/categories.schema';
-import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
+import { PageHeader, Button, DataTable, Modal, Input, Select, Badge } from '@/components/ui';
+import { PlusIcon, PencilIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { useAuthStore } from '@/store/auth.store';
 import type { Category, Subcategory } from '@/types';
@@ -36,19 +34,15 @@ export default function CategoriesPage() {
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [subcategoryCategory, setSubcategoryCategory] = useState<Category | null>(null);
   const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
-  const [deletingSubcategory, setDeletingSubcategory] = useState<Subcategory | null>(null);
 
   const { data, isLoading } = useCategories(page, 200);
   const createMutation = useCreateCategory();
   const updateMutation = useUpdateCategory();
-  const deleteMutation = useDeleteCategory();
   const { data: subcategoriesData } = useSubcategories(subcategoryCategory?.code || '');
   const createSubcatMutation = useCreateSubcategory();
   const updateSubcatMutation = useUpdateSubcategory();
-  const deleteSubcatMutation = useDeleteSubcategory();
 
   const categories = data?.items || [];
   const subcategories = subcategoriesData || [];
@@ -82,12 +76,6 @@ export default function CategoriesPage() {
     updateForm.reset();
   };
 
-  const handleDelete = async () => {
-    if (!deletingCategory) return;
-    await deleteMutation.mutateAsync(deletingCategory.code);
-    setDeletingCategory(null);
-  };
-
   const handleCreateSubcategory = async (formData: CreateSubcategoryFormData) => {
     if (!subcategoryCategory) return;
     await createSubcatMutation.mutateAsync({ categoryCode: subcategoryCategory.code, data: formData });
@@ -99,12 +87,6 @@ export default function CategoriesPage() {
     await updateSubcatMutation.mutateAsync({ id: editingSubcategory.id, data: formData });
     setEditingSubcategory(null);
     editSubcatForm.reset();
-  };
-
-  const handleDeleteSubcategory = async () => {
-    if (!deletingSubcategory) return;
-    await deleteSubcatMutation.mutateAsync(deletingSubcategory.id);
-    setDeletingSubcategory(null);
   };
 
   const columns = [
@@ -164,18 +146,6 @@ export default function CategoriesPage() {
               }}
             >
               <PencilIcon className="h-4 w-4" />
-            </Button>
-          )}
-          {can('categories:delete') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeletingCategory(item);
-              }}
-            >
-              <TrashIcon className="h-4 w-4 text-red-500" />
             </Button>
           )}
         </div>
@@ -353,11 +323,6 @@ export default function CategoriesPage() {
                         <PencilIcon className="h-4 w-4" />
                       </Button>
                     )}
-                    {can('categories:delete') && (
-                      <Button variant="ghost" size="sm" onClick={() => setDeletingSubcategory(sub)}>
-                        <TrashIcon className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
                   </div>
                 </div>
               ))}
@@ -396,24 +361,6 @@ export default function CategoriesPage() {
           </div>
         </form>
       </Modal>
-
-      <ConfirmDialog
-        isOpen={!!deletingCategory}
-        onClose={() => setDeletingCategory(null)}
-        onConfirm={handleDelete}
-        title={t('common.confirmDelete')}
-        message={t('common.confirmDeleteMessage', { name: getLocalizedName(deletingCategory || {}) })}
-        isLoading={deleteMutation.isPending}
-      />
-
-      <ConfirmDialog
-        isOpen={!!deletingSubcategory}
-        onClose={() => setDeletingSubcategory(null)}
-        onConfirm={handleDeleteSubcategory}
-        title={t('common.confirmDelete')}
-        message={t('common.confirmDeleteMessage', { name: getLocalizedName(deletingSubcategory || {}) })}
-        isLoading={deleteSubcatMutation.isPending}
-      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
   FolderIcon,
   ShieldCheckIcon,
   ClipboardDocumentCheckIcon,
+  ShoppingCartIcon,
 } from '@heroicons/react/24/outline';
 import type { Permission } from '@/types';
 import { cn } from '@/utils';
@@ -41,9 +42,11 @@ const navItems: NavItem[] = [
   { labelKey: 'nav.unitConversions', path: '/unit-conversions', icon: ArrowsRightLeftIcon, permissions: ['unit-conversions:view'] },
   { labelKey: 'nav.transactions', path: '/transactions', icon: DocumentTextIcon, permissions: ['transactions:view'] },
   { labelKey: 'nav.stockMovements', path: '/stock-movements', icon: ClipboardDocumentListIcon, permissions: ['stock-movements:view-all'] },
-  { labelKey: 'nav.materialRequests', path: '/requests', icon: ClipboardDocumentCheckIcon, permissions: ['requests:view'] },
+  { labelKey: 'nav.materialRequests', path: '/requests', icon: ClipboardDocumentCheckIcon, permissions: ['requests:view', 'requests:view_own'] },
+  { labelKey: 'nav.purchaseOrders', path: '/purchase-orders', icon: ShoppingCartIcon, permissions: ['purchase-orders:view'] },
   { labelKey: 'nav.projects', path: '/projects', icon: FolderIcon, permissions: ['projects:view'] },
   { labelKey: 'nav.custodies', path: '/custodies', icon: ShieldCheckIcon, permissions: ['custodies:view'] },
+  { labelKey: 'nav.myCustody', path: '/my-custody', icon: ShieldCheckIcon, permissions: ['custodies:view_own'] },
   { labelKey: 'nav.reports', path: '/reports', icon: ChartBarIcon, permissions: ['reports:view'] },
   { labelKey: 'nav.settings', path: '/settings', icon: Cog6ToothIcon, permissions: ['settings:view'] },
   { labelKey: 'nav.users', path: '/users', icon: UserGroupIcon, permissions: ['users:view'] },

@@ -12,7 +12,11 @@ export async function cleanupTestData(prefix: string): Promise<void> {
 
   await p.query(
     `DELETE FROM journal_entries
-      WHERE transaction_id IN (SELECT id FROM transactions WHERE transaction_no LIKE $1)
+      WHERE transaction_id IN (SELECT id FROM transactions
+              WHERE transaction_no LIKE $1
+                 OR created_by IN (SELECT id FROM users WHERE username LIKE $1)
+                 OR warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
+                 OR to_warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1))
          OR created_by IN (SELECT id FROM users WHERE username LIKE $1)`,
     [pattern]
   );
@@ -44,6 +48,33 @@ export async function cleanupTestData(prefix: string): Promise<void> {
          OR warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)`,
     [pattern]
   );
+  // Purchase order tables must be cleaned BEFORE transactions (allocations
+  // reference them) and BEFORE warehouses/items/users.
+  await p.query(
+    `DELETE FROM purchase_order_allocations
+      WHERE po_id IN (SELECT id FROM purchase_orders WHERE po_number LIKE $1)
+         OR allocated_by IN (SELECT id FROM users WHERE username LIKE $1)
+         OR transferred_by IN (SELECT id FROM users WHERE username LIKE $1)
+         OR source_warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
+         OR dest_warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
+         OR transfer_transaction_id IN (SELECT id FROM transactions WHERE transaction_no LIKE $1)
+         OR receive_transaction_id IN (SELECT id FROM transactions WHERE transaction_no LIKE $1)`,
+    [pattern]
+  );
+  await p.query(
+    `DELETE FROM purchase_order_details
+      WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)
+         OR po_id IN (SELECT id FROM purchase_orders WHERE po_number LIKE $1)`,
+    [pattern]
+  );
+  await p.query(
+    `DELETE FROM purchase_orders
+       WHERE po_number LIKE $1
+          OR created_by IN (SELECT id FROM users WHERE username LIKE $1)
+          OR warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
+          OR department_id IN (SELECT id FROM departments WHERE code LIKE $1)`,
+    [pattern]
+  );
   await p.query(
     `DELETE FROM material_request_details
       WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)
@@ -59,21 +90,33 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     [pattern]
   );
   await p.query(
+    `DELETE FROM batches
+      WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)
+         OR transaction_id IN (SELECT id FROM transactions
+              WHERE transaction_no LIKE $1
+                 OR created_by IN (SELECT id FROM users WHERE username LIKE $1)
+                 OR warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
+                 OR to_warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1))`,
+    [pattern]
+  );
+  await p.query(
     `DELETE FROM transaction_details
       WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)
-         OR transaction_id IN (SELECT id FROM transactions WHERE transaction_no LIKE $1)`,
+         OR transaction_id IN (SELECT id FROM transactions
+              WHERE transaction_no LIKE $1
+                 OR created_by IN (SELECT id FROM users WHERE username LIKE $1)
+                 OR warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
+                 OR to_warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1))`,
     [pattern]
   );
   await p.query(
     `DELETE FROM stock_movements
       WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)
-         OR transaction_id IN (SELECT id FROM transactions WHERE transaction_no LIKE $1)`,
-    [pattern]
-  );
-  await p.query(
-    `DELETE FROM batches
-      WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)
-         OR transaction_id IN (SELECT id FROM transactions WHERE transaction_no LIKE $1)`,
+         OR transaction_id IN (SELECT id FROM transactions
+              WHERE transaction_no LIKE $1
+                 OR created_by IN (SELECT id FROM users WHERE username LIKE $1)
+                 OR warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
+                 OR to_warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1))`,
     [pattern]
   );
   await p.query(

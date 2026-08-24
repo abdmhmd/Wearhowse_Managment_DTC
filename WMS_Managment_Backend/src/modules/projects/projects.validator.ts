@@ -9,12 +9,13 @@ export const studentSchema = z.object({
 export const createProjectSchema = z.object({
   name: z.string().min(1, 'Project name is required').max(500),
   department_id: z.number({ message: 'department_id is required' }).int().positive(),
-  supervisor_id: z.number({ message: 'supervisor_id is required' }).int().positive(),
+  // Optional: a `supervisor` creating a project omits it — the service derives
+  // supervisor_id from the authenticated user (a forged value cannot transfer
+  // ownership). warehouse_manager / system_admin must still provide it.
+  supervisor_id: z.number({ message: 'supervisor_id is required' }).int().positive().optional(),
   warehouse_id: z.number().int().positive().optional(),
   academic_year: z.string().max(20).optional().nullable(),
   description: z.string().max(4000).optional().nullable(),
-  start_date: z.string().optional().nullable(),
-  expected_completion_date: z.string().optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
   students: z.array(studentSchema).max(200).optional(),
 });
@@ -25,8 +26,6 @@ export const updateProjectSchema = z.object({
   warehouse_id: z.number().int().positive().optional(),
   academic_year: z.string().max(20).optional().nullable(),
   description: z.string().max(4000).optional().nullable(),
-  start_date: z.string().optional().nullable(),
-  expected_completion_date: z.string().optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
 });
 

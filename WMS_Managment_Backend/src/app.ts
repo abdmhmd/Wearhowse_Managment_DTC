@@ -29,6 +29,7 @@ import batchesRoutes from './modules/batches/batches.routes';
 import projectsRoutes from './modules/projects/projects.routes';
 import custodiesRoutes from './modules/custodies/custodies.routes';
 import supervisorsRoutes from './modules/supervisors/supervisors.routes';
+import purchaseOrdersRoutes from './modules/purchase-orders/purchase-orders.routes';
 
 const app: Application = express();
 
@@ -68,6 +69,7 @@ app.use('/api/batches', batchesRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/custodies', custodiesRoutes);
 app.use('/api/supervisors', supervisorsRoutes);
+app.use('/api/purchase-orders', purchaseOrdersRoutes);
 
 import { testConnection } from './config/database';
 
@@ -81,7 +83,7 @@ app.get('/health', async (_req: Request, res: Response) => {
 
 app.use('/api', swaggerRoutes);
 
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof AppError) {
     return sendError(res, err.message, err.status, err.code, err.details);
   }

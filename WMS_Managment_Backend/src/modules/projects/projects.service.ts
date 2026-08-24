@@ -13,12 +13,10 @@ export class ProjectsService {
     data: {
       name: string;
       department_id: number;
-      supervisor_id: number;
+      supervisor_id?: number;
       warehouse_id?: number;
       academic_year?: string | null;
       description?: string | null;
-      start_date?: string | null;
-      expected_completion_date?: string | null;
       notes?: string | null;
       students?: ProjectStudent[];
     },
@@ -30,13 +28,43 @@ export class ProjectsService {
       // never from the client-supplied payload.
       const scope = user ? scopeForUser(user) : 'GLOBAL';
       let departmentId = data.department_id;
-      if (scope === 'WAREHOUSE') {
+
+      // ── Supervisor: creates ONLY their OWN projects ────────────────────────
+      // Both the supervisor AND the department are DERIVED from the
+      // authenticated user and never trusted from the payload. A forged
+      // `supervisor_id` of another user is rejected outright so a hand-crafted
+      // request can never create a project owned by someone else. The department
+      // is derived too — otherwise a supervisor could never use the project in a
+      // material request (which requires project.department_id == the
+      // supervisor's department, enforced in material-requests.service.ts).
+      let supervisorId = data.supervisor_id;
+      if (user?.role === 'supervisor') {
+        if (user.department_id == null) {
+          throw new ValidationError(
+            'Your account is not assigned to a department. Contact your administrator.'
+          );
+        }
+        if (supervisorId != null && supervisorId !== user.id) {
+          throw new ValidationError(
+            'Supervisors can only create projects assigned to themselves.',
+            { supervisor_id: supervisorId }
+          );
+        }
+        supervisorId = user.id;
+        departmentId = user.department_id;
+      } else if (scope === 'WAREHOUSE') {
+        // A warehouse manager can only create a project for their own
+        // department — derived from the authenticated user.
         if (!user || user.department_id == null) {
           throw new ValidationError(
             'A warehouse manager must be assigned to a department before creating a project.'
           );
         }
         departmentId = user.department_id;
+      }
+
+      if (supervisorId == null) {
+        throw new ValidationError('supervisor_id is required.', {});
       }
 
       const warehouse_id = await this.resolveAndValidateWarehouse(
@@ -52,14 +80,10 @@ export class ProjectsService {
           name: data.name,
           department_id: departmentId,
           warehouse_id,
-          supervisor_id: data.supervisor_id,
+          supervisor_id: supervisorId,
           created_by: createdBy,
           academic_year: data.academic_year ?? null,
           description: data.description ?? null,
-          start_date: data.start_date ? new Date(data.start_date) : null,
-          expected_completion_date: data.expected_completion_date
-            ? new Date(data.expected_completion_date)
-            : null,
           notes: data.notes ?? null,
         },
         client
@@ -103,7 +127,7 @@ export class ProjectsService {
     return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
-  private async inScope(project: { department_id: number }, user: AuthUserContext): Promise<boolean> {
+  private async inScope(project: { department_id: number; supervisor_id?: number }, user: AuthUserContext): Promise<boolean> {
     const scope: DataScope = scopeForUser(user);
     if (scope === 'GLOBAL') return true;
     if (scope === 'DEPARTMENT') return project.department_id === user.department_id;
@@ -119,6 +143,9 @@ export class ProjectsService {
       );
       return res.rows.length > 0;
     }
+    // A supervisor resolves to NONE scope: they may open ONLY the projects they
+    // personally supervise (same rule as the list endpoint).
+    if (user.role === 'supervisor') return project.supervisor_id === user.id;
     return false;
   }
 
@@ -225,8 +252,6 @@ export class ProjectsService {
       supervisor_id?: number;
       academic_year?: string | null;
       description?: string | null;
-      start_date?: string | null;
-      expected_completion_date?: string | null;
       notes?: string | null;
     },
     user?: AuthUserContext
@@ -235,6 +260,16 @@ export class ProjectsService {
     if (!project) throw new NotFoundError('Project', 'PROJECT_NOT_FOUND', { id });
     if (user && !(await this.inScope(project, user))) {
       throw new NotFoundError('Project', 'PROJECT_NOT_FOUND', { id });
+    }
+
+    // A supervisor can never transfer their own project to another supervisor
+    // (or to themselves — supervisor_id stays the authenticated user). Any
+    // attempt to change it is rejected outright.
+    if (user?.role === 'supervisor' && data.supervisor_id !== undefined && data.supervisor_id !== project.supervisor_id) {
+      throw new ValidationError(
+        'Supervisors cannot change the project supervisor.',
+        { supervisor_id: data.supervisor_id }
+      );
     }
 
     const updateData: any = { ...data };

@@ -13,7 +13,13 @@ import type { TransactionType, MovementType } from '@/types';
 
 export default function DashboardPage() {
   const { t } = useTranslation();
-  const { canAny } = useAuthStore();
+  const { can, canAny } = useAuthStore();
+  // Each dashboard widget is loaded ONLY when the current user actually holds
+  // the matching view permission. A supervisor has neither items:view nor
+  // transactions:view, so no unauthorized requests are fired — the requests
+  // are prevented rather than their errors being hidden.
+  const canViewItems = can('items:view');
+  const canViewTransactions = can('transactions:view');
   const canViewAllMovements = canAny('stock-movements:view-all');
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
     queryKey: ['items', 'dashboard'],
@@ -21,6 +27,7 @@ export default function DashboardPage() {
       const res = await itemsApi.getAll(1, 100);
       return res.data.data;
     },
+    enabled: canViewItems,
   });
 
   const { data: transactionsData, isLoading: txLoading } = useQuery({
@@ -29,6 +36,7 @@ export default function DashboardPage() {
       const res = await transactionsApi.getAll(1, 100);
       return res.data.data;
     },
+    enabled: canViewTransactions,
   });
 
   const { data: movementsData, isLoading: movLoading } = useQuery({

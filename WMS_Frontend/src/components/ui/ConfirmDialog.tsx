@@ -16,7 +16,7 @@ export default function ConfirmDialog({
   onConfirm,
   title,
   message,
-  confirmLabel = 'Delete',
+  confirmLabel = 'Confirm',
   isLoading,
 }: ConfirmDialogProps) {
   if (!isOpen) return null;
@@ -40,7 +40,7 @@ export default function ConfirmDialog({
               disabled={isLoading}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
             >
-              {isLoading ? 'Deleting...' : confirmLabel}
+              {isLoading ? 'Processing...' : confirmLabel}
             </button>
           </div>
         </div>

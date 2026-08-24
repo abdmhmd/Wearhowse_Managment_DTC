@@ -4,13 +4,14 @@ import type { CreateDepartmentFormData, UpdateDepartmentFormData } from '@/schem
 import { showSuccess, showError } from '@/utils/toast';
 import { getErrorMessage } from '@/utils/error';
 
-export function useDepartments(page = 1, limit = 20) {
+export function useDepartments(page = 1, limit = 20, enabled = true) {
   return useQuery({
     queryKey: ['departments', page, limit],
     queryFn: async () => {
       const res = await departmentsApi.getAll(page, limit);
       return res.data.data;
     },
+    enabled,
   });
 }
 

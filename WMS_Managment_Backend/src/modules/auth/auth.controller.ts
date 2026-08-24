@@ -196,6 +196,8 @@ export class AuthController {
           full_name: context.full_name,
           role: context.role,
           department_id: context.department_id,
+          department_name_ar: context.department_name_ar,
+          department_name_en: context.department_name_en,
           permissions: context.permissions,
           warehouses: context.warehouses,
           warehouse_ids: context.warehouse_ids,

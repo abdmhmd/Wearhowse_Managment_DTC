@@ -6,6 +6,7 @@ import type { AuthUserContext } from '../authorization/authorization.service';
 export type RequestStatus =
   | 'pending'          // created, awaiting department approval
   | 'dept_approved'    // approved by the department manager
+  | 'wm_approved'      // approved by the warehouse manager (supervisor requests)
   | 'forwarded'        // forwarded by the department manager to the warehouse admin
   | 'admin_approved'   // approved by the warehouse admin
   | 'admin_rejected'   // rejected by the warehouse admin
@@ -254,6 +255,7 @@ export class MaterialRequestsRepository {
     let idx = 3;
 
     if (status === 'dept_approved')  { sets.push(`dept_approved_by = $${idx++}`, `dept_approved_at = NOW()`); vals.push(options?.dept_approved_by); }
+    if (status === 'wm_approved')    { sets.push(`dept_approved_by = $${idx++}`, `dept_approved_at = NOW()`); vals.push(options?.dept_approved_by); }
     if (status === 'forwarded')      { sets.push(`forwarded_by = $${idx++}`, `forwarded_at = NOW()`); vals.push(options?.forwarded_by); }
     if (status === 'admin_approved') { sets.push(`approved_by = $${idx++}`, `approved_at = NOW()`); vals.push(options?.approved_by); }
     if (status === 'admin_rejected') { sets.push(`rejected_by = $${idx++}`, `rejection_reason = $${idx++}`); vals.push(options?.rejected_by, options?.rejection_reason); }

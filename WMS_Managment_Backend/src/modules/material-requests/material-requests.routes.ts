@@ -14,6 +14,15 @@ router.get(
   materialRequestsController.getAll.bind(materialRequestsController)
 );
 
+// GET /api/requests/catalog — request-creation catalog (department-scoped
+// warehouses / items + units) for users with requests:create. MUST be
+// registered before GET /:id so 'catalog' is not captured as a numeric id.
+router.get(
+  '/catalog',
+  authorize('requests:create'),
+  materialRequestsController.getCatalog.bind(materialRequestsController)
+);
+
 // GET /api/requests/:id — view single request
 router.get(
   '/:id',

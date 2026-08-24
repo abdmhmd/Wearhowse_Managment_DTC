@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepartment } from '@/hooks/useDepartments';
+import { useDepartments, useCreateDepartment, useUpdateDepartment } from '@/hooks/useDepartments';
 import { createDepartmentSchema, updateDepartmentSchema, type CreateDepartmentFormData, type UpdateDepartmentFormData } from '@/schemas/departments.schema';
-import { PageHeader, Button, DataTable, Modal, Input, ConfirmDialog } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PageHeader, Button, DataTable, Modal, Input } from '@/components/ui';
+import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import type { Department } from '@/types';
 
@@ -15,12 +15,10 @@ export default function DepartmentsPage() {
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
-  const [deletingDept, setDeletingDept] = useState<Department | null>(null);
 
   const { data } = useDepartments(page);
   const createMutation = useCreateDepartment();
   const updateMutation = useUpdateDepartment();
-  const deleteMutation = useDeleteDepartment();
 
   const createForm = useForm<CreateDepartmentFormData>({ resolver: zodResolver(createDepartmentSchema) });
   const updateForm = useForm<UpdateDepartmentFormData>({ resolver: zodResolver(updateDepartmentSchema) });
@@ -38,12 +36,6 @@ export default function DepartmentsPage() {
     updateForm.reset();
   };
 
-  const handleDelete = async () => {
-    if (!deletingDept) return;
-    await deleteMutation.mutateAsync(deletingDept.code);
-    setDeletingDept(null);
-  };
-
   const columns = [
     { key: 'code', header: t('table.code') },
     { key: 'name_ar', header: t('table.name'), render: (item: Department) => getLocalizedName(item) },
@@ -54,9 +46,6 @@ export default function DepartmentsPage() {
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingDept(item); updateForm.reset({ name_ar: item.name_ar }); }}>
             <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingDept(item); }}>
-            <TrashIcon className="h-4 w-4 text-red-500" />
           </Button>
         </div>
       ),
@@ -88,8 +77,6 @@ export default function DepartmentsPage() {
           </div>
         </form>
       </Modal>
-
-      <ConfirmDialog isOpen={!!deletingDept} onClose={() => setDeletingDept(null)} onConfirm={handleDelete} title={t('common.confirmDelete')} message={t('common.confirmDeleteMessage', { name: getLocalizedName(deletingDept || {}) })} isLoading={deleteMutation.isPending} />
     </div>
   );
 }

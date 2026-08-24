@@ -3,17 +3,17 @@ import { useTranslation } from 'react-i18next';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useSupervisorsQuery, useCreateSupervisor, useUpdateSupervisor, useDeleteSupervisor } from '@/hooks/useSupervisors';
+import { useSupervisorsQuery, useCreateSupervisor, useUpdateSupervisor } from '@/hooks/useSupervisors';
 import { useAllDepartments } from '@/hooks/useDepartments';
 import { useAuthStore } from '@/store/auth.store';
 import { createSupervisorSchema, updateSupervisorSchema, type CreateSupervisorFormData, type UpdateSupervisorFormData } from '@/schemas/supervisors.schema';
 import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog, LoadingSpinner } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import type { Supervisor } from '@/types';
 
 interface PendingAction {
-  type: 'deactivate' | 'delete';
+  type: 'deactivate';
   item: Supervisor;
 }
 
@@ -31,7 +31,6 @@ export default function SupervisorsPage() {
   const { data: departmentsData } = useAllDepartments();
   const createMutation = useCreateSupervisor();
   const updateMutation = useUpdateSupervisor();
-  const deleteMutation = useDeleteSupervisor();
 
   const createForm = useForm<CreateSupervisorFormData>({
     resolver: zodResolver(createSupervisorSchema),
@@ -66,12 +65,6 @@ export default function SupervisorsPage() {
     if (!pendingAction) return;
     const { item } = pendingAction;
     await updateMutation.mutateAsync({ id: item.id, data: { is_active: !item.is_active } });
-    setPendingAction(null);
-  };
-
-  const handleDelete = async () => {
-    if (!pendingAction) return;
-    await deleteMutation.mutateAsync(pendingAction.item.id);
     setPendingAction(null);
   };
 
@@ -114,11 +107,6 @@ export default function SupervisorsPage() {
               onClick={(e) => { e.stopPropagation(); setPendingAction({ type: 'deactivate', item }); }}
             >
               {item.is_active ? t('common.inactive') : t('common.active')}
-            </Button>
-          )}
-          {can('supervisors:delete') && !isSelf(item) && (
-            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setPendingAction({ type: 'delete', item }); }}>
-              <TrashIcon className="h-4 w-4 text-red-500" />
             </Button>
           )}
         </div>
@@ -187,14 +175,13 @@ export default function SupervisorsPage() {
       <ConfirmDialog
         isOpen={!!pendingAction}
         onClose={() => setPendingAction(null)}
-        onConfirm={pendingAction?.type === 'delete' ? handleDelete : handleToggleStatus}
-        title={pendingAction?.type === 'delete' ? t('common.confirmDelete') : t('common.areYouSure')}
-        message={pendingAction?.type === 'delete'
-          ? t('common.confirmDeleteMessage', { name: pendingAction?.item.username || '' })
-          : pendingAction?.item.is_active
-            ? t('pages.supervisors.deactivateConfirm', { name: pendingAction?.item.username || '' })
-            : t('pages.supervisors.activateConfirm', { name: pendingAction?.item.username || '' })}
-        isLoading={pendingAction?.type === 'delete' ? deleteMutation.isPending : updateMutation.isPending}
+        onConfirm={handleToggleStatus}
+        title={t('common.areYouSure')}
+        message={pendingAction?.item.is_active
+          ? t('pages.supervisors.deactivateConfirm', { name: pendingAction?.item.username || '' })
+          : t('pages.supervisors.activateConfirm', { name: pendingAction?.item.username || '' })}
+        confirmLabel={t('common.confirm')}
+        isLoading={updateMutation.isPending}
       />
     </div>
   );

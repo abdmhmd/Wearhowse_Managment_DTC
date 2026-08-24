@@ -43,8 +43,6 @@ export class ProjectsRepository {
       created_by: number;
       academic_year?: string | null;
       description?: string | null;
-      start_date?: string | Date | null;
-      expected_completion_date?: string | Date | null;
       notes?: string | null;
     },
     client?: PoolClient
@@ -54,7 +52,7 @@ export class ProjectsRepository {
       `INSERT INTO projects
          (project_no, name, department_id, warehouse_id, supervisor_id, created_by,
           academic_year, description, start_date, expected_completion_date, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_DATE, NULL, $9)
        RETURNING *`,
       [
         data.project_no,
@@ -65,8 +63,6 @@ export class ProjectsRepository {
         data.created_by,
         data.academic_year ?? null,
         data.description ?? null,
-        data.start_date ? new Date(data.start_date) : null,
-        data.expected_completion_date ? new Date(data.expected_completion_date) : null,
         data.notes ?? null,
       ]
     );
@@ -103,6 +99,11 @@ export class ProjectsRepository {
           where += ` AND p.department_id IN (SELECT DISTINCT w.department_id FROM warehouses w WHERE w.id = ANY($${i++}) AND w.department_id IS NOT NULL AND w.is_active = true)`;
           params.push(filters.user.warehouse_ids);
         }
+      } else if (filters.user.role === 'supervisor') {
+        // A supervisor sees ONLY the projects they personally supervise — never
+        // department-wide and never another supervisor's projects.
+        where += ` AND p.supervisor_id = $${i++}`;
+        params.push(filters.user.id);
       } else {
         where += ' AND FALSE';
       }
@@ -172,8 +173,6 @@ export class ProjectsRepository {
       supervisor_id?: number;
       academic_year?: string | null;
       description?: string | null;
-      start_date?: string | Date | null;
-      expected_completion_date?: string | Date | null;
       notes?: string | null;
     }
   ) {
@@ -186,8 +185,6 @@ export class ProjectsRepository {
     if (data.supervisor_id !== undefined)           { sets.push(`supervisor_id = $${i++}`);          params.push(data.supervisor_id); }
     if (data.academic_year !== undefined)           { sets.push(`academic_year = $${i++}`);          params.push(data.academic_year); }
     if (data.description !== undefined)             { sets.push(`description = $${i++}`);            params.push(data.description); }
-    if (data.start_date !== undefined)              { sets.push(`start_date = $${i++}`);             params.push(data.start_date ? new Date(data.start_date) : null); }
-    if (data.expected_completion_date !== undefined){ sets.push(`expected_completion_date = $${i++}`); params.push(data.expected_completion_date ? new Date(data.expected_completion_date) : null); }
     if (data.notes !== undefined)                   { sets.push(`notes = $${i++}`);                  params.push(data.notes); }
 
     if (sets.length === 0) {
@@ -206,7 +203,7 @@ export class ProjectsRepository {
     const q = client ?? pool;
     const res = await q.query(
       `UPDATE projects
-       SET status = 'closed', closed_by = $2, closed_at = NOW()
+       SET status = 'closed', closed_by = $2, closed_at = NOW(), end_date = CURRENT_DATE
        WHERE id = $1 AND is_active = true
        RETURNING *`,
       [id, closedBy]

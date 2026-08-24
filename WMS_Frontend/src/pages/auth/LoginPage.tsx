@@ -27,9 +27,8 @@ export default function LoginPage() {
       login(token, refreshToken, user);
       showSuccess(t('auth.welcomeBack', { name: user.full_name }));
       navigate('/');
-    } catch (error: any) {
-      const message = error.response?.data?.error?.message || t('auth.loginFailed');
-      showError(message);
+    } catch {
+      showError(t('auth.loginFailed'));
     } finally {
       setIsLoading(false);
     }

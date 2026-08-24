@@ -14,13 +14,14 @@ export function useWarehouses(page = 1, limit = 20) {
   });
 }
 
-export function useAllWarehouses() {
+export function useAllWarehouses(enabled = true) {
   return useQuery({
     queryKey: ['warehouses', 'all'],
     queryFn: async () => {
       const res = await warehousesApi.getAll(1, 200);
       return res.data.data;
     },
+    enabled,
   });
 }
 

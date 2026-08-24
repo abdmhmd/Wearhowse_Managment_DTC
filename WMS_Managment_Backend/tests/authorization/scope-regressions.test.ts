@@ -80,6 +80,8 @@ describe('Scope regressions (audit remediation)', () => {
     unitCode = await seedUnit();
     deptA = await seedDepartment();
     deptB = await seedDepartment();
+    await seedWarehouse({ department_id: deptA, is_main: true });
+    await seedWarehouse({ department_id: deptB, is_main: true });
     whA = await seedWarehouse({ department_id: deptA });
     whB = await seedWarehouse({ department_id: deptB });
     itemA = await seedItem(catCode, unitCode, whA, 100);

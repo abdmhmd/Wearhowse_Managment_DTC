@@ -94,7 +94,7 @@ export class TransactionsService {
   }
 
   async createDraft(
-    header: { transaction_no?: string; type: string; supplier_id?: number | null; department_id?: number | null; warehouse_id: number; to_warehouse_id?: number | null; notes?: string | null; created_by: number },
+    header: { transaction_no?: string; type: string; supplier_id?: number | null; department_id?: number | null; warehouse_id: number; to_warehouse_id?: number | null; purchase_order_id?: number | null; notes?: string | null; created_by: number },
     details: Omit<TransactionDetail, 'id' | 'transaction_id' | 'total_price'>[],
     client?: PoolClient
   ) {

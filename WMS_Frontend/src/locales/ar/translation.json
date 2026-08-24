@@ -20,7 +20,9 @@
     "settings": "الإعدادات",
     "projects": "المشاريع",
     "custodies": "العهد",
-    "materialRequests": "طلبات الصرف"
+    "materialRequests": "طلبات الصرف",
+    "myCustody": "عهدتي",
+    "purchaseOrders": "أوامر الشراء"
   },
   "roles": {
     "system_admin": "مدير النظام",
@@ -65,7 +67,12 @@
     "confirmDeleteMessage": "هل أنت متأكد أنك تريد حذف \"{{name}}\"؟ لا يمكن التراجع عن هذا الإجراء.",
     "logout": "تسجيل الخروج",
     "close": "إغلاق",
-    "selectRole": "اختر الدور"
+    "selectRole": "اختر الدور",
+    "select": "اختر",
+    "status": "الحالة",
+    "view": "عرض",
+    "notes": "الملاحظات",
+    "saving": "جارٍ الحفظ…"
   },
   "table": {
     "id": "المعرّف",
@@ -119,7 +126,11 @@
     "totalValue": "القيمة الإجمالية",
     "lastPurchasePrice": "آخر سعر شراء",
     "subcategory": "الفئة الفرعية",
-    "parentCategory": "الفئة الرئيسية"
+    "parentCategory": "الفئة الرئيسية",
+    "department": "القسم",
+    "physicalStock": "المخزون الفعلي",
+    "allocatedStock": "المخزون المخصص",
+    "availableStock": "المخزون المتاح"
   },
   "form": {
     "code": "الرمز",
@@ -174,7 +185,8 @@
     "selectCategoryFirst": "اختر الفئة أولاً",
     "selectItemFirst": "اختر الصنف أولاً",
     "parentCategory": "الفئة الرئيسية",
-    "selectParentCategory": "اختر الفئة الرئيسية"
+    "selectParentCategory": "اختر الفئة الرئيسية",
+    "warehouses": "المستودعات"
   },
   "transaction": {
     "types": {
@@ -418,7 +430,10 @@
       "addStudent": "إضافة طالب",
       "editStudents": "تعديل قائمة الطلاب",
       "view": "عرض",
-      "deleteConfirm": "هل أنت متأكد من حذف هذا المشروع؟"
+      "deleteConfirm": "هل أنت متأكد من رغبتك في حذف هذا المشروع؟ لا يمكن التراجع عن هذه العملية.",
+      "warehouseAuto": "يُعيَّن تلقائيًا إلى المخزن الافتراضي لقسمك",
+      "endDate": "تاريخ الانتهاء",
+      "delete": "حذف المشروع"
     },
     "custodies": {
       "title": "العهد",
@@ -446,7 +461,12 @@
       "return": "تسجيل إرجاع",
       "returnConfirm": "سجل إرجاع هذا الغرض. الإرجاع بحالة سليمة ينشئ ويعتمد إذن إرجاع للمخزون (RTI)؛ الإرجاع التالف أو المفقود يحفظ السجل دون إعادة إلى المخزون.",
       "returnNotes": "ملاحظات الإرجاع (اختياري)",
-      "noData": "لا توجد عهد مسجلة"
+      "noData": "لا توجد عهد مسجلة",
+      "returnPending": "بانتظار الإرجاع",
+      "confirmReturn": "تأكيد الاستلام",
+      "confirmReturnConfirm": "تأكيد استلام الغرض بحالة سليمة؟ سيتم إعادة الصنف إلى المخزون.",
+      "requestReturn": "طلب إرجاع",
+      "requestReturnConfirm": "تقديم طلب إرجاع؟ يحتاج مدير المستودع لتأكيد الاستلام قبل إعادة إلى المخزون."
     },
     "materialRequests": {
       "title": "طلبات الصرف",
@@ -462,6 +482,7 @@
       },
       "statuses": {
         "pending": "قيد الانتظار",
+        "wm_approved": "معتمد من المستودع",
         "dept_approved": "معتمد من القسم",
         "forwarded": "محول للمستودع",
         "admin_approved": "معتمد من الإدارة",
@@ -504,7 +525,130 @@
       "noDetails": "لا توجد أصناف في هذا الطلب",
       "selectWarehouseFirst": "اختر المستودع أولاً",
       "destination": "وجهة الطلب",
-      "noWarehouseAvailable": "لا يوجد مستودع متاح لك. تواصل مع المسؤول لتخصيص مستودع."
+      "noWarehouseAvailable": "لا يوجد مستودع متاح لك. تواصل مع المسؤول لتخصيص مستودع.",
+      "errors": {
+        "insufficientStock": "الكمية المطلوبة من المادة غير متوفرة في المخزون.",
+        "insufficientStockWithQty": "الكمية المطلوبة غير متوفرة. المتوفر: {{available}}، المطلوب: {{requested}}.",
+        "invalidItem": "المادة المحددة غير موجودة أو غير متاحة.",
+        "invalidUnit": "وحدة المادة غير صالحة.",
+        "notFound": "طلب المواد غير موجود.",
+        "invalidStatus": "لا يمكن تنفيذ هذا الإجراء على الطلب في حالته الحالية.",
+        "forbidden": "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
+        "warehouseScope": "لا يمكنك تنفيذ هذا الإجراء على هذا المستودع.",
+        "mainWarehouseDestination": "لا يمكن صرف الطلب إلى المستودع الرئيسي. يجب اختيار مستودع قسم.",
+        "noMainWarehouse": "لا يوجد مستودع رئيسي مُهيأ لهذا القسم."
+      }
+    },
+    "purchaseOrders": {
+      "title": "أوامر الشراء",
+      "subtitle": "المشتريات من الموردين وتوزيع المخزون",
+      "new": "أمر شراء جديد",
+      "createTitle": "إنشاء أمر شراء",
+      "empty": "لا توجد أوامر شراء",
+      "poNumber": "رقم أمر الشراء",
+      "supplier": "المورد",
+      "receivingWarehouse": "مستودع الاستلام",
+      "orderDate": "تاريخ الطلب",
+      "expectedDate": "التاريخ المتوقع",
+      "createdBy": "أنشئ بواسطة",
+      "approvedAt": "تاريخ الاعتماد",
+      "lines": "بنود الأمر",
+      "allocations": "التخصيصات",
+      "noAllocations": "لا توجد تخصيصات بعد",
+      "quantityOrdered": "الكمية المطلوبة",
+      "quantityReceived": "الكمية المستلمة",
+      "remainingToReceive": "المتبقي للاستلام",
+      "quantityAllocated": "المخصصة",
+      "quantityTransferred": "المنقولة",
+      "remainingToTransfer": "المتبقي للنقل",
+      "unitPrice": "سعر الوحدة",
+      "unit": "الوحدة",
+      "destination": "المستودع الوجهة",
+      "statuses": {
+        "draft": "مسودة",
+        "approved": "معتمد",
+        "partially_received": "استلام جزئي",
+        "received": "مستلم بالكامل",
+        "closed": "مغلق",
+        "cancelled": "ملغي"
+      },
+      "allocStatuses": {
+        "allocated": "مخصص",
+        "partially_transferred": "نقل جزئي",
+        "transferred": "منقول بالكامل",
+        "cancelled": "ملغي"
+      },
+      "actions": {
+        "approve": "اعتماد",
+        "cancel": "إلغاء الأمر",
+        "receive": "استلام",
+        "allocate": "تخصيص",
+        "transfer": "نقل",
+        "close": "إغلاق",
+        "editDraft": "تعديل"
+      },
+      "receiveTitle": "استلام المخزون (سند استلام)",
+      "receiveQuantity": "كمية الاستلام",
+      "receiveProgress": "تم استلام {{received}} من {{ordered}} — المتبقي {{remaining}}",
+      "allocateTitle": "تخصيص المخزون",
+      "allocateQuantity": "كمية التخصيص",
+      "allocatableHint": "القابل للتخصيص: {{value}}",
+      "transferTitle": "نقل المخزون المخصص",
+      "transferQuantity": "كمية النقل",
+      "transferableHint": "الحد الأقصى للنقل: {{value}}",
+      "receiveIntoHint": "سيتم استلام المخزون في المستودع الرئيسي: {{warehouse}}",
+      "confirm": {
+        "approve": {
+          "title": "اعتماد أمر الشراء",
+          "message": "اعتماد هذا الأمر؟ لن يكون قابلاً للتعديل بعد ذلك."
+        },
+        "cancel": {
+          "title": "إلغاء أمر الشراء",
+          "message": "إلغاء هذا الأمر؟ لا يمكن التراجع عن هذه العملية."
+        },
+        "close": {
+          "title": "إغلاق أمر الشراء",
+          "message": "إغلاق هذا الأمر المُستلم بالكامل؟ يبقى المخزون غير المحجوز في المستودع الرئيسي كمخزون عام."
+        }
+      },
+      "validation": {
+        "warehouseRequired": "مستودع الاستلام مطلوب",
+        "warehouseNotEligible": "المستودع المحدد ليس مستودعاً رئيسياً مؤهلاً",
+        "itemRequired": "كل بند يحتاج إلى صنف",
+        "quantityPositive": "يجب أن تكون الكميات أكبر من صفر",
+        "unitRequired": "الوحدة مطلوبة",
+        "duplicateItem": "لا يسمح بتكرار نفس الصنف"
+      },
+      "requestTitle": "إنشاء طلب شراء",
+      "requestInfoSection": "معلومات الطلب",
+      "orderInfo": "معلومات الأمر",
+      "departmentLabel": "القسم",
+      "warehouseAutoHint": "يتم تحديد المستودع تلقائياً حسب قسم المستخدم.",
+      "requestedItems": "بنود الطلب",
+      "itemLabel": "المادة",
+      "quantityRequested": "الكمية المطلوبة",
+      "addItem": "إضافة مادة",
+      "removeItem": "إزالة",
+      "submitRequest": "إرسال الطلب",
+      "noValidWarehouseWarning": "لا يمكن تحديد مستودع رئيسي صالح لحسابك. يرجى التواصل مع المسؤول.",
+      "ambiguousWarehouseWarning": "تم تعيين أكثر من مستودع رئيسي لحسابك؛ يرجى التواصل مع المسؤول.",
+      "errors": {
+        "insufficientAllocation": "الكمية المتاحة للتخصيص غير كافية.",
+        "insufficientAllocationWithQty": "الكمية المتاحة للتخصيص هي {{available}} فقط، بينما تم طلب تخصيص {{requested}}.",
+        "exceedsReceived": "لا يمكن تخصيص كمية أكبر من الكمية المستلمة.",
+        "exceedsAllocated": "لا يمكن نقل كمية أكبر من الكمية المخصصة.",
+        "exceedsOrdered": "لا يمكن استلام كمية أكبر من الكمية المطلوبة في أمر الشراء.",
+        "allocationTransferred": "تم نقل كامل الكمية المخصصة مسبقاً.",
+        "notFound": "أمر الشراء غير موجود.",
+        "invalidStatus": "لا يمكن تنفيذ هذا الإجراء على أمر الشراء في حالته الحالية.",
+        "forbidden": "ليس لديك صلاحية لتنفيذ هذا الإجراء على أمر الشراء.",
+        "warehouseScope": "لا يمكنك تنفيذ هذا الإجراء على هذا المستودع.",
+        "mainWarehouseRequired": "يجب أن يكون المستودع المستلم مستودعاً رئيسياً.",
+        "invalidDestination": "يجب أن يكون مستودع التوزيع مستودعاً فرعياً تابعاً للقسم.",
+        "cannotCancel": "لا يمكن إلغاء أمر الشراء بعد استلام مواد منه.",
+        "cannotClose": "لا يمكن إغلاق أمر الشراء قبل اكتمال عمليات التخصيص والنقل المطلوبة.",
+        "receiveFailed": "تعذر استلام المواد. يرجى التحقق من الكميات والمحاولة مرة أخرى."
+      }
     }
   },
   "toast": {
@@ -531,6 +675,10 @@
     "TRANSACTION_NOT_FOUND": "العملية غير موجودة",
     "INSUFFICIENT_STOCK": "المخزون غير كافٍ للصنف {{itemCode}}",
     "CONVERSION_NOT_FOUND": "تحويل الوحدات غير موجود",
-    "INTERNAL_ERROR": "حدث خطأ داخلي. يرجى المحاولة مرة أخرى."
+    "INTERNAL_ERROR": "حدث خطأ داخلي. يرجى المحاولة مرة أخرى.",
+    "unexpected": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.",
+    "notFound": "العنصر المطلوب غير موجود.",
+    "forbidden": "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
+    "unauthorized": "يرجى تسجيل الدخول للمتابعة."
   }
 }

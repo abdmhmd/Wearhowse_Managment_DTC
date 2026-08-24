@@ -1,4 +1,5 @@
 import i18n from '@/i18n';
+import { mapApiError } from '@/utils/apiErrors';
 
 export interface ApiError {
   response?: {
@@ -15,22 +16,16 @@ export interface ApiError {
   message?: string;
 }
 
+/**
+ * Central user-facing error translation.
+ *
+ * Delegates to the central API error mapper (utils/apiErrors.ts) which maps
+ * stable backend error codes / HTTP statuses to i18n messages. Raw backend
+ * messages are NEVER returned or displayed — unknown errors fall back to the
+ * provided fallback key/text or a safe generic message.
+ */
 export function getErrorMessage(error: unknown, fallback: string): string {
-  const err = error as ApiError;
-  const code = err?.response?.data?.error?.code;
-  const details = err?.response?.data?.error?.details;
-  const serverMessage = err?.response?.data?.error?.message;
-
-  if (code) {
-    const translated = i18n.t(`errors.${code}`, { ...details, defaultValue: '' });
-    if (translated && translated !== `errors.${code}`) {
-      return translated;
-    }
-  }
-
-  if (serverMessage) {
-    return serverMessage;
-  }
-
-  return fallback;
+  const mapped = mapApiError(error);
+  const translated = i18n.t(mapped.key, { ...(mapped.params ?? {}), defaultValue: '' }) as string;
+  return translated || fallback;
 }

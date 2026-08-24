@@ -122,13 +122,13 @@ export default function MaterialRequestDetailPage() {
                 {t('pages.materialRequests.forward')}
               </Button>
             )}
-            {canIssue && req.status === 'admin_approved' && (
+            {canIssue && ['admin_approved', 'wm_approved'].includes(req.status) && (
               <Button type="button" onClick={() => setConfirmIssue(true)} isLoading={issueMutation.isPending}>
                 <ArrowUpTrayIcon className="h-4 w-4 me-2" />
                 {t('pages.materialRequests.issue')}
               </Button>
             )}
-            {(canCancel || req.requested_by === user?.id) && ['pending', 'dept_approved', 'forwarded'].includes(req.status) && (
+            {(canCancel || req.requested_by === user?.id) && ['pending', 'dept_approved', 'wm_approved', 'forwarded'].includes(req.status) && (
               <Button variant="secondary" type="button" onClick={() => setConfirmCancel(true)}>
                 <NoSymbolIcon className="h-4 w-4 me-2" />
                 {t('pages.materialRequests.cancel')}

@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier } from '@/hooks/useSuppliers';
+import { useSuppliers, useCreateSupplier, useUpdateSupplier } from '@/hooks/useSuppliers';
 import { createSupplierSchema, updateSupplierSchema, type CreateSupplierFormData, type UpdateSupplierFormData } from '@/schemas/suppliers.schema';
-import { PageHeader, Button, DataTable, Modal, Input, ConfirmDialog } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PageHeader, Button, DataTable, Modal, Input } from '@/components/ui';
+import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { useAuthStore } from '@/store/auth.store';
 import type { Supplier } from '@/types';
@@ -17,12 +17,10 @@ export default function SuppliersPage() {
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null);
 
   const { data, isLoading } = useSuppliers(page);
   const createMutation = useCreateSupplier();
   const updateMutation = useUpdateSupplier();
-  const deleteMutation = useDeleteSupplier();
 
   const createForm = useForm<CreateSupplierFormData>({ resolver: zodResolver(createSupplierSchema) });
   const updateForm = useForm<UpdateSupplierFormData>({ resolver: zodResolver(updateSupplierSchema) });
@@ -40,12 +38,6 @@ export default function SuppliersPage() {
     updateForm.reset();
   };
 
-  const handleDelete = async () => {
-    if (!deletingSupplier) return;
-    await deleteMutation.mutateAsync(deletingSupplier.id);
-    setDeletingSupplier(null);
-  };
-
   const columns = [
     { key: 'id', header: t('table.id') },
     { key: 'name_ar', header: t('table.name'), render: (item: Supplier) => getLocalizedName(item) },
@@ -59,11 +51,6 @@ export default function SuppliersPage() {
           {can('suppliers:update') && (
             <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingSupplier(item); updateForm.reset({ name_ar: item.name_ar, phone: item.phone || '', email: item.email || '', address: item.address || '' }); }}>
               <PencilIcon className="h-4 w-4" />
-            </Button>
-          )}
-          {can('suppliers:delete') && (
-            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingSupplier(item); }}>
-              <TrashIcon className="h-4 w-4 text-red-500" />
             </Button>
           )}
         </div>
@@ -96,8 +83,6 @@ export default function SuppliersPage() {
       <Modal isOpen={!!editingSupplier} onClose={() => { setEditingSupplier(null); updateForm.reset(); }} title={t('pages.suppliers.edit')}>
         {renderForm(updateForm, handleUpdate)}
       </Modal>
-
-      <ConfirmDialog isOpen={!!deletingSupplier} onClose={() => setDeletingSupplier(null)} onConfirm={handleDelete} title={t('common.confirmDelete')} message={t('common.confirmDeleteMessage', { name: getLocalizedName(deletingSupplier || {}) })} isLoading={deleteMutation.isPending} />
     </div>
   );
 }

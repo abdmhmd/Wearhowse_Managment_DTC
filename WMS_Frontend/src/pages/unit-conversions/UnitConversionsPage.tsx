@@ -4,12 +4,12 @@ import { getLocalizedName } from '@/i18n/helpers';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useUnitConversions, useCreateUnitConversion, useUpdateUnitConversion, useDeleteUnitConversion } from '@/hooks/useUnitConversions';
+import { useUnitConversions, useCreateUnitConversion, useUpdateUnitConversion } from '@/hooks/useUnitConversions';
 import { useItems } from '@/hooks/useItems';
 import { useAllUnits } from '@/hooks/useUnits';
 import { createUnitConversionSchema, updateUnitConversionSchema, type CreateUnitConversionFormData, type UpdateUnitConversionFormData } from '@/schemas/unit-conversions.schema';
-import { PageHeader, Button, DataTable, Modal, Input, Select, ConfirmDialog } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PageHeader, Button, DataTable, Modal, Input, Select } from '@/components/ui';
+import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 import type { UnitConversion } from '@/types';
 
 export default function UnitConversionsPage() {
@@ -17,14 +17,12 @@ export default function UnitConversionsPage() {
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUC, setEditingUC] = useState<UnitConversion | null>(null);
-  const [deletingUC, setDeletingUC] = useState<UnitConversion | null>(null);
 
   const { data } = useUnitConversions(page);
   const { data: itemsData } = useItems(1, 200);
   const { data: unitsData } = useAllUnits();
   const createMutation = useCreateUnitConversion();
   const updateMutation = useUpdateUnitConversion();
-  const deleteMutation = useDeleteUnitConversion();
 
   const items = itemsData?.items || [];
   const units = unitsData?.items || [];
@@ -45,12 +43,6 @@ export default function UnitConversionsPage() {
     updateForm.reset();
   };
 
-  const handleDelete = async () => {
-    if (!deletingUC) return;
-    await deleteMutation.mutateAsync(deletingUC.id);
-    setDeletingUC(null);
-  };
-
   const columns = [
     { key: 'item_id', header: t('pages.unitConversions.itemId') },
     { key: 'from_unit_code', header: t('pages.unitConversions.fromUnit') },
@@ -62,9 +54,6 @@ export default function UnitConversionsPage() {
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingUC(item); updateForm.reset({ from_unit_code: item.from_unit_code, to_unit_code: item.to_unit_code, factor: item.factor }); }}>
             <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingUC(item); }}>
-            <TrashIcon className="h-4 w-4 text-red-500" />
           </Button>
         </div>
       ),
@@ -116,8 +105,6 @@ export default function UnitConversionsPage() {
       <Modal isOpen={!!editingUC} onClose={() => { setEditingUC(null); updateForm.reset(); }} title={t('pages.unitConversions.edit')}>
         {renderForm(updateForm, handleUpdate, updateMutation.isPending)}
       </Modal>
-
-      <ConfirmDialog isOpen={!!deletingUC} onClose={() => setDeletingUC(null)} onConfirm={handleDelete} title={t('pages.unitConversions.delete')} message={t('pages.unitConversions.deleteMessage')} isLoading={deleteMutation.isPending} />
     </div>
   );
 }

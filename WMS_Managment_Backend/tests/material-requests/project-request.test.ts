@@ -18,6 +18,7 @@ beforeAll(async () => {
   catCode = await seedCategory();
   unitCode = await seedUnit();
   deptId = await seedDepartment();
+  await seedWarehouse({ department_id: deptId, is_main: true });
   whId = await seedWarehouse({ department_id: deptId });
   requesterId = await seedUser();
   itemId = await seedItem(catCode, unitCode, whId, 100);

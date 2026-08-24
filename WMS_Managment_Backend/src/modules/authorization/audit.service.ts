@@ -22,6 +22,7 @@ export type AuditAction =
   | 'REQUEST_ISSUED'
   | 'REQUEST_CANCELLED'
   | 'CUSTODY_RETURNED'
+  | 'CUSTODY_RECEIVED'
   | 'INVENTORY_SESSION_OPENED'
   | 'INVENTORY_SESSION_CLOSED'
   | 'ITEM_CREATED'
@@ -38,6 +39,14 @@ export type AuditAction =
   | 'SUPERVISOR_STATUS_CHANGED'
   | 'SUPERVISOR_DELETED'
   | 'SETTINGS_UPDATED'
+  | 'PO_CREATED'
+  | 'PO_UPDATED'
+  | 'PO_APPROVED'
+  | 'PO_CANCELLED'
+  | 'PO_CLOSED'
+  | 'PO_RECEIVED'
+  | 'PO_ALLOCATED'
+  | 'PO_TRANSFERRED'
   | 'GENERIC';
 
 export interface AuditEntry {

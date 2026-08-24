@@ -139,6 +139,8 @@ describe('Self-approval prevention for department managers', () => {
     unitCode = await seedUnit();
     deptA = await seedDepartment();
     deptB = await seedDepartment();
+    await seedWarehouse({ department_id: deptA, is_main: true });
+    await seedWarehouse({ department_id: deptB, is_main: true });
     whA = await seedWarehouse({ department_id: deptA });
     whB = await seedWarehouse({ department_id: deptB });
     itemId = await seedItem(catCode, unitCode, whA, 100);
@@ -242,15 +244,15 @@ describe('Self-approval prevention for department managers', () => {
       expect(a2.body.data.status).toBe('dept_approved');
     });
 
-    test('E: warehouse_manager behavior remains unchanged (cannot approve -> 403 AUTH_FORBIDDEN)', async () => {
+    test('E: warehouse_manager can now approve pending requests (wm_approved flow)', async () => {
       const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemId, quantity: 1, unit_code: unitCode }]);
       expect(r.status).toBe(201);
 
       const res = await request(app)
         .patch(`/api/requests/${r.body.data.id}/approve`)
         .set('Authorization', `Bearer ${wmA.token}`);
-      expect(res.status).toBe(403);
-      expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
+      expect(res.status).toBe(200);
+      expect(res.body.data.status).toBe('wm_approved');
     });
 
     test('G: department_manager cannot create a material request (route 403 AUTH_FORBIDDEN)', async () => {

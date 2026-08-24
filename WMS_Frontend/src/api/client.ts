@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { showError } from '@/utils/toast';
+import { getApiErrorMessage } from '@/utils/apiErrors';
 
 const api = axios.create({
   baseURL: '/api',
@@ -81,8 +82,14 @@ api.interceptors.response.use(
       }
     }
 
-    const message = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'An unexpected error occurred.';
-    showError(message);
+    // NEVER surface raw backend/server messages to the user: the central
+    // error mapper translates stable error codes / HTTP statuses into
+    // user-friendly i18n messages. The raw error is console-logged in dev.
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.error('[API]', error?.response?.status, error?.response?.data ?? error);
+    }
+    showError(getApiErrorMessage(error));
     return Promise.reject(error);
   }
 );

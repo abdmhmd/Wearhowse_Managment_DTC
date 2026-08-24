@@ -20,6 +20,9 @@ export interface AuthUserContext {
   full_name: string;
   role: UserRole;
   department_id: number | null;
+  /** Display names of the user's department (LEFT JOIN), null when unassigned. */
+  department_name_ar: string | null;
+  department_name_en: string | null;
   is_active: boolean;
   token_version: number;
   permissions: string[];
@@ -66,9 +69,11 @@ export const getAssignedWarehouses = async (userId: number): Promise<AuthWarehou
  */
 export const loadAuthContext = async (userId: number): Promise<AuthUserContext | null> => {
   const user = await pool.query(
-    `SELECT id, username, full_name, role, department_id, is_active, token_version
-       FROM users
-      WHERE id = $1`,
+    `SELECT u.id, u.username, u.full_name, u.role, u.department_id, u.is_active, u.token_version,
+            d.name_ar AS department_name_ar, d.name_en AS department_name_en
+       FROM users u
+       LEFT JOIN departments d ON d.id = u.department_id
+      WHERE u.id = $1`,
     [userId]
   );
   const row = user.rows[0];
@@ -86,6 +91,8 @@ export const loadAuthContext = async (userId: number): Promise<AuthUserContext |
     full_name: row.full_name,
     role: row.role,
     department_id: row.department_id,
+    department_name_ar: row.department_name_ar as (string | null),
+    department_name_en: row.department_name_en as (string | null),
     is_active: row.is_active,
     token_version: row.token_version,
     permissions,

@@ -10,7 +10,7 @@ import { useSupervisors } from '@/hooks/useUsers';
 import { useAuthStore } from '@/store/auth.store';
 import { createProjectSchema, updateProjectSchema, type CreateProjectFormData, type UpdateProjectFormData } from '@/schemas/projects.schema';
 import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog } from '@/components/ui';
-import { PlusIcon, PencilIcon, TrashIcon, LockClosedIcon, XCircleIcon, EyeIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, LockClosedIcon, XCircleIcon, EyeIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
 import type { Project } from '@/types';
@@ -41,11 +41,24 @@ export default function ProjectsPage() {
   const [cancellingProject, setCancellingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
-  const { data } = useProjects(page, 20, statusFilter ? { status: statusFilter as any } : undefined);
-  const { data: departmentsData } = useDepartments(1, 200);
-  const { data: warehousesData } = useAllWarehouses();
   const { can, user } = useAuthStore();
-  const needsSupervisors = can('projects:create') || can('projects:update');
+  const isSupervisor = user?.role === 'supervisor';
+  const isWarehouseManager = user?.role === 'warehouse_manager';
+  const isDepartmentManager = user?.role === 'department_manager';
+
+  const { data } = useProjects(page, 20, statusFilter ? { status: statusFilter as any } : undefined);
+  // Departments/warehouses are only needed for the create/edit pickers, which
+  // admins and warehouse managers legitimately use. A supervisor never picks
+  // them (the department is derived from the auth context and the warehouse is
+  // assigned server-side), so the lookups are skipped entirely — no
+  // unauthorized requests are fired for supervisors.
+  const { data: departmentsData } = useDepartments(1, 200, can('departments:view'));
+  const { data: warehousesData } = useAllWarehouses(can('warehouses:view'));
+
+  // A supervisor never picks a supervisor (their projects are implicitly
+  // assigned to THEMSELVES server-side) and holds no `projects:supervisors`
+  // permission — so the supervisor lookup is skipped entirely for them.
+  const needsSupervisors = !isSupervisor && (can('projects:create') || can('projects:update'));
   const { data: supervisorsData } = useSupervisors(needsSupervisors);
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
@@ -57,15 +70,14 @@ export default function ProjectsPage() {
   const warehouses = warehousesData?.items || [];
   const supervisors = (supervisorsData || []).filter((u: any) => u.role === 'supervisor');
 
-  const isWarehouseManager = user?.role === 'warehouse_manager';
-  const isDepartmentManager = user?.role === 'department_manager';
-
+  const createDefaults = {
+    students: [],
+    department_id: (isWarehouseManager || isSupervisor) && user?.department_id ? user.department_id : undefined,
+    supervisor_id: isSupervisor ? user?.id : undefined,
+  };
   const createForm = useForm<CreateProjectFormData>({
     resolver: zodResolver(createProjectSchema),
-    defaultValues: {
-      students: [],
-      department_id: isWarehouseManager && user?.department_id ? user.department_id : undefined,
-    },
+    defaultValues: createDefaults,
   });
   const updateForm = useForm<UpdateProjectFormData>({ resolver: zodResolver(updateProjectSchema) });
   const createStudents = useFieldArray({ control: createForm.control, name: 'students' });
@@ -80,12 +92,15 @@ export default function ProjectsPage() {
 
   const handleCreate = async (formData: CreateProjectFormData) => {
     const payload = cleanOptional({ ...formData });
+    // A supervisor's project is always assigned to THEMSELVES server-side; we
+    // still send the current user id so the form value is explicit.
+    if (isSupervisor && user?.id) payload.supervisor_id = user.id;
     if (Array.isArray(payload.students)) {
       payload.students = payload.students.filter((s: any) => s?.full_name?.trim());
     }
     await createMutation.mutateAsync(payload as any);
     setIsCreateOpen(false);
-    createForm.reset({ students: [] });
+    createForm.reset(createDefaults);
   };
 
   const handleUpdate = async (formData: UpdateProjectFormData) => {
@@ -154,8 +169,6 @@ export default function ProjectsPage() {
                 warehouse_id: item.warehouse_id,
                 academic_year: item.academic_year || '',
                 description: item.description || '',
-                start_date: item.start_date ? String(item.start_date).slice(0, 10) : '',
-                expected_completion_date: item.expected_completion_date ? String(item.expected_completion_date).slice(0, 10) : '',
                 notes: item.notes || '',
               });
             }}>
@@ -163,8 +176,11 @@ export default function ProjectsPage() {
             </Button>
           )}
           {can('projects:delete') && (
-            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingProject(item); }}>
-              <TrashIcon className="h-4 w-4 text-red-500" />
+            <Button variant="ghost" size="sm" onClick={(e) => {
+              e.stopPropagation();
+              setDeletingProject(item);
+            }}>
+              <TrashIcon className="h-4 w-4 text-red-600" />
             </Button>
           )}
         </div>
@@ -208,7 +224,7 @@ export default function ProjectsPage() {
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <Input label={t('pages.projects.name')} {...form.register('name')} error={form.formState.errors.name?.message} />
       <div className="grid grid-cols-2 gap-4">
-        {!isEdit && !isWarehouseManager && (
+        {!isEdit && !isWarehouseManager && !isSupervisor && (
           <Select
             label={t('pages.projects.department')}
             {...form.register('department_id')}
@@ -217,42 +233,65 @@ export default function ProjectsPage() {
             options={departments.map((d: any) => ({ value: d.id, label: getLocalizedName(d) }))}
           />
         )}
-        {!isEdit && isWarehouseManager && (
+        {!isEdit && (isWarehouseManager || isSupervisor) && (
           <div>
             <label className="block text-sm font-medium text-gray-700">{t('pages.projects.department')}</label>
             <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
               {(() => {
+                // Prefer the department list when loaded; otherwise fall back
+                // to the authenticated user's department names so supervisors
+                // (who cannot view /api/departments) still see their name.
                 const dept = departments.find((d: any) => d.id === user?.department_id);
-                return dept ? getLocalizedName(dept) : (user?.department_id ?? '-');
+                if (dept) return getLocalizedName(dept);
+                const fromUser = {
+                  name_ar: user?.department_name_ar ?? undefined,
+                  name_en: user?.department_name_en ?? undefined,
+                };
+                if (fromUser.name_ar || fromUser.name_en) return getLocalizedName(fromUser);
+                return user?.department_id != null ? String(user.department_id) : '-';
               })()}
             </div>
           </div>
         )}
-        <Select
-          label={t('pages.projects.supervisor')}
-          {...form.register('supervisor_id')}
-          error={form.formState.errors.supervisor_id?.message}
-          placeholder={t('pages.projects.selectSupervisor')}
-          options={supervisors.map((u: any) => ({ value: u.id, label: u.full_name }))}
-        />
+        {isSupervisor ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">{t('pages.projects.supervisor')}</label>
+            <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              {user?.full_name || '-'}
+            </div>
+          </div>
+        ) : (
+          <Select
+            label={t('pages.projects.supervisor')}
+            {...form.register('supervisor_id')}
+            error={form.formState.errors.supervisor_id?.message}
+            placeholder={t('pages.projects.selectSupervisor')}
+            options={supervisors.map((u: any) => ({ value: u.id, label: u.full_name }))}
+          />
+        )}
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Select
-          label={t('pages.projects.warehouse')}
-          {...form.register('warehouse_id')}
-          error={form.formState.errors.warehouse_id?.message}
-          placeholder={t('pages.projects.selectWarehouse')}
-          disabled={isEdit && isDepartmentManager}
-          options={warehousesForDept(Number(form.watch('department_id')) || (editingProject?.department_id ?? 0))
-            .map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
-        />
+        {isSupervisor ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">{t('pages.projects.warehouse')}</label>
+            <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              {t('pages.projects.warehouseAuto')}
+            </div>
+          </div>
+        ) : (
+          <Select
+            label={t('pages.projects.warehouse')}
+            {...form.register('warehouse_id')}
+            error={form.formState.errors.warehouse_id?.message}
+            placeholder={t('pages.projects.selectWarehouse')}
+            disabled={isEdit && isDepartmentManager}
+            options={warehousesForDept(Number(form.watch('department_id')) || (editingProject?.department_id ?? 0))
+              .map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
+          />
+        )}
         <Input label={t('pages.projects.academicYear')} placeholder="2025/2026" {...form.register('academic_year')} />
       </div>
       <Input label={t('pages.projects.description')} {...form.register('description')} />
-      <div className="grid grid-cols-2 gap-4">
-        <Input type="date" label={t('pages.projects.startDate')} {...form.register('start_date')} />
-        <Input type="date" label={t('pages.projects.expectedCompletion')} {...form.register('expected_completion_date')} />
-      </div>
       <Input label={t('pages.projects.notes')} {...form.register('notes')} />
       {!isEdit && renderStudentsSection()}
       <div className="flex justify-end gap-3">
@@ -281,7 +320,7 @@ export default function ProjectsPage() {
 
       <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
-      <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset({ students: [] }); }} title={t('pages.projects.create')} size="lg">
+      <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(createDefaults); }} title={t('pages.projects.create')} size="lg">
         {renderForm(createForm, handleCreate, createMutation.isPending)}
       </Modal>
 
@@ -313,7 +352,15 @@ export default function ProjectsPage() {
         isLoading={cancelMutation.isPending}
       />
 
-      <ConfirmDialog isOpen={!!deletingProject} onClose={() => setDeletingProject(null)} onConfirm={handleDelete} title={t('common.delete')} message={t('pages.projects.deleteConfirm')} isLoading={deleteMutation.isPending} />
+      <ConfirmDialog
+        isOpen={!!deletingProject}
+        onClose={() => setDeletingProject(null)}
+        onConfirm={handleDelete}
+        title={t('pages.projects.delete')}
+        message={t('pages.projects.deleteConfirm')}
+        confirmLabel={t('pages.projects.delete')}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }
