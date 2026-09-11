@@ -12,7 +12,8 @@ describe('Purchase orders â€” status machine', () => {
   let world: PoWorld;
 
   const makePo = async (): Promise<number> => {
-    const res = await apiCreatePo(app, world.users.admin.token, {
+const res = await apiCreatePo(app, world.users.admin.token, {
+      supplier_id: world.supplierId,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 10, unit_code: world.unitCode }],
     });

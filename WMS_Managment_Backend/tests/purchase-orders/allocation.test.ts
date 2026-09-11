@@ -1,4 +1,4 @@
-﻿import request from 'supertest';
+import request from 'supertest';
 import { cleanup } from '../helpers';
 import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, getStock, poTeardown, type PoWorld } from './helpers';
 
@@ -9,7 +9,8 @@ import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, getStock, p
  */
 
 async function approvedPoWithReceived(app: any, world: PoWorld, qty: number) {
-  const created = await apiCreatePo(app, world.users.admin.token, {
+const created = await apiCreatePo(app, world.users.admin.token, {
+    supplier_id: world.supplierId,
     warehouse_id: world.mainWhA,
     lines: [{ item_id: world.itemId, quantity_ordered: qty, unit_code: world.unitCode }],
   });
@@ -81,7 +82,8 @@ describe('Purchase orders â€” allocation', () => {
   });
 
   test('cannot allocate before anything is received', async () => {
-    const created = await apiCreatePo(app, world.users.admin.token, {
+const created = await apiCreatePo(app, world.users.admin.token, {
+      supplier_id: world.supplierId,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 10, unit_code: world.unitCode }],
     });
@@ -150,6 +152,40 @@ describe('Purchase orders â€” allocation', () => {
       .set('Authorization', `Bearer ${world.users.admin.token}`)
       .send({ detail_id: other.detailId, dest_warehouse_id: world.subWhA1, quantity: 2 });
     expect([400, 404]).toContain(res.status);
+  });
+
+  test('cancel allocation releases reserved quantity and updates status', async () => {
+    await seedStock(world.itemId, world.mainWhA, 300);
+    const { poId, detailId } = await approvedPoWithReceived(app, world, 50);
+
+    const allocRes = await request(app)
+      .post(`/api/purchase-orders/${poId}/allocations`)
+      .set('Authorization', `Bearer ${world.users.admin.token}`)
+      .send({ detail_id: detailId, dest_warehouse_id: world.subWhA1, quantity: 25 });
+    expect(allocRes.status).toBe(201);
+    const allocId = allocRes.body.data.id;
+
+    // Check detail before cancellation
+    const poBefore = await request(app).get(`/api/purchase-orders/${poId}`).set('Authorization', `Bearer ${world.users.admin.token}`);
+    expect(Number(poBefore.body.data.details[0].quantity_allocated)).toBe(25);
+
+    // Cancel allocation via DELETE
+    const cancelRes = await request(app)
+      .delete(`/api/purchase-orders/allocations/${allocId}`)
+      .set('Authorization', `Bearer ${world.users.admin.token}`);
+    expect(cancelRes.status).toBe(200);
+    expect(cancelRes.body.data.released_quantity).toBe(25);
+
+    // Check detail after cancellation — quantity_allocated is reset
+    const poAfter = await request(app).get(`/api/purchase-orders/${poId}`).set('Authorization', `Bearer ${world.users.admin.token}`);
+    expect(Number(poAfter.body.data.details[0].quantity_allocated)).toBe(0);
+
+    // Re-allocating the released quantity now succeeds
+    const reAllocRes = await request(app)
+      .post(`/api/purchase-orders/${poId}/allocations`)
+      .set('Authorization', `Bearer ${world.users.admin.token}`)
+      .send({ detail_id: detailId, dest_warehouse_id: world.subWhA1, quantity: 25 });
+    expect(reAllocRes.status).toBe(201);
   });
 });
 

@@ -142,7 +142,8 @@ describe('Purchase orders â€” CRUD', () => {
     let poId: number;
 
     beforeAll(async () => {
-      const res = await apiCreatePo(app, world.users.admin.token, {
+const res = await apiCreatePo(app, world.users.admin.token, {
+        supplier_id: world.supplierId,
         warehouse_id: world.mainWhA,
         notes: 'before',
         lines: [{ item_id: world.itemId, quantity_ordered: 50, unit_code: world.unitCode }],
@@ -183,7 +184,8 @@ describe('Purchase orders â€” CRUD', () => {
   describe('list + detail scoping', () => {
     let poA: number;
     beforeAll(async () => {
-      const res = await apiCreatePo(app, world.users.admin.token, {
+const res = await apiCreatePo(app, world.users.admin.token, {
+        supplier_id: world.supplierId,
         warehouse_id: world.mainWhB,
         lines: [{ item_id: world.itemId, quantity_ordered: 3, unit_code: world.unitCode }],
       });

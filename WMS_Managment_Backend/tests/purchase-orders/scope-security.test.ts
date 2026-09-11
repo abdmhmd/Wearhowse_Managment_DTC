@@ -8,10 +8,11 @@ import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, poTeardown,
  * supervisor/department-manager exclusion. No frontend involved.
  */
 
-async function fullWorkflowPo(app: any, world: PoWorld) {
-  const created = await apiCreatePo(app, world.users.admin.token, {
+async function fullWorkflowPo(app: any, world: PoWorld, qty = 20) {
+const created = await apiCreatePo(app, world.users.admin.token, {
+    supplier_id: world.supplierId,
     warehouse_id: world.mainWhA,
-    lines: [{ item_id: world.itemId, quantity_ordered: 20, unit_code: world.unitCode }],
+    lines: [{ item_id: world.itemId, quantity_ordered: qty, unit_code: world.unitCode }],
   });
   const poId = created.body.data.id;
   const detailId = created.body.data.details[0].id;
@@ -63,7 +64,8 @@ describe('Purchase orders â€” scope & security (direct API)', () => {
   });
 
   test('WM cannot view / approve another warehouse PO (hidden as 404)', async () => {
-    const createdB = await apiCreatePo(app, world.users.admin.token, {
+const createdB = await apiCreatePo(app, world.users.admin.token, {
+      supplier_id: world.supplierId,
       warehouse_id: world.mainWhB,
       lines: [{ item_id: world.itemId, quantity_ordered: 5, unit_code: world.unitCode }],
     });
@@ -79,7 +81,8 @@ describe('Purchase orders â€” scope & security (direct API)', () => {
     // wmMain IS in scope for mainWhA â€” sanity check receive works for owner
     void poId; void detailId;
 
-    const createdB = await apiCreatePo(app, world.users.admin.token, {
+const createdB = await apiCreatePo(app, world.users.admin.token, {
+      supplier_id: world.supplierId,
       warehouse_id: world.mainWhB,
       lines: [{ item_id: world.itemId2, quantity_ordered: 5, unit_code: world.unitCode }],
     });
@@ -109,7 +112,8 @@ describe('Purchase orders â€” scope & security (direct API)', () => {
   test('forged detail_id on receive returns 404 without touching stock', async () => {
     // Approved but NOT received: the status gate must pass so the request
     // actually reaches the (forged) detail lookup.
-    const created = await apiCreatePo(app, world.users.admin.token, {
+const created = await apiCreatePo(app, world.users.admin.token, {
+      supplier_id: world.supplierId,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 5, unit_code: world.unitCode }],
     });

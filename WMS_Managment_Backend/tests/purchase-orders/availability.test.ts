@@ -11,7 +11,8 @@ import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, poTeardown,
  */
 
 async function approvedPoWithReceived(app: any, world: PoWorld, qty: number, itemId?: number) {
-  const created = await apiCreatePo(app, world.users.admin.token, {
+const created = await apiCreatePo(app, world.users.admin.token, {
+    supplier_id: world.supplierId,
     warehouse_id: world.mainWhA,
     lines: [{ item_id: itemId ?? world.itemId, quantity_ordered: qty, unit_code: world.unitCode }],
   });
@@ -57,7 +58,8 @@ describe('Purchase orders â€” availability overlay', () => {
     expect(a1.status).toBe(201);
 
     // Second PO: receive 120 and reserve 120
-    const created2 = await apiCreatePo(app, world.users.admin.token, {
+const created2 = await apiCreatePo(app, world.users.admin.token, {
+      supplier_id: world.supplierId,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 120, unit_code: world.unitCode }],
     });
