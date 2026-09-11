@@ -48,6 +48,8 @@ export class PurchaseOrdersService {
   private async isUnitValidForItem(itemId: number, defaultUnit: string, unitCode: string): Promise<boolean> {
     if (!unitCode) return false;
     if (unitCode === defaultUnit) return true;
+    // [NP4-UNIT-H] Piece unit (H) requires no conversion — always valid as-is
+    if (unitCode === 'H') return true;
     const conversions = await unitConversionsRepository.findByItemId(itemId);
     return conversions.some(c => c.from_unit_code === defaultUnit && c.to_unit_code === unitCode);
   }
@@ -158,8 +160,18 @@ export class PurchaseOrdersService {
     // from the client payload.
     const departmentId: number | null = warehouse.department_id ?? null;
 
-    // Supplier must exist and be active when provided (procurement side only).
-    if (!isManagerCreator && supplierId != null) {
+    // [NP7-DISBURSEMENT-VS-PURCHASE]
+    // Purchase Orders are strictly for external procurement from a supplier.
+    // Internal inter-warehouse movements are always material requests (disbursement).
+    // System admins creating a purchase order must specify an active supplier.
+    if (!isManagerCreator) {
+      if (!supplierId) {
+        throw new ValidationError(
+          'A purchase order from a system administrator must be linked to a supplier. For internal transfers, use a material disbursement request instead.',
+          { supplier_id: null },
+          'SUPPLIER_REQUIRED_FOR_ADMIN_PO'
+        );
+      }
       const supRes = await pool.query('SELECT id FROM suppliers WHERE id = $1 AND is_active = true', [supplierId]);
       if (!supRes.rows[0]) throw new ValidationError('Supplier not found or inactive', { supplier_id: supplierId });
     }
@@ -439,6 +451,12 @@ export class PurchaseOrdersService {
       const newStatus: PurchaseOrderStatus = allReceived ? 'received' : 'partially_received';
       await repo.updateStatus(client, id, newStatus);
 
+      // [NP5-RECEIVE-TIMESTAMP] Record first-receipt timestamp from supplier
+      await client.query(
+        `UPDATE purchase_orders SET received_at = COALESCE(received_at, NOW()) WHERE id = $1`,
+        [id]
+      );
+
       logger.info(`[PO_RECEIVED] PO ${po.po_number} received via RV ${rvHeader.transaction_no}`, 'purchase-orders');
 
       return {
@@ -627,6 +645,128 @@ export class PurchaseOrdersService {
         status: newStatus,
         quantity_transferred: newTransferred,
         remaining: Number(allocation.quantity_allocated) - newTransferred,
+      };
+    });
+  }
+
+  // ── Allocation Cancellation / Deallocation ──────────────────────────────
+
+  async cancelAllocation(allocationId: number, user?: AuthUserContext): Promise<any> {
+    return runInTransaction(async (client) => {
+      const allocation = await repo.findAllocationByIdForUpdate(client, allocationId);
+      if (!allocation) throw new NotFoundError('Allocation', 'ALLOCATION_NOT_FOUND');
+      this.assertPoInScope({ warehouse_id: allocation.source_warehouse_id }, user);
+
+      if (!['allocated', 'partially_transferred'].includes(allocation.status)) {
+        throw new ValidationError(
+          `Cannot cancel an allocation with status '${allocation.status}'`,
+          { status: allocation.status },
+          'INVALID_ALLOCATION_STATUS'
+        );
+      }
+
+      // Quantity that was reserved but NOT transferred
+      const unTransferredQty = Number(allocation.quantity_allocated) - Number(allocation.quantity_transferred);
+
+      // Decrement detail's quantity_allocated by the unTransferred amount
+      if (unTransferredQty > 0) {
+        await client.query(
+          `UPDATE purchase_order_details
+           SET quantity_allocated = GREATEST(quantity_allocated - $2, 0)
+           WHERE id = $1`,
+          [allocation.po_detail_id, unTransferredQty]
+        );
+      }
+
+      if (Number(allocation.quantity_transferred) === 0) {
+        // Nothing was transferred: the reservation is fully released. The row
+        // cannot hold quantity_allocated = 0 (CHECK quantity_allocated > 0),
+        // so a full cancellation removes the allocation row entirely.
+        await client.query('DELETE FROM purchase_order_allocations WHERE id = $1', [allocationId]);
+      } else {
+        // Partially transferred: clamp the reservation down to the quantity
+        // actually moved (keeps quantity_allocated > 0).
+        await client.query(
+          `UPDATE purchase_order_allocations
+           SET status = 'cancelled'::allocation_status,
+               quantity_allocated = quantity_transferred
+           WHERE id = $1`,
+          [allocationId]
+        );
+      }
+
+      logger.info(
+        `[PO_ALLOCATION_CANCELLED] Allocation #${allocationId} cancelled by user ${user?.id ?? 'system'} (released ${unTransferredQty})`,
+        'purchase-orders'
+      );
+
+      return {
+        message: 'Allocation cancelled successfully',
+        allocation_id: allocationId,
+        released_quantity: unTransferredQty,
+      };
+    });
+  }
+
+  // ── [NP3] Explicit Confirmations for Inbound & Outbound Movements ────────
+
+  async confirmReceive(id: number, user?: AuthUserContext): Promise<any> {
+    return runInTransaction(async (client) => {
+      const po = await repo.findHeaderByIdForUpdate(client, id);
+      if (!po) throw new NotFoundError('PurchaseOrder', 'PURCHASE_ORDER_NOT_FOUND');
+      this.assertPoInScope(po, user);
+
+      if (!['received', 'partially_received'].includes(po.status)) {
+        throw new ValidationError(
+          `Cannot confirm receipt for a purchase order with status '${po.status}'. It must be received first.`,
+          { status: po.status },
+          'INVALID_PURCHASE_ORDER_STATUS'
+        );
+      }
+
+      await client.query(
+        `UPDATE purchase_orders
+         SET receive_confirmed_by = $2, receive_confirmed_at = NOW()
+         WHERE id = $1`,
+        [id, user!.id]
+      );
+
+      logger.info(`[PO_RECEIVE_CONFIRMED] PO ${po.po_number} receipt confirmed by user ${user!.id}`, 'purchase-orders');
+      return this.loadFullPo(client, id);
+    });
+  }
+
+  async confirmTransfer(allocationId: number, user?: AuthUserContext): Promise<any> {
+    return runInTransaction(async (client) => {
+      const allocation = await repo.findAllocationByIdForUpdate(client, allocationId);
+      if (!allocation) throw new NotFoundError('Allocation', 'ALLOCATION_NOT_FOUND');
+      this.assertPoInScope({ warehouse_id: allocation.source_warehouse_id }, user);
+
+      if (!['transferred', 'partially_transferred'].includes(allocation.status)) {
+        throw new ValidationError(
+          `Cannot confirm transfer for an allocation with status '${allocation.status}'. It must be transferred first.`,
+          { status: allocation.status },
+          'INVALID_ALLOCATION_STATUS'
+        );
+      }
+
+      await client.query(
+        `UPDATE purchase_order_allocations
+         SET transfer_confirmed_by = $2, transfer_confirmed_at = NOW()
+         WHERE id = $1`,
+        [allocationId, user!.id]
+      );
+
+      logger.info(
+        `[PO_TRANSFER_CONFIRMED] Allocation #${allocationId} transfer confirmed by user ${user!.id}`,
+        'purchase-orders'
+      );
+
+      return {
+        message: 'Transfer confirmed successfully',
+        allocation_id: allocationId,
+        transfer_confirmed_by: user!.id,
+        transfer_confirmed_at: new Date(),
       };
     });
   }
