@@ -100,28 +100,23 @@ export class MaterialRequestsService {
     } else if (user && scope !== 'GLOBAL') {
       if (user.warehouse_ids.length > 0) {
         // ── Case A: the user HAS assigned warehouses ─────────────────────────
-        // Strict spoofing protection: the payload `warehouse_id` is IGNORED and
-        // the first eligible (active, non-main) assigned warehouse is used.
+        // Validates explicit warehouse_id against the caller's assigned eligible warehouses.
+        // If omitted, defaults to the first assigned warehouse for backward compatibility.
         const assigned = await warehousesRepository.findAssignedNonMainByUser(user.id);
         if (assigned.length === 0) {
           // Assignments exist but none is an eligible destination (e.g. only the
           // department MAIN warehouse or only inactive warehouses).
           throw new ValidationError('Your assigned warehouses are not eligible request destinations. Contact your administrator.', {});
         }
-        // Multiple assignments currently fall back to the FIRST one in a
-        // deterministic order (warehouse_id ASC). The frontend shows which
-        // warehouse will be used so the outcome is never surprising.
-        // TODO(multi-warehouse): once the workflow needs per-warehouse targeting
-        // for non-admin creators, surface a picker restricted to the assigned set
-        // instead of silently choosing the lowest warehouse id.
-        if (assigned.length > 1) {
-          logger.warn(
-            `User ${user.id} has ${assigned.length} assigned warehouses; auto-assigning the first one`,
-            'material-requests',
-            { user_id: user.id, assigned_ids: assigned.map((w) => w.id), selected_id: assigned[0].id }
-          );
+        if (data.warehouse_id != null) {
+          const selected = assigned.find((w) => w.id === data.warehouse_id);
+          if (!selected) {
+            throw new ValidationError('The selected warehouse is not in your assigned eligible warehouses', { warehouse_id: data.warehouse_id });
+          }
+          warehouseId = selected.id;
+        } else {
+          warehouseId = assigned[0].id;
         }
-        warehouseId = assigned[0].id;
       } else {
         // ── Case B: ZERO assigned warehouses (fallback) ──────────────────────
         // The payload `warehouse_id` is now MANDATORY and validated (exists,
