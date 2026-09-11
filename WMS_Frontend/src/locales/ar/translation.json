@@ -404,6 +404,7 @@
       "supervisor": "المشرف",
       "status": "الحالة",
       "open": "مفتوح",
+      "pendingClosure": "قيد الإغلاق",
       "closed": "مغلق",
       "cancelled": "ملغي",
       "academicYear": "السنة الأكاديمية",

@@ -594,6 +594,7 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
 
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   open: 'Open',
+  pending_closure: 'Pending Closure',
   closed: 'Closed',
   cancelled: 'Cancelled',
 };

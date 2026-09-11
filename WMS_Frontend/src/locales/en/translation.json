@@ -399,6 +399,7 @@
       "supervisor": "Supervisor",
       "status": "Status",
       "open": "Open",
+      "pendingClosure": "Pending Closure",
       "closed": "Closed",
       "cancelled": "Cancelled",
       "academicYear": "Academic Year",

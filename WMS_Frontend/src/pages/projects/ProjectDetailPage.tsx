@@ -49,6 +49,7 @@ export default function ProjectDetailPage() {
   const statusBadge = () => {
     if (!project) return null;
     if (project.status === 'open') return <Badge variant="success">{t('pages.projects.open')}</Badge>;
+    if (project.status === 'pending_closure') return <Badge variant="warning">{t('pages.projects.pendingClosure')}</Badge>;
     if (project.status === 'closed') return <Badge variant="default">{t('pages.projects.closed')}</Badge>;
     return <Badge variant="danger">{t('pages.projects.cancelled')}</Badge>;
   };

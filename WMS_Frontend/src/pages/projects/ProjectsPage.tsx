@@ -26,6 +26,7 @@ function cleanOptional(data: Record<string, any>) {
 
 const statusBadge = (status: string, t: any) => {
   if (status === 'open') return <Badge variant="success">{t('pages.projects.open')}</Badge>;
+  if (status === 'pending_closure') return <Badge variant="warning">{t('pages.projects.pendingClosure')}</Badge>;
   if (status === 'closed') return <Badge variant="default">{t('pages.projects.closed')}</Badge>;
   return <Badge variant="danger">{t('pages.projects.cancelled')}</Badge>;
 };
@@ -313,6 +314,7 @@ export default function ProjectsPage() {
         >
           <option value="">{t('common.all')}</option>
           <option value="open">{t('pages.projects.open')}</option>
+          <option value="pending_closure">{t('pages.projects.pendingClosure')}</option>
           <option value="closed">{t('pages.projects.closed')}</option>
           <option value="cancelled">{t('pages.projects.cancelled')}</option>
         </select>
