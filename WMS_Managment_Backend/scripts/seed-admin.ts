@@ -13,7 +13,7 @@ const pool = new Pool({
 const USERNAME = 'admin';
 const PASSWORD = 'Admin@123';
 const FULL_NAME = 'System Administrator';
-const ROLE = 'system_admin';
+const ROLE = 'admin';
 const SALT_ROUNDS = 10;
 
 async function seedAdmin(): Promise<void> {

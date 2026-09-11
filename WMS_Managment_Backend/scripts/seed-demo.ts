@@ -89,7 +89,7 @@ const CATEGORIES = [
 ];
 
 const DEMO_USERS = [
-  { username: 'wh_manager', full_name: 'Warehouse Manager', role: 'warehouse_manager', department: 'PROC' },
+  { username: 'wh_manager', full_name: 'Warehouse Manager', role: 'sub_warehouse_manager', department: 'PROC' },
   { username: 'dept_manager', full_name: 'Department Manager', role: 'department_manager', department: 'ENG' },
   { username: 'dept_manager2', full_name: 'Production Manager', role: 'department_manager', department: 'PROD' },
 ];
@@ -848,8 +848,8 @@ async function seedDemo(): Promise<void> {
     log('  ┌──────────────┬────────────┬─────────────────────┐');
     log('  │ Username     │ Password   │ Role                │');
     log('  ├──────────────┼────────────┼─────────────────────┤');
-    log('  │ admin        │ Admin@123  │ system_admin        │');
-    log('  │ wh_manager   │ Admin@123  │ warehouse_manager   │');
+    log('  │ admin        │ Admin@123  │ admin               │');
+    log('  │ wh_manager   │ Admin@123  │ sub_warehouse_manager │');
     log('  │ dept_manager │ Admin@123  │ department_manager  │');
     log('  │ dept_manager2│ Admin@123  │ department_manager  │');
     log('  └──────────────┴────────────┴─────────────────────┘');

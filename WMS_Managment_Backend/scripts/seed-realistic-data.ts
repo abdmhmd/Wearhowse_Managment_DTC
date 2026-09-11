@@ -388,7 +388,7 @@ async function seed(): Promise<void> {
     const roleMap: Record<string, string> = {
       'dept_manager': 'department_manager',
       'dept_manager2': 'department_manager',
-      'wh_manager': 'warehouse_manager',
+      'wh_manager': 'sub_warehouse_manager',
     };
     const role = roleMap[key];
     const matches = usersRes.rows.filter((u: any) => u.role === role && u.is_active);

@@ -668,9 +668,9 @@ async function validate(client: any): Promise<void> {
       sql: `SELECT username FROM users WHERE role = 'department_manager' AND is_active AND department_id IS NULL`,
     },
     {
-      label: 'Every active warehouse manager has at least one active assigned warehouse',
+      label: 'Every active sub_warehouse_manager has at least one active assigned warehouse',
       sql: `SELECT u.username FROM users u
-             WHERE u.role = 'warehouse_manager' AND u.is_active
+             WHERE u.role = 'sub_warehouse_manager' AND u.is_active
                AND NOT EXISTS (
                  SELECT 1 FROM user_warehouses uw JOIN warehouses w ON w.id = uw.warehouse_id
                   WHERE uw.user_id = u.id AND w.is_active)`,
@@ -680,7 +680,7 @@ async function validate(client: any): Promise<void> {
       sql: `SELECT u.username, w.code FROM users u
               JOIN user_warehouses uw ON uw.user_id = u.id
               JOIN warehouses w ON w.id = uw.warehouse_id
-             WHERE u.role = 'warehouse_manager' AND u.is_active AND u.department_id IS NOT NULL
+             WHERE u.role = 'sub_warehouse_manager' AND u.is_active AND u.department_id IS NOT NULL
                AND w.department_id IS DISTINCT FROM u.department_id`,
     },
     {

@@ -42,17 +42,18 @@ const CATEGORIES = [
   { code: 'RAW', name_ar: 'مواد خام', name_en: 'Raw Materials', prefix: 'RAW', parent_code: null },
 ];
 
-// Every role value present in the user_role enum. The legacy roles
-// (storekeeper / accountant / viewer) were deactivated by migration 019 and
-// cannot log in, but stay active in the DB so they appear in the user list.
+// Every role value present in the user_role enum. Migration 038 removed the
+// legacy roles (storekeeper / accountant / viewer); their users were
+// reassigned — sub_warehouse_manager when they hold warehouse assignments,
+// otherwise admin — and the demo rows below mirror exactly that outcome.
 const USERS = [
-  { username: 'admin', full_name: 'System Administrator', role: 'system_admin', department_code: null, warehouse_codes: null },
-  { username: 'wh.manager', full_name: 'Ahmad Khaled', role: 'warehouse_manager', department_code: null, warehouse_codes: ['WH-MAIN', 'WH-SEC'] },
+  { username: 'admin', full_name: 'System Administrator', role: 'admin', department_code: null, warehouse_codes: null },
+  { username: 'wh.manager', full_name: 'Ahmad Khaled', role: 'sub_warehouse_manager', department_code: null, warehouse_codes: ['WH-MAIN', 'WH-SEC'] },
   { username: 'dept.manager', full_name: 'Khaled Mahmoud', role: 'department_manager', department_code: 'IT', warehouse_codes: null },
   { username: 'supervisor.user', full_name: 'Omar Hassan', role: 'supervisor', department_code: 'ENG', warehouse_codes: null },
-  { username: 'storekeeper', full_name: 'Legacy Storekeeper', role: 'storekeeper', department_code: 'OPS', warehouse_codes: ['WH-MAIN'] },
-  { username: 'accountant', full_name: 'Legacy Accountant', role: 'accountant', department_code: 'FIN', warehouse_codes: null },
-  { username: 'viewer', full_name: 'Legacy Viewer', role: 'viewer', department_code: null, warehouse_codes: ['WH-MAIN', 'WH-SEC'] },
+  { username: 'storekeeper', full_name: 'Sub Warehouse Manager', role: 'sub_warehouse_manager', department_code: 'OPS', warehouse_codes: ['WH-MAIN'] },
+  { username: 'accountant', full_name: 'Administrator (Finance)', role: 'admin', department_code: 'FIN', warehouse_codes: null },
+  { username: 'viewer', full_name: 'Sub Warehouse Manager', role: 'sub_warehouse_manager', department_code: null, warehouse_codes: ['WH-MAIN', 'WH-SEC'] },
 ];
 
 const ITEMS = [
@@ -206,7 +207,7 @@ async function seedTestData(): Promise<void> {
     console.log('  username          | role                | can login');
     console.log('  ' + '-'.repeat(52));
     for (const u of await client.query('SELECT username, role FROM users ORDER BY role').then((r) => r.rows)) {
-      const canLogin = ['system_admin', 'warehouse_manager', 'department_manager', 'supervisor'].includes(u.role);
+      const canLogin = ['admin', 'sub_warehouse_manager', 'department_manager', 'supervisor'].includes(u.role);
       console.log(`  ${u.username.padEnd(17)}| ${u.role.padEnd(19)}| ${canLogin ? 'yes' : 'no (legacy)'}`);
     }
     console.log(`\n  Password: ${TEST_PASSWORD}`);

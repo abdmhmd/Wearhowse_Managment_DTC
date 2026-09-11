@@ -23,24 +23,21 @@ interface NewUser {
 }
 
 const NEW_USERS: NewUser[] = [
-  { username: 'admin', full_name: 'System Administrator', role: 'system_admin' },
-  { username: 'warehouse.manager1', full_name: 'Ahmad Khaled', role: 'warehouse_manager', warehouse_codes: ['DEMO-WH-1', 'DEMO-WH-2'] },
-  { username: 'warehouse.manager2', full_name: 'Omar Hassan', role: 'warehouse_manager', warehouse_codes: ['DEMO-WH-3'] },
+  { username: 'admin', full_name: 'System Administrator', role: 'admin' },
+  { username: 'warehouse.manager1', full_name: 'Ahmad Khaled', role: 'sub_warehouse_manager', warehouse_codes: ['DEMO-WH-1', 'DEMO-WH-2'] },
+  { username: 'warehouse.manager2', full_name: 'Omar Hassan', role: 'sub_warehouse_manager', warehouse_codes: ['DEMO-WH-3'] },
   { username: 'department.manager1', full_name: 'Khaled Mahmoud', role: 'department_manager', department_code: 'DEMO-ENG' },
   { username: 'department.manager2', full_name: 'Samer Hassan', role: 'department_manager', department_code: 'DEMO-LAB' },
   { username: 'department.manager3', full_name: 'Nasser Khalil', role: 'department_manager', department_code: 'DEMO-PROD' },
 ];
 
 // Blocking FKs (RESTRICT / NO ACTION on NOT NULL columns) reassigned by role.
-// Deactivated legacy roles (storekeeper / accountant / viewer) map onto an
-// active role holder so existing data keeps a valid actor.
+// The legacy roles (storekeeper / accountant / viewer) no longer exist since
+// migration 038, so the map only covers the four surviving roles.
 const OLD_ROLE_TO_NEW_USERNAME: Record<string, string> = {
-  system_admin: 'admin',
-  warehouse_manager: 'warehouse.manager1',
-  storekeeper: 'warehouse.manager1',
-  accountant: 'warehouse.manager2',
+  admin: 'admin',
+  sub_warehouse_manager: 'warehouse.manager1',
   department_manager: 'department.manager1',
-  viewer: 'admin',
 };
 
 const BLOCKING_FK_UPDATES: Array<[string, string]> = [

@@ -10,7 +10,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 // ONLY. The target topology is the clean demo environment produced by
 // scripts/reset-demo-environment.ts:
 //
-//   users        : admin (system_admin), warehouse.manager1 (ENG),
+//   users        : admin (admin), warehouse.manager1 (ENG),
 //                  warehouse.manager2 (IT)
 //   departments  : DEMO-ENG (Engineering), DEMO-IT (Information Technology)
 //   warehouses   : DEMO-MAIN-ENG, DEMO-MAIN-IT  (one main warehouse each)
@@ -22,7 +22,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 //     Stationery) plus their subcategories — master-data creation performed by
 //     the system administrator only (matches the business rule).
 //   * Creates ~20 demo items as master records (opening balance 0) via the
-//     items service, exactly as a system_admin would.
+//     items service, exactly as an admin would.
 //   * Brings stock in through the NORMAL receiving workflow: one approved
 //     Receiving Voucher (RV) per warehouse, created and approved through the
 //     transactions service. No direct balance edits.
@@ -61,7 +61,7 @@ const WAREHOUSE_IT = 'DEMO-MAIN-IT';
 // ---- Master data to reuse (must already exist) ------------------------------
 const REUSED_CATEGORIES = ['DEMO-ELEC', 'DEMO-HARD', 'DEMO-SAFE'];
 
-// ---- Master data to create (system_admin only) ------------------------------
+// ---- Master data to create (admin only) -------------------------------------
 const CATEGORIES_TO_CREATE = [
   { code: 'DEMO-COMP', name_ar: 'أجهزة الكمبيوتر', name_en: 'Computer Equipment', prefix: 'CMP', description: 'حواسيب وملحقاتها' },
   { code: 'DEMO-OFF', name_ar: 'القرطاسية والمكتب', name_en: 'Office & Stationery', prefix: 'OFF', description: 'مواد القرطاسية والتجهيزات المكتبية' },
@@ -164,9 +164,9 @@ async function main(): Promise<void> {
   log(`Mode: ${EXECUTE ? 'EXECUTE' : 'DRY RUN (no changes)'}`);
   log('');
 
-  const admin = await pool.query(`SELECT id, username, role FROM users WHERE username = $1 AND role = 'system_admin'`, [ADMIN_USERNAME]);
+  const admin = await pool.query(`SELECT id, username, role FROM users WHERE username = $1 AND role = 'admin'`, [ADMIN_USERNAME]);
   if (admin.rows.length !== 1) {
-    throw new Error(`SAFETY STOP: expected exactly one system_admin account "${ADMIN_USERNAME}".`);
+    throw new Error(`SAFETY STOP: expected exactly one admin account "${ADMIN_USERNAME}".`);
   }
   const adminId = admin.rows[0].id;
 
@@ -526,9 +526,9 @@ async function runVerify(pool: any, loadAuthContext: any, itemsService: any): Pr
   const wrongScope = m1Items.items.some((i: any) => i.warehouse_id !== 24) || m2Items.items.some((i: any) => i.warehouse_id !== 25);
   check('manager item lists contain no out-of-scope rows', !wrongScope);
 
-  check('warehouse_manager lacks items:create (business rule)', !m1Ctx.permissions.includes('items:create'));
-  check('warehouse_manager lacks categories:create (business rule)', !m2Ctx.permissions.includes('categories:create'));
-  check('system_admin has items:create + categories:create', adminCtx.permissions.includes('items:create') && adminCtx.permissions.includes('categories:create'));
+  check('sub_warehouse_manager lacks items:create (business rule)', !m1Ctx.permissions.includes('items:create'));
+  check('sub_warehouse_manager lacks categories:create (business rule)', !m2Ctx.permissions.includes('categories:create'));
+  check('admin has items:create + categories:create', adminCtx.permissions.includes('items:create') && adminCtx.permissions.includes('categories:create'));
 
   log('');
   if (failures === 0) {

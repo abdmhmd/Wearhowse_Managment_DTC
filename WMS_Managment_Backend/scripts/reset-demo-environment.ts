@@ -33,7 +33,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 //   * Refuses to run against any database other than dtc_wms (dev).
 //   * Refuses to run when it detects non-demo master rows it is not allowed
 //     to delete (guards against deleting unknown/real data).
-//   * Never deletes the system_admin account.
+//   * Never deletes the admin account.
 //   * Never touches migrations, RBAC tables, or system settings.
 //   * Backs up every affected table to backups/ as JSON before deleting.
 //   * Fully idempotent: running --execute twice yields the same end state.
@@ -163,16 +163,16 @@ async function runGuards(client: PoolClient): Promise<void> {
   }
 
   const admin = await client.query(
-    `SELECT id, username, role FROM users WHERE username = 'admin' AND role = 'system_admin'`
+    `SELECT id, username, role FROM users WHERE username = 'admin' AND role = 'admin'`
   );
   if (admin.rows.length !== 1) {
-    throw new Error('SAFETY STOP: expected exactly one system_admin account "admin". Refusing to proceed.');
+    throw new Error('SAFETY STOP: expected exactly one admin account "admin". Refusing to proceed.');
   }
 
-  const otherAdmins = await client.query(`SELECT username FROM users WHERE role = 'system_admin' AND username <> 'admin'`);
+  const otherAdmins = await client.query(`SELECT username FROM users WHERE role = 'admin' AND username <> 'admin'`);
   if (otherAdmins.rows.length > 0) {
     throw new Error(
-      `SAFETY STOP: found additional system_admin account(s) that are not "admin": ${otherAdmins.rows.map((r: any) => r.username).join(', ')}`
+      `SAFETY STOP: found additional admin account(s) that are not "admin": ${otherAdmins.rows.map((r: any) => r.username).join(', ')}`
     );
   }
 }
@@ -196,14 +196,14 @@ async function clearDemoData(client: PoolClient, deleted: Record<string, number>
   log(`    deleted ${deleted['departments']} row(s) from departments`);
 
   const delUsers = await client.query(
-    `DELETE FROM users WHERE NOT (username = 'admin' AND role = 'system_admin')`
+    `DELETE FROM users WHERE NOT (username = 'admin' AND role = 'admin')`
   );
   deleted['users'] = delUsers.rowCount ?? 0;
-  log(`    deleted ${deleted['users']} demo/test user(s) (system_admin "admin" preserved)`);
+  log(`    deleted ${deleted['users']} demo/test user(s) (admin "admin" preserved)`);
 
-  const adminAfter = await count(client, `SELECT COUNT(*)::int AS total FROM users WHERE username = 'admin' AND role = 'system_admin'`);
+  const adminAfter = await count(client, `SELECT COUNT(*)::int AS total FROM users WHERE username = 'admin' AND role = 'admin'`);
   if (adminAfter !== 1) {
-    throw new Error('SAFETY STOP: system_admin "admin" no longer exists after user cleanup.');
+    throw new Error('SAFETY STOP: admin "admin" no longer exists after user cleanup.');
   }
   const userTotal = await count(client, `SELECT COUNT(*)::int AS total FROM users`);
   if (userTotal !== 1) {
@@ -245,10 +245,10 @@ async function createTopology(client: PoolClient): Promise<void> {
   for (const m of MANAGERS) {
     await client.query(
       `INSERT INTO users (username, password_hash, full_name, role, department_id, is_active, token_version)
-       VALUES ($1, $2, $3, 'warehouse_manager', $4, true, 0)
+       VALUES ($1, $2, $3, 'sub_warehouse_manager', $4, true, 0)
        ON CONFLICT (username) DO UPDATE
          SET password_hash = EXCLUDED.password_hash, full_name = EXCLUDED.full_name,
-             role = 'warehouse_manager', department_id = EXCLUDED.department_id, is_active = true`,
+             role = 'sub_warehouse_manager', department_id = EXCLUDED.department_id, is_active = true`,
       [m.username, passwordHash, m.full_name, deptIds[m.department_code]]
     );
     const res = await client.query(`SELECT id FROM users WHERE username = $1`, [m.username]);
@@ -259,7 +259,7 @@ async function createTopology(client: PoolClient): Promise<void> {
        ON CONFLICT (user_id, warehouse_id) DO NOTHING`,
       [userIds[m.username], whIds[m.warehouse_code]]
     );
-    log(`    user ${m.username} (#${userIds[m.username]}) role=warehouse_manager dept=${m.department_code} -> warehouse ${m.warehouse_code}`);
+    log(`    user ${m.username} (#${userIds[m.username]}) role=sub_warehouse_manager dept=${m.department_code} -> warehouse ${m.warehouse_code}`);
   }
 }
 
@@ -296,7 +296,7 @@ async function validate(client: PoolClient): Promise<void> {
   log('Departments:');
   const depts = await client.query(
     `SELECT d.id, d.code, d.name_ar, d.name_en, d.is_active,
-            (SELECT u.username FROM users u WHERE u.department_id = d.id AND u.role = 'warehouse_manager' LIMIT 1) AS manager
+            (SELECT u.username FROM users u WHERE u.department_id = d.id AND u.role = 'sub_warehouse_manager' LIMIT 1) AS manager
        FROM departments d ORDER BY d.id`
   );
   for (const d of depts.rows) log(`  ${JSON.stringify(d)}`);
@@ -324,13 +324,13 @@ async function validate(client: PoolClient): Promise<void> {
 
   const checks: Array<{ label: string; sql: string; expectRows: number }> = [
     {
-      label: 'Exactly 3 users (1 system_admin + 2 warehouse managers)',
+      label: 'Exactly 3 users (1 admin + 2 sub warehouse managers)',
       sql: `SELECT u.username, u.role FROM users u ORDER BY u.id`,
       expectRows: 3,
     },
     {
-      label: 'Exactly 1 system_admin account (admin)',
-      sql: `SELECT username FROM users WHERE role = 'system_admin'`,
+      label: 'Exactly 1 admin account (admin)',
+      sql: `SELECT username FROM users WHERE role = 'admin'`,
       expectRows: 1,
     },
     {
@@ -353,14 +353,14 @@ async function validate(client: PoolClient): Promise<void> {
       expectRows: 0,
     },
     {
-      label: 'No warehouse_manager without a department',
-      sql: `SELECT username FROM users WHERE role = 'warehouse_manager' AND is_active AND department_id IS NULL`,
+      label: 'No sub_warehouse_manager without a department',
+      sql: `SELECT username FROM users WHERE role = 'sub_warehouse_manager' AND is_active AND department_id IS NULL`,
       expectRows: 0,
     },
     {
-      label: 'No warehouse_manager with zero assigned warehouses',
+      label: 'No sub_warehouse_manager with zero assigned warehouses',
       sql: `SELECT u.username FROM users u
-             WHERE u.role = 'warehouse_manager' AND u.is_active
+             WHERE u.role = 'sub_warehouse_manager' AND u.is_active
                AND NOT EXISTS (SELECT 1 FROM user_warehouses uw WHERE uw.user_id = u.id)`,
       expectRows: 0,
     },
@@ -369,7 +369,7 @@ async function validate(client: PoolClient): Promise<void> {
       sql: `SELECT u.username, w.code FROM users u
               JOIN user_warehouses uw ON uw.user_id = u.id
               JOIN warehouses w ON w.id = uw.warehouse_id
-             WHERE u.role = 'warehouse_manager' AND u.is_active
+             WHERE u.role = 'sub_warehouse_manager' AND u.is_active
                AND w.department_id IS DISTINCT FROM u.department_id`,
       expectRows: 0,
     },
@@ -412,35 +412,35 @@ async function validate(client: PoolClient): Promise<void> {
       expectRows: 0,
     },
     {
-      label: 'warehouse_manager role: no items:create (business rule)',
+      label: 'sub_warehouse_manager role: no items:create (business rule)',
       sql: `SELECT p.code FROM role_permissions rp
               JOIN roles r ON r.id = rp.role_id
               JOIN permissions p ON p.id = rp.permission_id
-             WHERE r.code = 'warehouse_manager' AND p.code = 'items:create'`,
+             WHERE r.code = 'sub_warehouse_manager' AND p.code = 'items:create'`,
       expectRows: 0,
     },
     {
-      label: 'warehouse_manager role: no categories:create (business rule)',
+      label: 'sub_warehouse_manager role: no categories:create (business rule)',
       sql: `SELECT p.code FROM role_permissions rp
               JOIN roles r ON r.id = rp.role_id
               JOIN permissions p ON p.id = rp.permission_id
-             WHERE r.code = 'warehouse_manager' AND p.code = 'categories:create'`,
+             WHERE r.code = 'sub_warehouse_manager' AND p.code = 'categories:create'`,
       expectRows: 0,
     },
     {
-      label: 'warehouse_manager role: no items:update / categories:update (master catalog read-only)',
+      label: 'sub_warehouse_manager role: no items:update / categories:update (master catalog read-only)',
       sql: `SELECT p.code FROM role_permissions rp
               JOIN roles r ON r.id = rp.role_id
               JOIN permissions p ON p.id = rp.permission_id
-             WHERE r.code = 'warehouse_manager' AND p.code IN ('items:update', 'categories:update')`,
+             WHERE r.code = 'sub_warehouse_manager' AND p.code IN ('items:update', 'categories:update')`,
       expectRows: 0,
     },
     {
-      label: 'warehouse_manager role: has projects:create (project ownership business rule)',
+      label: 'sub_warehouse_manager role: has projects:create (project ownership business rule)',
       sql: `SELECT p.code FROM role_permissions rp
               JOIN roles r ON r.id = rp.role_id
               JOIN permissions p ON p.id = rp.permission_id
-             WHERE r.code = 'warehouse_manager' AND p.code = 'projects:create'`,
+             WHERE r.code = 'sub_warehouse_manager' AND p.code = 'projects:create'`,
       expectRows: 1,
     },
   ];
@@ -569,9 +569,9 @@ async function main(): Promise<void> {
 
     log('');
     log('Demo credentials:');
-    log(`  admin               / ${DEMO_PASSWORD} (system_admin) — kept as-is`);
-    log(`  warehouse.manager1  / ${DEMO_PASSWORD} (warehouse_manager -> Engineering)`);
-    log(`  warehouse.manager2  / ${DEMO_PASSWORD} (warehouse_manager -> Information Technology)`);
+    log(`  admin               / ${DEMO_PASSWORD} (admin) — kept as-is`);
+    log(`  warehouse.manager1  / ${DEMO_PASSWORD} (sub_warehouse_manager -> Engineering)`);
+    log(`  warehouse.manager2  / ${DEMO_PASSWORD} (sub_warehouse_manager -> Information Technology)`);
   } catch (err: any) {
     if (inTxn) {
       await client.query('ROLLBACK').catch(() => undefined);

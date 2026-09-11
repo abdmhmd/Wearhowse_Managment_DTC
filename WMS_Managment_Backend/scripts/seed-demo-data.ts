@@ -64,8 +64,8 @@ const DEPARTMENTS = [
 ];
 
 const USERS = [
-  { username: 'admin', full_name: 'System Administrator', full_name_ar: 'مدير النظام', role: 'system_admin', department_code: null },
-  { username: 'wh_manager', full_name: 'Warehouse Manager', full_name_ar: 'مدير المستودع', role: 'warehouse_manager', department_code: null },
+  { username: 'admin', full_name: 'System Administrator', full_name_ar: 'مدير النظام', role: 'admin', department_code: null },
+  { username: 'wh_manager', full_name: 'Warehouse Manager', full_name_ar: 'مدير المستودع', role: 'sub_warehouse_manager', department_code: null },
   { username: 'dept_manager', full_name: 'Department Manager', full_name_ar: 'مدير القسم', role: 'department_manager', department_code: 'IT' },
   { username: 'dept_manager_ops', full_name: 'Operations Manager', full_name_ar: 'مدير العمليات', role: 'department_manager', department_code: 'OPS' },
 ];
@@ -452,8 +452,8 @@ async function seedDemoData(): Promise<void> {
     log('  ┌──────────────┬────────────┬─────────────────────┐');
     log('  │ Username     │ Password   │ Role                │');
     log('  ├──────────────┼────────────┼─────────────────────┤');
-    log('  │ admin        │ Admin@123  │ system_admin        │');
-    log('  │ wh_manager   │ Admin@123  │ warehouse_manager   │');
+    log('  │ admin        │ Admin@123  │ admin               │');
+    log('  │ wh_manager   │ Admin@123  │ sub_warehouse_manager │');
     log('  │ dept_manager │ Admin@123  │ department_manager  │');
     log('  └──────────────┴────────────┴─────────────────────┘');
     log('');

@@ -177,7 +177,7 @@ async function seedLocalDb(): Promise<void> {
     if (existingAdmin.rows.length === 0) {
       await client.query(
         'INSERT INTO users (username, password_hash, full_name, role, is_active) VALUES ($1, $2, $3, $4, true)',
-        ['admin', passwordHash, 'System Administrator', 'system_admin']
+        ['admin', passwordHash, 'System Administrator', 'admin']
       );
       userInserted++;
     } else {
@@ -363,7 +363,7 @@ async function seedLocalDb(): Promise<void> {
     log('  ┌──────────────┬────────────┬─────────────────────┐');
     log('  │ Username     │ Password   │ Role                │');
     log('  ├──────────────┼────────────┼─────────────────────┤');
-    log('  │ admin        │ Admin@123  │ system_admin        │');
+    log('  │ admin        │ Admin@123  │ admin               │');
     log('  └──────────────┴────────────┴─────────────────────┘');
     log('');
 
