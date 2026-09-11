@@ -1,37 +1,40 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { Layout, ProtectedRoute } from '@/components/layout';
 import { useLanguage, setDocumentDirection } from '@/i18n/helpers';
-import LoginPage from '@/pages/auth/LoginPage';
-import DashboardPage from '@/pages/dashboard/DashboardPage';
-import CategoriesPage from '@/pages/categories/CategoriesPage';
-import UnitsPage from '@/pages/units/UnitsPage';
-import SuppliersPage from '@/pages/suppliers/SuppliersPage';
-import DepartmentsPage from '@/pages/departments/DepartmentsPage';
-import WarehousesPage from '@/pages/warehouses/WarehousesPage';
-import ItemsPage from '@/pages/items/ItemsPage';
-import ItemCardPage from '@/pages/items/ItemCardPage';
-import UnitConversionsPage from '@/pages/unit-conversions/UnitConversionsPage';
-import TransactionsListPage from '@/pages/transactions/TransactionsListPage';
-import CreateTransactionPage from '@/pages/transactions/CreateTransactionPage';
-import TransactionDetailPage from '@/pages/transactions/TransactionDetailPage';
-import StockMovementsPage from '@/pages/stock-movements/StockMovementsPage';
-import ReportsPage from '@/pages/reports/ReportsPage';
-import UsersPage from '@/pages/users/UsersPage';
-import SupervisorsPage from '@/pages/supervisors/SupervisorsPage';
-import SettingsPage from '@/pages/settings/SettingsPage';
-import ProjectsPage from '@/pages/projects/ProjectsPage';
-import ProjectDetailPage from '@/pages/projects/ProjectDetailPage';
-import CustodiesPage from '@/pages/custodies/CustodiesPage';
-import MyCustodyPage from '@/pages/custodies/MyCustodyPage';
-import MaterialRequestsListPage from '@/pages/material-requests/MaterialRequestsListPage';
-import CreateMaterialRequestPage from '@/pages/material-requests/CreateMaterialRequestPage';
-import MaterialRequestDetailPage from '@/pages/material-requests/MaterialRequestDetailPage';
-import PurchaseOrdersListPage from '@/pages/purchase-orders/PurchaseOrdersListPage';
-import CreatePurchaseOrderPage from '@/pages/purchase-orders/CreatePurchaseOrderPage';
-import PurchaseOrderDetailPage from '@/pages/purchase-orders/PurchaseOrderDetailPage';
+import { LoadingSpinner } from '@/components/ui';
+
+// ── Lazy-loaded Route Components for Code Splitting ─────────────────────────
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
+const CategoriesPage = lazy(() => import('@/pages/categories/CategoriesPage'));
+const UnitsPage = lazy(() => import('@/pages/units/UnitsPage'));
+const SuppliersPage = lazy(() => import('@/pages/suppliers/SuppliersPage'));
+const DepartmentsPage = lazy(() => import('@/pages/departments/DepartmentsPage'));
+const WarehousesPage = lazy(() => import('@/pages/warehouses/WarehousesPage'));
+const ItemsPage = lazy(() => import('@/pages/items/ItemsPage'));
+const ItemCardPage = lazy(() => import('@/pages/items/ItemCardPage'));
+const UnitConversionsPage = lazy(() => import('@/pages/unit-conversions/UnitConversionsPage'));
+const TransactionsListPage = lazy(() => import('@/pages/transactions/TransactionsListPage'));
+const CreateTransactionPage = lazy(() => import('@/pages/transactions/CreateTransactionPage'));
+const TransactionDetailPage = lazy(() => import('@/pages/transactions/TransactionDetailPage'));
+const StockMovementsPage = lazy(() => import('@/pages/stock-movements/StockMovementsPage'));
+const ReportsPage = lazy(() => import('@/pages/reports/ReportsPage'));
+const UsersPage = lazy(() => import('@/pages/users/UsersPage'));
+const SupervisorsPage = lazy(() => import('@/pages/supervisors/SupervisorsPage'));
+const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'));
+const ProjectsPage = lazy(() => import('@/pages/projects/ProjectsPage'));
+const ProjectDetailPage = lazy(() => import('@/pages/projects/ProjectDetailPage'));
+const CustodiesPage = lazy(() => import('@/pages/custodies/CustodiesPage'));
+const MyCustodyPage = lazy(() => import('@/pages/custodies/MyCustodyPage'));
+const MaterialRequestsListPage = lazy(() => import('@/pages/material-requests/MaterialRequestsListPage'));
+const CreateMaterialRequestPage = lazy(() => import('@/pages/material-requests/CreateMaterialRequestPage'));
+const MaterialRequestDetailPage = lazy(() => import('@/pages/material-requests/MaterialRequestDetailPage'));
+const PurchaseOrdersListPage = lazy(() => import('@/pages/purchase-orders/PurchaseOrdersListPage'));
+const CreatePurchaseOrderPage = lazy(() => import('@/pages/purchase-orders/CreatePurchaseOrderPage'));
+const PurchaseOrderDetailPage = lazy(() => import('@/pages/purchase-orders/PurchaseOrderDetailPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +44,14 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function PageLoader() {
+  return (
+    <div className="flex h-64 w-full items-center justify-center">
+      <LoadingSpinner size="lg" />
+    </div>
+  );
+}
 
 function AppToaster() {
   const lang = useLanguage();
@@ -73,94 +84,97 @@ export default function App() {
       <BrowserRouter>
         <DocumentDirection />
         <AppToaster />
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
 
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route path="/" element={<DashboardPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={<DashboardPage />} />
 
-              <Route element={<ProtectedRoute allowedPermissions={['categories:view', 'units:view', 'suppliers:view', 'departments:view', 'warehouses:view', 'unit-conversions:view']} />}>
-                <Route path="/categories" element={<CategoriesPage />} />
-                <Route path="/units" element={<UnitsPage />} />
-                <Route path="/suppliers" element={<SuppliersPage />} />
-                <Route path="/departments" element={<DepartmentsPage />} />
-                <Route path="/warehouses" element={<WarehousesPage />} />
-                <Route path="/unit-conversions" element={<UnitConversionsPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['categories:view', 'units:view', 'suppliers:view', 'departments:view', 'warehouses:view', 'unit-conversions:view']} />}>
+                  <Route path="/categories" element={<CategoriesPage />} />
+                  <Route path="/units" element={<UnitsPage />} />
+                  <Route path="/suppliers" element={<SuppliersPage />} />
+                  <Route path="/departments" element={<DepartmentsPage />} />
+                  <Route path="/warehouses" element={<WarehousesPage />} />
+                  <Route path="/unit-conversions" element={<UnitConversionsPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['items:view']} />}>
-                <Route path="/items" element={<ItemsPage />} />
-                <Route path="/items/:id" element={<ItemCardPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['items:view']} />}>
+                  <Route path="/items" element={<ItemsPage />} />
+                  <Route path="/items/:id" element={<ItemCardPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['transactions:view']} />}>
-                <Route path="/transactions" element={<TransactionsListPage />} />
-                <Route path="/transactions/:id" element={<TransactionDetailPage />} />
-              </Route>
-              <Route element={<ProtectedRoute allowedPermissions={['transactions:create']} />}>
-                <Route path="/transactions/new" element={<CreateTransactionPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['transactions:view']} />}>
+                  <Route path="/transactions" element={<TransactionsListPage />} />
+                  <Route path="/transactions/:id" element={<TransactionDetailPage />} />
+                </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['transactions:create']} />}>
+                  <Route path="/transactions/new" element={<CreateTransactionPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['stock-movements:view-all']} />}>
-                <Route path="/stock-movements" element={<StockMovementsPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['stock-movements:view-all']} />}>
+                  <Route path="/stock-movements" element={<StockMovementsPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['projects:view', 'custodies:view']} />}>
-                <Route path="/projects" element={<ProjectsPage />} />
-                <Route path="/projects/:id" element={<ProjectDetailPage />} />
-                <Route path="/custodies" element={<CustodiesPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['projects:view', 'custodies:view']} />}>
+                  <Route path="/projects" element={<ProjectsPage />} />
+                  <Route path="/projects/:id" element={<ProjectDetailPage />} />
+                  <Route path="/custodies" element={<CustodiesPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['custodies:view_own']} />}>
-                <Route path="/my-custody" element={<MyCustodyPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['custodies:view_own']} />}>
+                  <Route path="/my-custody" element={<MyCustodyPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['requests:view', 'requests:view_own']} />}>
-                <Route path="/requests" element={<MaterialRequestsListPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['requests:view', 'requests:view_own']} />}>
+                  <Route path="/requests" element={<MaterialRequestsListPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['requests:create']} />}>
-                <Route path="/requests/new" element={<CreateMaterialRequestPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['requests:create']} />}>
+                  <Route path="/requests/new" element={<CreateMaterialRequestPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['requests:view', 'requests:view_own']} />}>
-                <Route path="/requests/:id" element={<MaterialRequestDetailPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['requests:view', 'requests:view_own']} />}>
+                  <Route path="/requests/:id" element={<MaterialRequestDetailPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:view']} />}>
-                <Route path="/purchase-orders" element={<PurchaseOrdersListPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:view']} />}>
+                  <Route path="/purchase-orders" element={<PurchaseOrdersListPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:create']} />}>
-                <Route path="/purchase-orders/new" element={<CreatePurchaseOrderPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:create']} />}>
+                  <Route path="/purchase-orders/new" element={<CreatePurchaseOrderPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:view']} />}>
-                <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:view']} />}>
+                  <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['reports:view']} />}>
-                <Route path="/reports" element={<ReportsPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['reports:view']} />}>
+                  <Route path="/reports" element={<ReportsPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['users:view']} />}>
-                <Route path="/users" element={<UsersPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['users:view']} />}>
+                  <Route path="/users" element={<UsersPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['supervisors:view']} />}>
-                <Route path="/supervisors" element={<SupervisorsPage />} />
-              </Route>
+                <Route element={<ProtectedRoute allowedPermissions={['supervisors:view']} />}>
+                  <Route path="/supervisors" element={<SupervisorsPage />} />
+                </Route>
 
-              <Route element={<ProtectedRoute allowedPermissions={['settings:view']} />}>
-                <Route path="/settings" element={<SettingsPage />} />
+                <Route element={<ProtectedRoute allowedPermissions={['settings:view']} />}>
+                  <Route path="/settings" element={<SettingsPage />} />
+                </Route>
               </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
   );
 }
+

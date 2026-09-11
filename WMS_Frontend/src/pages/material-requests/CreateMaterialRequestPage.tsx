@@ -95,13 +95,11 @@ export default function CreateMaterialRequestPage() {
     : [];
   const warehouseOptions = isSupervisor ? supervisorWarehouses : availableWarehouses;
 
-  // Auto-assignment mirrors the backend rule: the first assigned warehouse by
-  // id (deterministic) for non-admin creators WITH assignments. A supervisor
-  // sees a selector ONLY when their department has more than one eligible
-  // warehouse; a single warehouse is auto-selected and shown read-only.
+  // Auto-assignment mirrors the backend rule: if exactly one eligible warehouse is available,
+  // it is auto-selected; if multiple are available (multi-warehouse targeting), a selector is shown.
   const showWarehouseSelector = isSupervisor
     ? supervisorWarehouses.length > 1
-    : isSystemAdmin || !hasAssignedWarehouses;
+    : isSystemAdmin || !hasAssignedWarehouses || availableWarehouses.length > 1;
 
   const autoWarehouse = showWarehouseSelector
     ? undefined

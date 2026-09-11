@@ -97,6 +97,7 @@ export interface PurchaseOrder {
   approved_by_name?: string | null;
   cancelled_by_name?: string | null;
   approved_at?: string | null;
+  received_at?: string | null;
   lines_count?: number;
   quantity_ordered?: number | string;
   quantity_received?: number | string;
@@ -114,7 +115,7 @@ export type MovementType = 'IN' | 'OUT';
 export type RequestType = 'experiment' | 'semester' | 'project';
 export type RequestPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type RequestStatus = 'pending' | 'dept_approved' | 'wm_approved' | 'forwarded' | 'admin_approved' | 'admin_rejected' | 'issued' | 'cancelled';
-export type ProjectStatus = 'open' | 'closed' | 'cancelled';
+export type ProjectStatus = 'open' | 'closed' | 'cancelled' | 'pending_closure';
 export type CustodyStatus = 'active' | 'returned' | 'damaged' | 'lost' | 'return_pending';
 export type CustodyCondition = 'good' | 'damaged' | 'lost';
 
