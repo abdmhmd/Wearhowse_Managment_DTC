@@ -141,6 +141,8 @@ export class TransactionsService {
   private async isUnitValidForItem(itemId: number, defaultUnit: string, unitCode: string): Promise<boolean> {
     if (!unitCode) return false;
     if (unitCode === defaultUnit) return true;
+    // [NP4-UNIT-H] Piece unit (H) requires no conversion — always valid as-is
+    if (unitCode === 'H') return true;
     const conversions = await unitConversionsRepository.findByItemId(itemId);
     return conversions.some(c => c.from_unit_code === defaultUnit && c.to_unit_code === unitCode);
   }

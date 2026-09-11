@@ -166,10 +166,11 @@ export class InventoryService {
             unit_code: v.unit_code,
             unit_price: parseFloat(v.unit_price || 0),
             batch_number: null,
-          }))
+          })),
+          client
         );
 
-        await transactionsService.approveTransaction(adjTransaction.id!, completedBy);
+        await transactionsService.approveTransaction(adjTransaction.id!, completedBy, client);
         adjTransactionId = adjTransaction.id!;
       }
 

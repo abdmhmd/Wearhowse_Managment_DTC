@@ -144,9 +144,8 @@ export class ItemsRepository {
     await client.query('UPDATE items SET last_purchase_price = $1 WHERE id = $2', [price, id]);
   }
 
-  /** Update balance in both items (legacy) and item_warehouse_stock (new source of truth) */
+  /** Update balance in both items (legacy primary) and item_warehouse_stock (source of truth) */
   async updateBalance(client: PoolClient, id: number, newBalance: number, warehouseId?: number) {
-    await client.query('UPDATE items SET current_balance = $1 WHERE id = $2', [newBalance, id]);
     if (warehouseId) {
       await client.query(
         `INSERT INTO item_warehouse_stock (item_id, warehouse_id, current_balance)
@@ -155,6 +154,13 @@ export class ItemsRepository {
          DO UPDATE SET current_balance = EXCLUDED.current_balance`,
         [id, warehouseId, newBalance]
       );
+      // Only update the legacy primary column if the transacted warehouse is the item's primary warehouse
+      await client.query(
+        'UPDATE items SET current_balance = $1 WHERE id = $2 AND warehouse_id = $3',
+        [newBalance, id, warehouseId]
+      );
+    } else {
+      await client.query('UPDATE items SET current_balance = $1 WHERE id = $2', [newBalance, id]);
     }
   }
 
