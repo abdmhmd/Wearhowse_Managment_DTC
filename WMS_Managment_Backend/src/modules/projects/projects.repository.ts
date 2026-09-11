@@ -3,7 +3,7 @@ import { PoolClient } from 'pg';
 import { scopeForUser } from '../authorization/scope';
 import type { AuthUserContext } from '../authorization/authorization.service';
 
-export type ProjectStatus = 'open' | 'closed' | 'cancelled';
+export type ProjectStatus = 'open' | 'closed' | 'cancelled' | 'pending_closure';
 
 export interface ProjectStudent {
   id?: number;
@@ -277,6 +277,93 @@ export class ProjectsRepository {
       [projectId]
     );
     return res.rows;
+  }
+
+  // ── [NP1] Closure Workflow & Reports ──────────────────────────────────────
+
+  async initiateClosure(id: number, initiatedBy: number, client?: PoolClient) {
+    const q = client ?? pool;
+    const res = await q.query(
+      `UPDATE projects
+       SET status = 'pending_closure', closure_initiated_by = $2, closure_initiated_at = NOW()
+       WHERE id = $1 AND is_active = true
+       RETURNING *`,
+      [id, initiatedBy]
+    );
+    return res.rows[0] || null;
+  }
+
+  async getCloseReport(projectId: number) {
+    // 1. Pending return materials (active custodies)
+    const pendingCustodiesRes = await pool.query(
+      `SELECT c.id AS custody_id, c.item_id, c.quantity, c.unit_code, c.status, c.condition,
+              c.assigned_to, u.full_name AS assigned_to_name,
+              i.item_code, i.name_ar AS item_name_ar, i.name_en AS item_name_en,
+              w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
+              it.transaction_no AS issued_transaction_no
+       FROM custodies c
+       JOIN items i ON i.id = c.item_id
+       JOIN users u ON u.id = c.assigned_to
+       JOIN warehouses w ON w.id = c.warehouse_id
+       LEFT JOIN transactions it ON it.id = c.issued_transaction_id
+       WHERE c.project_id = $1 AND c.status = 'active' AND c.is_active = true
+       ORDER BY c.created_at DESC`,
+      [projectId]
+    );
+
+    // 2. Returned materials
+    const returnedCustodiesRes = await pool.query(
+      `SELECT c.id AS custody_id, c.item_id, c.quantity, c.unit_code, c.status, c.condition,
+              c.assigned_to, u.full_name AS assigned_to_name,
+              c.returned_at,
+              i.item_code, i.name_ar AS item_name_ar, i.name_en AS item_name_en,
+              w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
+              it.transaction_no AS issued_transaction_no,
+              rt.transaction_no AS return_transaction_no
+       FROM custodies c
+       JOIN items i ON i.id = c.item_id
+       JOIN users u ON u.id = c.assigned_to
+       JOIN warehouses w ON w.id = c.warehouse_id
+       LEFT JOIN transactions it ON it.id = c.issued_transaction_id
+       LEFT JOIN transactions rt ON rt.id = c.return_transaction_id
+       WHERE c.project_id = $1 AND c.status = 'returned' AND c.is_active = true
+       ORDER BY c.returned_at DESC`,
+      [projectId]
+    );
+
+    // 3. Consumable items issued directly to the project via material requests
+    const consumableMaterialsRes = await pool.query(
+      `SELECT mrd.id AS detail_id, mrd.item_id, mrd.quantity, mrd.unit_code,
+              mr.request_no, mr.issued_at,
+              i.item_code, i.name_ar AS item_name_ar, i.name_en AS item_name_en,
+              t.transaction_no AS issued_transaction_no
+       FROM material_request_details mrd
+       JOIN material_requests mr ON mr.id = mrd.request_id
+       JOIN items i ON i.id = mrd.item_id
+       LEFT JOIN transactions t ON t.id = mr.transaction_id
+       WHERE mr.project_id = $1 AND mr.status = 'issued' AND i.is_consumable = true AND mr.is_active = true
+       ORDER BY mr.issued_at DESC`,
+      [projectId]
+    );
+
+    const pending = pendingCustodiesRes.rows;
+    const returned = returnedCustodiesRes.rows;
+    const consumables = consumableMaterialsRes.rows;
+
+    return {
+      consumed_materials: [
+        ...consumables.map((c) => ({ ...c, material_type: 'consumable' as const })),
+        ...returned.map((r) => ({ ...r, material_type: 'returned_durable' as const })),
+      ],
+      pending_return_materials: pending,
+      summary: {
+        total_custodies: pending.length + returned.length,
+        active_custodies: pending.length,
+        returned_custodies: returned.length,
+        consumable_count: consumables.length,
+        can_close: pending.length === 0,
+      },
+    };
   }
 }
 

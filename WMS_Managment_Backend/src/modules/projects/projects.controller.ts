@@ -95,6 +95,38 @@ export class ProjectsController {
     }
   }
 
+  // ── [NP1] Close Report & Closure Handlers ─────────────────────────────────
+
+  async getCloseReport(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid project ID');
+      const result = await projectsService.getCloseReport(id, req.user);
+      sendData(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async initiateClose(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid project ID');
+      const result = await projectsService.initiateClose(id, req.user!.id, req.user);
+      await writeAudit({
+        user_id: req.user!.id,
+        action: 'PROJECT_CLOSURE_INITIATED',
+        resource: 'projects',
+        resource_id: id,
+        ip_address: req.ip,
+        user_agent: req.headers?.['user-agent'] ?? null,
+      });
+      sendData(res, result, { message: 'تم بدء إجراءات إغلاق المشروع بنجاح' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async close(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id);

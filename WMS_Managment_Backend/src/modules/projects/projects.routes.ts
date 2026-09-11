@@ -41,6 +41,20 @@ router.patch(
   projectsController.update.bind(projectsController)
 );
 
+// GET /api/projects/:id/close-report — report of consumed materials and pending custodies before closing
+router.get(
+  '/:id/close-report',
+  authorize('projects:view'),
+  projectsController.getCloseReport.bind(projectsController)
+);
+
+// POST /api/projects/:id/initiate-close — initiate closure procedure (status -> pending_closure)
+router.post(
+  '/:id/initiate-close',
+  authorize('projects:close'),
+  projectsController.initiateClose.bind(projectsController)
+);
+
 // PATCH /api/projects/:id/close — close project (blocks when active custodies exist)
 router.patch(
   '/:id/close',

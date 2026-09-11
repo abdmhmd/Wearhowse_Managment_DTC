@@ -291,6 +291,43 @@ export class ProjectsService {
     return project;
   }
 
+  // ── [NP1] Close Report & Closure Workflow ─────────────────────────────────
+
+  async getCloseReport(id: number, user?: AuthUserContext) {
+    const project = await projectsRepository.findById(id);
+    if (!project) throw new NotFoundError('Project', 'PROJECT_NOT_FOUND', { id });
+    if (user && !(await this.inScope(project, user))) {
+      throw new NotFoundError('Project', 'PROJECT_NOT_FOUND', { id });
+    }
+    const report = await projectsRepository.getCloseReport(id);
+    return {
+      project_id: project.id,
+      project_no: project.project_no,
+      project_name: project.name,
+      status: project.status,
+      ...report,
+    };
+  }
+
+  async initiateClose(id: number, initiatedBy: number, user?: AuthUserContext) {
+    return runInTransaction(async (client) => {
+      const project = await projectsRepository.findById(id);
+      if (!project) throw new NotFoundError('Project', 'PROJECT_NOT_FOUND', { id });
+      if (user && !(await this.inScope(project, user))) {
+        throw new NotFoundError('Project', 'PROJECT_NOT_FOUND', { id });
+      }
+
+      if (project.status === 'closed') {
+        throw new ValidationError('Project is already closed', { id });
+      }
+      if (project.status === 'cancelled') {
+        throw new ValidationError('A cancelled project cannot be closed', { id });
+      }
+
+      return projectsRepository.initiateClosure(id, initiatedBy, client);
+    });
+  }
+
   async close(id: number, closedBy: number, user?: AuthUserContext) {
     return runInTransaction(async (client) => {
       const project = await projectsRepository.findById(id);
