@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "seed:admin": "ts-node scripts/seed-admin.ts",
@@ -15,6 +16,7 @@
     "reset:admin": "ts-node scripts/reset-admin-password.ts",
     "reset-demo": "ts-node scripts/reset-demo-environment.ts",
     "seed-demo-items": "ts-node scripts/seed-demo-items.ts",
+    "seed:test": "ts-node scripts/seed-test-data.ts",
     "migrate": "ts-node scripts/run-migrations.ts",
     "test": "jest --forceExit --detectOpenHandles",
     "test:watch": "jest --watch"
