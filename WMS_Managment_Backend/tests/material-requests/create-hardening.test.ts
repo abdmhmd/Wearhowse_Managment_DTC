@@ -107,6 +107,7 @@ describe('Create request: server-derived warehouse + department enforcement', ()
     whA = await seedWarehouse({ department_id: deptA });
     whB = await seedWarehouse({ department_id: deptB });
     whMain = await seedWarehouse({ department_id: deptA, is_main: true });
+    await seedWarehouse({ department_id: deptB, is_main: true });
     whNoDept = await seedWarehouse();
     itemId = await seedItem(catCode, unitCode, whA, 100);
 
@@ -162,30 +163,36 @@ describe('Create request: server-derived warehouse + department enforcement', ()
     expect(res.body.error.code).toBe('DEPARTMENT_WAREHOUSE_MISMATCH');
   });
 
-  test('4: warehouse_manager payload warehouse_id is ignored; assigned warehouse is used (201)', async () => {
+  test('4: warehouse_manager attempting to target an unassigned warehouse -> 400 rejection', async () => {
     const res = await createRequest(wmA.token, whB, items());
-    expect(res.status).toBe(201);
-    expect(res.body.data.warehouse_id).toBe(whA);
-    expect(res.body.data.department_id).toBe(deptA);
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('not in your assigned eligible warehouses');
   });
 
-  test('5: warehouse_manager payload pointing at a non-existent warehouse still derives safely (201)', async () => {
+  test('5: warehouse_manager payload pointing at a non-existent warehouse -> 400 rejection', async () => {
     const res = await createRequest(wmA.token, 99999999, items());
-    expect(res.status).toBe(201);
-    expect(res.body.data.warehouse_id).toBe(whA);
-    expect(res.body.data.department_id).toBe(deptA);
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('not in your assigned eligible warehouses');
   });
 
-  test('6: multi-assignment warehouse_manager always uses the first assigned warehouse (deterministic)', async () => {
+  test('6: multi-assignment warehouse_manager can target any assigned warehouse or default to first', async () => {
+    // Target whA explicitly
     const resA = await createRequest(wmMulti.token, whA, items());
     expect(resA.status).toBe(201);
     expect(resA.body.data.warehouse_id).toBe(whA);
     expect(resA.body.data.department_id).toBe(deptA);
 
+    // Target whB explicitly
     const resB = await createRequest(wmMulti.token, whB, items());
     expect(resB.status).toBe(201);
-    expect(resB.body.data.warehouse_id).toBe(whA);
-    expect(resB.body.data.department_id).toBe(deptA);
+    expect(resB.body.data.warehouse_id).toBe(whB);
+    expect(resB.body.data.department_id).toBe(deptB);
+
+    // Omit warehouse_id -> defaults to first assigned (whA)
+    const resDefault = await createRequest(wmMulti.token, null, items());
+    expect(resDefault.status).toBe(201);
+    expect(resDefault.body.data.warehouse_id).toBe(whA);
+    expect(resDefault.body.data.department_id).toBe(deptA);
   });
 
   test('7: warehouse_manager with ZERO assignments + valid warehouse_id -> 201 (fallback)', async () => {

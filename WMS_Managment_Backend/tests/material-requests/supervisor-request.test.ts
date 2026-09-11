@@ -20,7 +20,7 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *   5. supervisor, another supervisor's project (same dept) -> 400 (rejected)
  *   6. supervisor, project of another department         -> 409 PROJECT_DEPARTMENT_MISMATCH
  *   7. department_manager POST /api/requests             -> 403 (approver rule unchanged, 022)
- *   8. warehouse_manager create                          -> 201 (assigned warehouse, unchanged)
+ *   8. warehouse_manager create                          -> 400 (unassigned target rejected)
  *   9. system_admin create                               -> 201 (any warehouse, unchanged)
  *  10. supervisor list scopes to OWN requests only (requests:view_own)
  *  11. supervisor detail: own request 200, other user's request 404
@@ -223,11 +223,10 @@ describe('Create request: supervisor department + project enforcement', () => {
     expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
   });
 
-  test('8: warehouse_manager behavior unchanged (assigned warehouse wins, payload ignored)', async () => {
+  test('8: warehouse_manager targeting an unassigned warehouse is rejected (400)', async () => {
     const res = await createRequest(wmA.token, whB, items());
-    expect(res.status).toBe(201);
-    expect(res.body.data.warehouse_id).toBe(whA);
-    expect(res.body.data.department_id).toBe(deptA);
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('not in your assigned eligible warehouses');
   });
 
   test('9: system_admin behavior unchanged (any warehouse)', async () => {
