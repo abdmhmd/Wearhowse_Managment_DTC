@@ -57,13 +57,13 @@ export default function CreateMaterialRequestPage() {
 
   // The destination warehouse is DERIVED server-side from the authenticated
   // user's warehouse assignments:
-  //  - system_admin may pick any warehouse.
-  //  - warehouse_manager WITH assignments gets their first assigned warehouse
-  //    auto-selected; any payload warehouse_id is ignored (no spoofing).
-  //  - warehouse_manager with ZERO assignments uses the fallback: a warehouse
+  //  - admin may pick any warehouse.
+  //  - sub_warehouse_manager WITH assignments gets their first assigned
+  //    warehouse auto-selected; any payload warehouse_id is ignored (no spoofing).
+  //  - sub_warehouse_manager with ZERO assignments uses the fallback: a warehouse
   //    selector over the eligible pool (active, non-main) is shown and the
   //    chosen warehouse_id is sent and validated server-side.
-  const isSystemAdmin = user?.role === 'system_admin';
+  const isSystemAdmin = user?.role === 'admin';
   const hasAssignedWarehouses = (user?.warehouse_ids?.length ?? 0) > 0;
 
   const form = useForm<CreateMaterialRequestFormData>({
@@ -79,9 +79,9 @@ export default function CreateMaterialRequestPage() {
   // Requests are fulfilled from the department's MAIN warehouse into one of the
   // department's own warehouses. Only active, non-main warehouses linked to a
   // department are valid destinations (a main warehouse is the stock source,
-  // never a request target). The server scopes the list: warehouse_manager ->
-  // assigned warehouses, zero-assignment warehouse_manager -> eligible fallback
-  // pool, system_admin -> all.
+  // never a request target). The server scopes the list: sub_warehouse_manager ->
+  // assigned warehouses, zero-assignment sub_warehouse_manager -> eligible fallback
+  // pool, admin -> all.
   const availableWarehouses = warehouses
     .filter((w: any) => !w.is_main && w.is_active !== false && w.department_id != null)
     .sort((a: any, b: any) => Number(a.id) - Number(b.id));
@@ -118,7 +118,7 @@ export default function CreateMaterialRequestPage() {
     }
   }, [showWarehouseSelector, autoWarehouse, autoDepartmentId, form]);
 
-  // For system_admin the department is DERIVED from the selected warehouse
+  // For admin the department is DERIVED from the selected warehouse
   // (warehouses belong to exactly one department via warehouses.department_id);
   // the user never types it and the backend re-derives and validates it.
   const selectedWarehouse = warehouses.find((w: any) => Number(w.id) === Number(selectedWarehouseId));

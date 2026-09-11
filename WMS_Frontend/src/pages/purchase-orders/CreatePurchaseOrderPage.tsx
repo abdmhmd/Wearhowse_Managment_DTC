@@ -28,10 +28,10 @@ export default function CreatePurchaseOrderPage() {
   const createMutation = useCreatePurchaseOrder();
 
   // ── Role-aware creation ────────────────────────────────────────────────────
-  // warehouse_manager = pure MATERIAL REQUEST (item/quantity/unit/notes);
+  // sub_warehouse_manager = pure MATERIAL REQUEST (item/quantity/unit/notes);
   // the receiving main warehouse is derived SERVER-SIDE and only displayed.
-  // system_admin keeps full procurement control (supplier, price, warehouse).
-  const isManager = user?.role === 'warehouse_manager';
+  // admin keeps full procurement control (supplier, price, warehouse).
+  const isManager = user?.role === 'sub_warehouse_manager';
 
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');

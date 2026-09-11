@@ -25,7 +25,7 @@ describe('Frontend AuthStore', () => {
       id: 1,
       username: 'admin',
       full_name: 'Administrator',
-      role: 'system_admin',
+      role: 'admin',
       permissions: ['items:view', 'items:create', 'requests:approve'],
       warehouse_ids: [1, 2],
     });
@@ -34,7 +34,7 @@ describe('Frontend AuthStore', () => {
     expect(state.isAuthenticated).toBe(true);
     expect(state.token).toBe('mock-access-token');
     expect(state.user?.username).toBe('admin');
-    expect(state.user?.role).toBe('system_admin');
+    expect(state.user?.role).toBe('admin');
     expect(localStorage.getItem('wms_token')).toBe('mock-access-token');
     expect(localStorage.getItem('wms_refresh_token')).toBe('mock-refresh-token');
   });
@@ -44,7 +44,7 @@ describe('Frontend AuthStore', () => {
       id: 1,
       username: 'admin',
       full_name: 'Administrator',
-      role: 'system_admin',
+      role: 'admin',
       permissions: ['items:view'],
       warehouse_ids: [1],
     });
@@ -63,7 +63,7 @@ describe('Frontend AuthStore', () => {
       id: 2,
       username: 'manager',
       full_name: 'Warehouse Manager',
-      role: 'warehouse_manager',
+      role: 'sub_warehouse_manager',
       permissions: ['items:view', 'requests:create'] as any,
       warehouse_ids: [1],
     });
@@ -74,7 +74,7 @@ describe('Frontend AuthStore', () => {
     expect(can('items:create' as any)).toBe(false);
     expect(canAny('items:create' as any, 'requests:create' as any)).toBe(true);
     expect(canAny('users:view' as any, 'users:create' as any)).toBe(false);
-    expect(hasRole('warehouse_manager')).toBe(true);
-    expect(hasRole('system_admin')).toBe(false);
+    expect(hasRole('sub_warehouse_manager')).toBe(true);
+    expect(hasRole('admin')).toBe(false);
   });
 });

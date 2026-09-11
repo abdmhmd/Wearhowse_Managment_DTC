@@ -1,6 +1,6 @@
 export type UserRole =
-  | 'system_admin'
-  | 'warehouse_manager'
+  | 'admin'
+  | 'sub_warehouse_manager'
   | 'department_manager'
   | 'supervisor';
 
@@ -569,8 +569,8 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
-  system_admin: 'System Admin',
-  warehouse_manager: 'Warehouse Manager',
+  admin: 'System Admin',
+  sub_warehouse_manager: 'Warehouse Manager',
   department_manager: 'Department Manager',
   supervisor: 'Supervisor',
 };

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const roleEnum = z.enum(['system_admin', 'warehouse_manager', 'department_manager', 'supervisor']);
+const roleEnum = z.enum(['admin', 'sub_warehouse_manager', 'department_manager', 'supervisor']);
 
 // The <select> placeholder submits an empty string; coerce numbers but treat
 // an empty string as "not selected" so optional departments don't become 0.

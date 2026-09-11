@@ -25,8 +25,8 @@
     "materialRequests": "Requests"
   },
   "roles": {
-    "system_admin": "System Admin",
-    "warehouse_manager": "Warehouse Manager",
+    "admin": "System Admin",
+    "sub_warehouse_manager": "Warehouse Manager",
     "department_manager": "Department Manager",
     "supervisor": "Supervisor"
   },

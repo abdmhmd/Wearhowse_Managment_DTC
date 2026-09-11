@@ -25,8 +25,8 @@
     "purchaseOrders": "أوامر الشراء"
   },
   "roles": {
-    "system_admin": "مدير النظام",
-    "warehouse_manager": "مدير المستودع",
+    "admin": "مدير النظام",
+    "sub_warehouse_manager": "مدير المستودع",
     "department_manager": "مدير القسم / الأستاذ",
     "supervisor": "مشرف"
   },

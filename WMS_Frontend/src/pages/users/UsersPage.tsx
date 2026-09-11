@@ -34,7 +34,7 @@ export default function UsersPage() {
   const departmentOptions = (departmentsData?.items || []).map((d: any) => ({ value: d.id, label: getLocalizedName(d) }));
   const warehouseOptions = warehousesData?.items || [];
 
-  const isWarehouseRole = (role?: string) => role === 'warehouse_manager';
+  const isWarehouseRole = (role?: string) => role === 'sub_warehouse_manager';
   const isDepartmentRole = (role?: string) => role === 'department_manager' || role === 'supervisor';
 
   const toggleWarehouse = (id: number) => {
@@ -63,7 +63,7 @@ export default function UsersPage() {
     setWarehouseIds([]);
   };
 
-  const roleOptions = (['system_admin', 'warehouse_manager', 'department_manager', 'supervisor'] as UserRole[]).map((value) => ({ value, label: getLocalizedRoleLabel(value) }));
+  const roleOptions = (['admin', 'sub_warehouse_manager', 'department_manager', 'supervisor'] as UserRole[]).map((value) => ({ value, label: getLocalizedRoleLabel(value) }));
 
   const columns = [
     { key: 'id', header: t('table.id') },
@@ -77,8 +77,8 @@ export default function UsersPage() {
       key: 'role', header: t('table.role'),
       render: (item: User) => {
         const colors: Record<UserRole, string> = {
-          system_admin: 'bg-red-100 text-red-800',
-          warehouse_manager: 'bg-blue-100 text-blue-800',
+          admin: 'bg-red-100 text-red-800',
+          sub_warehouse_manager: 'bg-blue-100 text-blue-800',
           department_manager: 'bg-amber-100 text-amber-800',
           supervisor: 'bg-purple-100 text-purple-800',
         };

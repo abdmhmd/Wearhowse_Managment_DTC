@@ -42,7 +42,7 @@ export default function SupervisorsPage() {
   const myDepartment = (departmentsData?.items || []).find((d: any) => d.id === user?.department_id);
 
   const isSelf = (item: Supervisor) => user?.id === item.id;
-  const isAdmin = user?.role === 'system_admin';
+  const isAdmin = user?.role === 'admin';
 
   const handleCreate = async (formData: CreateSupervisorFormData) => {
     const payload: any = { ...formData };

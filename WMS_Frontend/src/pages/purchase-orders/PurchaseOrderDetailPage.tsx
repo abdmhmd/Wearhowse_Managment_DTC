@@ -61,7 +61,7 @@ export default function PurchaseOrderDetailPage() {
   // Transfer dialog state
   const [transferQty, setTransferQty] = useState('');
 
-  const isManager = user?.role === 'warehouse_manager';
+  const isManager = user?.role === 'sub_warehouse_manager';
 
   // Destination picker: active non-main warehouses. Managers see only their
   // own assignments; admins see every departmental warehouse.

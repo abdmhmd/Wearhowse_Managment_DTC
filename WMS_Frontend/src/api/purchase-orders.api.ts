@@ -10,8 +10,8 @@ export interface PurchaseOrdersFilter {
 
 export interface CreatePurchaseOrderPayload {
   supplier_id?: number | null;
-  /** Optional: warehouse managers omit it — the backend derives their
-   *  department main warehouse server-side. system_admin sends it. */
+  /** Optional: sub_warehouse_manager omit it — the backend derives their
+   *  department main warehouse server-side. admin sends it. */
   warehouse_id?: number;
   expected_date?: string | null;
   notes?: string | null;

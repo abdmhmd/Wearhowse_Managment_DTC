@@ -44,7 +44,7 @@ export default function ProjectsPage() {
 
   const { can, user } = useAuthStore();
   const isSupervisor = user?.role === 'supervisor';
-  const isWarehouseManager = user?.role === 'warehouse_manager';
+  const isWarehouseManager = user?.role === 'sub_warehouse_manager';
   const isDepartmentManager = user?.role === 'department_manager';
 
   const { data } = useProjects(page, 20, statusFilter ? { status: statusFilter as any } : undefined);
