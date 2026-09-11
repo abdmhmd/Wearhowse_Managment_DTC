@@ -19,7 +19,7 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS end_date DATE;
 -- and every project has a start date consistent with the new rule.
 UPDATE projects
 SET end_date = closed_at::date
-WHERE status = 'closed' AND end_date IS NULL AND closed_at IS NOT NULL;
+WHERE status::text = 'closed' AND end_date IS NULL AND closed_at IS NOT NULL;
 
 UPDATE projects
 SET start_date = created_at::date

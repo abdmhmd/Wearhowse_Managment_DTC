@@ -77,8 +77,8 @@ WHERE code IN ('viewer', 'accountant', 'storekeeper');
 ALTER TABLE material_requests ALTER COLUMN status DROP DEFAULT;
 ALTER TABLE material_requests ALTER COLUMN status TYPE TEXT USING status::text;
 
-UPDATE material_requests SET status = 'approved' WHERE status IN ('admin_approved', 'dept_approved', 'forwarded');
-UPDATE material_requests SET status = 'rejected' WHERE status = 'admin_rejected';
+UPDATE material_requests SET status = 'approved' WHERE status::text IN ('admin_approved', 'dept_approved', 'forwarded');
+UPDATE material_requests SET status = 'rejected' WHERE status::text = 'admin_rejected';
 
 DROP TYPE request_status;
 CREATE TYPE request_status AS ENUM ('pending', 'approved', 'rejected', 'issued', 'cancelled');

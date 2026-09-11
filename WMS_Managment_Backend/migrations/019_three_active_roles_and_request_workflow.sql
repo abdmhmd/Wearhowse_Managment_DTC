@@ -115,27 +115,29 @@ WHERE is_main = false
 CREATE INDEX IF NOT EXISTS idx_warehouses_department ON warehouses(department_id);
 
 -- 6. Material request workflow states -----------------------------------------
--- Recreate request_status (see file header note). Legacy 'approved'/'rejected'
--- rows are migrated onto the equivalent admin_* states while the column is
--- still TEXT (i.e. BEFORE the enum is recreated), so the cast cannot fail.
-ALTER TABLE material_requests ALTER COLUMN status DROP DEFAULT;
-ALTER TABLE material_requests ALTER COLUMN status TYPE TEXT USING status::text;
+DO $$
+BEGIN
+  ALTER TABLE material_requests ALTER COLUMN status DROP DEFAULT;
+  ALTER TABLE material_requests ALTER COLUMN status TYPE VARCHAR(50) USING status::text;
 
-UPDATE material_requests SET status = 'admin_approved' WHERE status = 'approved';
-UPDATE material_requests SET status = 'admin_rejected' WHERE status = 'rejected';
+  UPDATE material_requests SET status = 'admin_approved' WHERE status = 'approved';
+  UPDATE material_requests SET status = 'admin_rejected' WHERE status = 'rejected';
 
-DROP TYPE request_status;
-CREATE TYPE request_status AS ENUM (
-  'pending',          -- created, awaiting department approval
-  'dept_approved',    -- approved by the department manager
-  'forwarded',        -- forwarded by the department manager to the warehouse admin
-  'admin_approved',   -- approved by the warehouse admin
-  'admin_rejected',   -- rejected by the warehouse admin
-  'issued',           -- stock issued (transaction completed)
-  'cancelled'         -- cancelled by the creator or an admin
-);
-ALTER TABLE material_requests ALTER COLUMN status TYPE request_status USING status::request_status;
-ALTER TABLE material_requests ALTER COLUMN status SET DEFAULT 'pending'::request_status;
+  DROP TYPE IF EXISTS request_status CASCADE;
+
+  EXECUTE 'CREATE TYPE request_status AS ENUM (
+    ''pending'',
+    ''dept_approved'',
+    ''forwarded'',
+    ''admin_approved'',
+    ''admin_rejected'',
+    ''issued'',
+    ''cancelled''
+  )';
+
+  EXECUTE 'ALTER TABLE material_requests ALTER COLUMN status TYPE request_status USING status::request_status';
+  EXECUTE 'ALTER TABLE material_requests ALTER COLUMN status SET DEFAULT ''pending''::request_status';
+END $$;
 
 -- 7. Actor tracking for the extended workflow ---------------------------------
 ALTER TABLE material_requests
