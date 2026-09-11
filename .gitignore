@@ -36,3 +36,6 @@ logs/
 
 # OpenCode or other AI temp files
 .opencode/
+
+# Ephemeral one-off DB inspection scripts (contain plaintext connection strings)
+_inspect-*.tmp.js
