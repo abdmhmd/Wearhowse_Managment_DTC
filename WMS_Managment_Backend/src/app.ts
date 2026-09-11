@@ -87,7 +87,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof AppError) {
     return sendError(res, err.message, err.status, err.code, err.details);
   }
-  logger.error('Unhandled error', 'GlobalHandler', { error: err.message, stack: err.stack });
+  logger.error('Unhandled error', 'GlobalHandler', { requestId: (req as any).id, error: err.message, stack: err.stack });
   return sendError(res, 'Internal Server Error', 500, 'INTERNAL_SERVER_ERROR');
 });
 

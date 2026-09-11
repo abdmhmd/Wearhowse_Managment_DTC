@@ -1,10 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 import { logger } from '../utils/logger';
 
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const start = Date.now();
-  const requestId = Math.random().toString(36).substring(2, 10);
+  const incomingId = req.headers['x-request-id'] || req.headers['x-correlation-id'];
+  const requestId = (typeof incomingId === 'string' && incomingId.trim().length > 0)
+    ? incomingId.trim()
+    : randomUUID();
 
+  (req as any).id = requestId;
+  (req as any).requestId = requestId;
   res.setHeader('X-Request-Id', requestId);
 
   res.on('finish', () => {

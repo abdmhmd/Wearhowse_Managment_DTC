@@ -33,9 +33,18 @@ export function sendPaginated<T>(
   return sendData(res, data, options);
 }
 
-export function sendError(res: Response, message: string, statusCode = 500, code?: string, details?: Record<string, any>) {
+export function sendError(
+  res: Response,
+  message: string,
+  statusCode = 500,
+  code?: string,
+  details?: Record<string, any>,
+  requestId?: string
+) {
   const errorBody: Record<string, any> = { message };
   if (code) errorBody.code = code;
   if (details) errorBody.details = details;
+  const reqId = requestId || (res.req as any)?.id || (res.req as any)?.requestId;
+  if (reqId) errorBody.requestId = reqId;
   return res.status(statusCode).json({ success: false, error: errorBody });
 }
