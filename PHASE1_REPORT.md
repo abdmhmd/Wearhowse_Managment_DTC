@@ -44,16 +44,24 @@ remain enum values but stay inactive.
 ## 3. Migration 038
 
 - `WMS_Managment_Backend/migrations/038_role_model_rename.sql` (+ `.down.sql`):
-  - Renames enum values via `DO $$ BEGIN ALTER TYPE user_role RENAME VALUE … END $$`
-    (guarded so re-runs are idempotent).
-  - Adds legacy passthrough columns `admin_username` / `admin_password_hash` to
-    `users` so staged auth rollovers in later phases can read old credentials.
+  - Recreates the `user_role` enum with exactly the 4 new labels via a guarded
+    `DROP TYPE` / `CREATE TYPE` `DO` block (PostgreSQL has no
+    `ALTER TYPE … DROP VALUE`), then re-applies it to `users.role`.
   - Writes `_migration_notes` (`note_key = 'role_rename'`) per renamed user and
     bumps each renamed user's `token_version` (session revocation).
-  - Update triggers + role display labels (`roles` table) refreshed.
-- **Applied and checksum-locked on both DBs** (`dtc_wms`,
-  `dtc_wms_test`). The migration files are **final** — no further edits.
-- Down migration reverses the rename and drops the passthrough columns.
+  - Renames the active `roles` table codes and removes the legacy role rows.
+  - **No columns were added or dropped** from `users` or any existing table —
+    the 038 file contains no `ADD COLUMN` / `DROP COLUMN` statements, no
+    index/constraint changes, and no trigger changes.
+- > Correction (Phase 1.5): earlier draft versions of this report claimed 038
+  > added `admin_username` / `admin_password_hash` "passthrough" columns. They
+  > were **never implemented** — they appear in no migration, no code, and no
+  > database (verified via `information_schema` on both DBs and a repo-wide
+  > search). See `PHASE1_5_REPORT.md`.
+- **Applied and checksum-locked on both DBs** (`DTC_WMS_final_db`,
+  `dtc_wms_test`) — stored checksum `57edddf2…` matches the disk file exactly.
+  The migration files are **final** — no further edits.
+- Down migration reverses the rename and drops the `_migration_notes` ledger.
 
 ## 4. Behaviour-Critical Fixes
 
