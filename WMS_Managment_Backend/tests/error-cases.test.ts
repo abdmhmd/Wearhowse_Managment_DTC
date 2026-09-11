@@ -165,7 +165,7 @@ describe('403 Forbidden Errors', () => {
     const json = jest.fn().mockReturnValue({});
     const status = jest.fn().mockReturnValue({ json });
     const req = {
-      user: { userId: 1, username: 'test', role: 'warehouse_manager', permissions },
+      user: { userId: 1, username: 'test', role: 'sub_warehouse_manager', permissions },
       headers: { authorization: 'Bearer test' },
     } as any;
     const res = { status, json } as Partial<Response>;
@@ -204,7 +204,7 @@ describe('403 Forbidden Errors', () => {
     expect(next.mock.calls[0][0]).toBeUndefined();
   });
 
-  test('system_admin can delete users', () => {
+  test('admin can delete users', () => {
     const { req, res } = mockReqUser(['users:view', 'users:delete']);
     const next = jest.fn();
     authorize('users:delete')(req as any, res as Response, next);

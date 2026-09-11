@@ -4,7 +4,7 @@ import { hashPassword } from '../../src/utils/crypto';
 import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepartment, seedItem, cleanup } from '../helpers';
 
 /**
- * REPRO: warehouse_manager creates a material issue request for a graduation
+ * REPRO: sub_warehouse_manager creates a material issue request for a graduation
  * project. Mirrors the exact frontend payload.
  */
 const prefix = `${TEST_PREFIX}reproproj_`;
@@ -95,9 +95,9 @@ describe('REPRO: WM creates a material issue request for a graduation project', 
     whMain = await seedWarehouse({ department_id: deptA, is_main: true });
     itemId = await seedItem(catCode, unitCode, whA, 100);
 
-    wmAssigned = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
-    wmMainOnly = await seedRoleUser('warehouse_manager', { warehouse_ids: [whMain] });
-    wmZero = await seedRoleUser('warehouse_manager');
+    wmAssigned = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
+    wmMainOnly = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whMain] });
+    wmZero = await seedRoleUser('sub_warehouse_manager');
 
     projectA = await seedProject(deptA, whA, wmAssigned.id, wmAssigned.id);
     projectB = await seedProject(deptB, whB, wmAssigned.id, wmAssigned.id);

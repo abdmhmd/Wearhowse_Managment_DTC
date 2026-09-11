@@ -85,8 +85,8 @@ describe('Project system-managed lifecycle dates', () => {
     whMain = await seedWarehouse({ department_id: deptA, is_main: true });
     whA2 = await seedWarehouse({ department_id: deptA });
 
-    admin = await seedRoleUser('system_admin');
-    supervisor = await seedRoleUser('system_admin', { department_id: deptA });
+    admin = await seedRoleUser('admin');
+    supervisor = await seedRoleUser('admin', { department_id: deptA });
     dm = await seedRoleUser('department_manager', { department_id: deptA });
 
     admin.token = await login(admin);

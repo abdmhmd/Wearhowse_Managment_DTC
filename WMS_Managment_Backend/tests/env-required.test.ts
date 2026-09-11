@@ -14,7 +14,7 @@ describe('Environment Variable Requirements', () => {
     delete process.env.JWT_SECRET;
     process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
     const { generateToken } = require('../src/utils/jwt');
-    expect(() => generateToken({ userId: 1, username: 'test', role: 'system_admin' })).toThrow();
+    expect(() => generateToken({ userId: 1, username: 'test', role: 'admin' })).toThrow();
   });
 
   test('JWT verifyToken returns null if JWT_SECRET is missing', () => {
@@ -27,20 +27,20 @@ describe('Environment Variable Requirements', () => {
   test('JWT generateToken and verifyToken work end-to-end', () => {
     process.env.JWT_SECRET = 'test-secret-key-for-testing-0123456789';
     const { generateToken, verifyToken } = require('../src/utils/jwt');
-    const payload = { userId: 1, username: 'test', role: 'system_admin' };
+    const payload = { userId: 1, username: 'test', role: 'admin' };
     const token = generateToken(payload);
     expect(token).toBeDefined();
     const decoded = verifyToken(token);
     expect(decoded).not.toBeNull();
     expect(decoded!.userId).toBe(1);
     expect(decoded!.username).toBe('test');
-    expect(decoded!.role).toBe('system_admin');
+    expect(decoded!.role).toBe('admin');
   });
 
   test('JWT rejects tampered token', () => {
     process.env.JWT_SECRET = 'test-secret-key-for-testing-0123456789';
     const { generateToken, verifyToken } = require('../src/utils/jwt');
-    const token = generateToken({ userId: 1, username: 'test', role: 'system_admin' });
+    const token = generateToken({ userId: 1, username: 'test', role: 'admin' });
     const tampered = token.slice(0, -5) + 'XXXXX';
     const decoded = verifyToken(tampered);
     expect(decoded).toBeNull();

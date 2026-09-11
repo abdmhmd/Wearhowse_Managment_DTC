@@ -99,9 +99,9 @@ describe('Part 1: Supervisor request routing — WM approve + issue', () => {
       [itemId, mainWhA]
     );
 
-    admin = await seedRoleUser('system_admin');
+    admin = await seedRoleUser('admin');
     supA = await seedRoleUser('supervisor', { department_id: deptA });
-    wmA = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
+    wmA = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
 
     admin.token = await login(admin);
     supA.token = await login(supA);
@@ -252,11 +252,11 @@ describe('Part 2: Custody two-step return and supervisor scope', () => {
       [durableItemBId, mainWhB]
     );
 
-    admin = await seedRoleUser('system_admin');
+    admin = await seedRoleUser('admin');
     supA = await seedRoleUser('supervisor', { department_id: deptA });
     supB = await seedRoleUser('supervisor', { department_id: deptB });
-    wmA = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
-    wmB = await seedRoleUser('warehouse_manager', { warehouse_ids: [whB] });
+    wmA = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
+    wmB = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whB] });
 
     admin.token = await login(admin);
     supA.token = await login(supA);

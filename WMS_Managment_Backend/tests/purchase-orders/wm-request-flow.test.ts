@@ -50,7 +50,7 @@ describe('Purchase orders — WM purchase-request workflow', () => {
     const username = `${PO_TEST_PREFIX}wm_${shortId()}`;
     const u = await pool.query(
       `INSERT INTO users (username, password_hash, full_name, role, department_id, is_active)
-       VALUES ($1, $2, $3, 'warehouse_manager', $4, true) RETURNING id`,
+       VALUES ($1, $2, $3, 'sub_warehouse_manager', $4, true) RETURNING id`,
       [username, await hashPassword(password), username, opts.department_id ?? null]
     );
     const id = u.rows[0].id;
@@ -208,7 +208,7 @@ describe('Purchase orders — WM purchase-request workflow', () => {
   });
 
   // ── T11: procurement/admin path unchanged ──────────────────────────────────
-  test('T11: system_admin still controls warehouse + supplier + unit_price', async () => {
+  test('T11: admin still controls warehouse + supplier + unit_price', async () => {
     const res = await apiCreatePo(app, world.users.admin.token, {
       warehouse_id: world.mainWhA,
       supplier_id: world.supplierId,

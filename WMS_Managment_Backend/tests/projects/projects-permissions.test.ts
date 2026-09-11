@@ -6,19 +6,19 @@ import { shortId, TEST_PREFIX, seedWarehouse, seedDepartment, cleanup } from '..
 /**
  * Project & Warehouse Manager permissions:
  *
- *   WM-1  a warehouse_manager can only create projects in their own department
+ *   WM-1  a sub_warehouse_manager can only create projects in their own department
  *         (department_id is derived server-side, never trusted from the client)
- *   WM-2  a warehouse_manager can only create projects for an assigned warehouse
- *   WM-3  a warehouse_manager omitting the warehouse defaults to one of their
+ *   WM-2  a sub_warehouse_manager can only create projects for an assigned warehouse
+ *   WM-3  a sub_warehouse_manager omitting the warehouse defaults to one of their
  *         assigned warehouses of the department (preferring the main warehouse)
- *   WM-4  a warehouse_manager list/read is scoped to their assigned department
+ *   WM-4  a sub_warehouse_manager list/read is scoped to their assigned department
  *   DM-1  a department_manager is VIEW-ONLY: cannot edit the student roster or
  *         project metadata (projects:update revoked by migration 028 -> 403)
  *   DM-2  a department_manager cannot change the project warehouse (403)
  *   DM-3  a department_manager cannot create/close/cancel projects
  *   DM-4  a department_manager list/read is scoped to their own department;
  *         without a department the list is empty (fail-closed)
- *   G-1   system_admin is unchanged (GLOBAL scope)
+ *   G-1   admin is unchanged (GLOBAL scope)
  */
 const prefix = `${TEST_PREFIX}projperm_`;
 let app: any;
@@ -88,13 +88,13 @@ describe('Project & warehouse manager permissions', () => {
     whA2 = await seedWarehouse({ department_id: deptA });
     whBMain = await seedWarehouse({ department_id: deptB, is_main: true });
 
-    admin = await seedRoleUser('system_admin');
-    wmA = await seedRoleUser('warehouse_manager', { department_id: deptA, warehouse_ids: [whA2, whAMain] });
-    wmB = await seedRoleUser('warehouse_manager', { department_id: deptB, warehouse_ids: [whBMain] });
-    wmNoDept = await seedRoleUser('warehouse_manager', { warehouse_ids: [whAMain] });
+    admin = await seedRoleUser('admin');
+    wmA = await seedRoleUser('sub_warehouse_manager', { department_id: deptA, warehouse_ids: [whA2, whAMain] });
+    wmB = await seedRoleUser('sub_warehouse_manager', { department_id: deptB, warehouse_ids: [whBMain] });
+    wmNoDept = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whAMain] });
     dmA = await seedRoleUser('department_manager', { department_id: deptA });
     dmNoDept = await seedRoleUser('department_manager');
-    supervisorA = await seedRoleUser('system_admin', { department_id: deptA });
+    supervisorA = await seedRoleUser('admin', { department_id: deptA });
 
     admin.token = await login(admin);
     wmA.token = await login(wmA);
@@ -292,7 +292,7 @@ describe('Project & warehouse manager permissions', () => {
     });
   });
 
-  describe('G-1: system_admin is unchanged (GLOBAL scope)', () => {
+  describe('G-1: admin is unchanged (GLOBAL scope)', () => {
     test('admin can create a project in any department', async () => {
       const res = await request(app)
         .post('/api/projects')

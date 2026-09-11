@@ -72,15 +72,15 @@ describe('Material Requests — Enterprise Multi-Warehouse Targeting', () => {
     unitCode = await seedUnit();
     itemId = await seedItem(catCode, unitCode, mainWhA);
 
-    wmMulti = await seedRoleUser('warehouse_manager', {
+    wmMulti = await seedRoleUser('sub_warehouse_manager', {
       department_id: deptA,
       warehouse_ids: [subWhA1, subWhA2],
     });
-    wmSingle = await seedRoleUser('warehouse_manager', {
+    wmSingle = await seedRoleUser('sub_warehouse_manager', {
       department_id: deptA,
       warehouse_ids: [subWhA1],
     });
-    admin = await seedRoleUser('system_admin', {});
+    admin = await seedRoleUser('admin', {});
 
     wmMulti.token = await login(wmMulti);
     wmSingle.token = await login(wmSingle);

@@ -18,7 +18,7 @@ async function seedUser(): Promise<number> {
   const username = `${TEST_PREFIX}user_${shortId()}`;
   const res = await pool.query(
     `INSERT INTO users (username, password_hash, full_name, role, is_active)
-     VALUES ($1, 'hash', $2, 'system_admin', true) RETURNING id`,
+     VALUES ($1, 'hash', $2, 'admin', true) RETURNING id`,
     [username, username]
   );
   createdIds.users.push(res.rows[0].id);

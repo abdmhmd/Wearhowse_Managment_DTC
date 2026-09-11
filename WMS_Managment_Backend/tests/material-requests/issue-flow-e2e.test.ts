@@ -109,9 +109,9 @@ describe('Issue flow — end-to-end with correct warehouse architecture', () => 
       [consumableItemId, mainWh]
     );
 
-    admin = await seedRoleUser('system_admin');
+    admin = await seedRoleUser('admin');
     supA = await seedRoleUser('supervisor', { department_id: deptA });
-    wmA = await seedRoleUser('warehouse_manager', { warehouse_ids: [destWh] });
+    wmA = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [destWh] });
 
     admin.token = await login(admin);
     supA.token = await login(supA);
@@ -280,7 +280,7 @@ describe('Issue flow — end-to-end with correct warehouse architecture', () => 
       mainWh2 = await seedWarehouse({ department_id: mainWhDept, is_main: true });
       const destWh2 = await seedWarehouse({ department_id: mainWhDept });
       supB = await seedRoleUser('supervisor', { department_id: mainWhDept });
-      wmB = await seedRoleUser('warehouse_manager', { warehouse_ids: [destWh2] });
+      wmB = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [destWh2] });
       supB.token = await login(supB);
       wmB.token = await login(wmB);
     });

@@ -15,7 +15,7 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *   HIGH-4  material request creation for a zero-assignment warehouse manager:
  *           requires an explicit, eligible warehouse_id (fallback); without it
  *           the request is rejected.
- *   WM      warehouse_manager must always keep >= 1 warehouse assignment.
+ *   WM      sub_warehouse_manager must always keep >= 1 warehouse assignment.
  */
 const prefix = `${TEST_PREFIX}scope_reg_`;
 let app: any;
@@ -87,9 +87,9 @@ describe('Scope regressions (audit remediation)', () => {
     itemA = await seedItem(catCode, unitCode, whA, 100);
     itemB = await seedItem(catCode, unitCode, whB, 100);
 
-    admin = await seedRoleUser('system_admin');
-    wmAssigned = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
-    wmZero = await seedRoleUser('warehouse_manager');
+    admin = await seedRoleUser('admin');
+    wmAssigned = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
+    wmZero = await seedRoleUser('sub_warehouse_manager');
     dm = await seedRoleUser('department_manager', { department_id: deptA });
 
     admin.token = await login(admin);
@@ -153,7 +153,7 @@ describe('Scope regressions (audit remediation)', () => {
       expect(res.body.data.pagination.total).toBe(0);
     });
 
-    test('system_admin still sees all warehouses (global scope untouched)', async () => {
+    test('admin still sees all warehouses (global scope untouched)', async () => {
       const res = await request(app)
         .get('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`);
@@ -301,7 +301,7 @@ describe('Scope regressions (audit remediation)', () => {
       expect(res.body.data.last_receiving_voucher.id).toBe(rvWhAId);
     });
 
-    test('system_admin summary counts all warehouses (global)', async () => {
+    test('admin summary counts all warehouses (global)', async () => {
       const res = await request(app)
         .get(`/api/reports/item-card/${itemA}`)
         .set('Authorization', `Bearer ${admin.token}`);
@@ -353,13 +353,13 @@ describe('Scope regressions (audit remediation)', () => {
   });
 
   describe('Warehouse manager assignment enforcement', () => {
-    test('usersService.create rejects a warehouse_manager with no warehouses', async () => {
+    test('usersService.create rejects a sub_warehouse_manager with no warehouses', async () => {
       await expect(
         usersService.create({
           username: `${prefix}wm_none_${shortId()}`,
           password_hash: 'dummy_hash',
           full_name: 'No WH',
-          role: 'warehouse_manager',
+          role: 'sub_warehouse_manager',
         })
       ).rejects.toBeInstanceOf(ValidationError);
     });
@@ -369,7 +369,7 @@ describe('Scope regressions (audit remediation)', () => {
         username: `${prefix}wm_strip_${shortId()}`,
         password_hash: 'dummy_hash',
         full_name: 'Strip WH',
-        role: 'warehouse_manager',
+        role: 'sub_warehouse_manager',
         warehouse_ids: [whA],
       });
       await expect(
@@ -388,7 +388,7 @@ describe('Scope regressions (audit remediation)', () => {
         username: `${prefix}wm_reassign_${shortId()}`,
         password_hash: 'dummy_hash',
         full_name: 'Reassign',
-        role: 'warehouse_manager',
+        role: 'sub_warehouse_manager',
         warehouse_ids: [whA],
       });
       const updated = await usersService.update(created.id, { warehouse_ids: [whB] });
@@ -403,7 +403,7 @@ describe('Scope regressions (audit remediation)', () => {
           username: `${prefix}http_wm_${shortId()}`,
           password: 'testPass123',
           full_name: 'HTTP WM',
-          role: 'warehouse_manager',
+          role: 'sub_warehouse_manager',
         });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');

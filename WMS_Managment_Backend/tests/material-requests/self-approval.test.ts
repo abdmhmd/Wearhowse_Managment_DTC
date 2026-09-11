@@ -16,8 +16,8 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *   A. dm owns a request -> dm tries to approve own -> 403 SELF_APPROVAL_NOT_ALLOWED
  *   B. dm approves another user's request in the same department -> succeeds
  *   C. dm cannot approve a request from another department -> 404
- *   D. system_admin behavior remains unchanged
- *   E. warehouse_manager behavior remains unchanged (403 AUTH_FORBIDDEN)
+ *   D. admin behavior remains unchanged
+ *   E. sub_warehouse_manager behavior remains unchanged (403 AUTH_FORBIDDEN)
  *   F. direct service/API call bypassing routes is still rejected (403)
  *   G. department_manager can no longer CREATE requests (route 403 AUTH_FORBIDDEN)
  *   H. direct service call to createRequest is rejected for department_manager
@@ -145,10 +145,10 @@ describe('Self-approval prevention for department managers', () => {
     whB = await seedWarehouse({ department_id: deptB });
     itemId = await seedItem(catCode, unitCode, whA, 100);
 
-    admin = await seedRoleUser('system_admin');
+    admin = await seedRoleUser('admin');
     dmA = await seedRoleUser('department_manager', { department_id: deptA });
     dmB = await seedRoleUser('department_manager', { department_id: deptB });
-    wmA = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
+    wmA = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
 
     admin.token = await login(admin);
     dmA.token = await login(dmA);
@@ -224,7 +224,7 @@ describe('Self-approval prevention for department managers', () => {
       expect(res.body.error.code).toBe('REQUEST_NOT_FOUND');
     });
 
-    test('D: system_admin approval behavior remains unchanged', async () => {
+    test('D: admin approval behavior remains unchanged', async () => {
       // Admin can approve a pending request (dept approval step)...
       const r1 = await createRequest(admin.token, deptA, whA, [{ item_id: itemId, quantity: 1, unit_code: unitCode }]);
       expect(r1.status).toBe(201);
@@ -244,7 +244,7 @@ describe('Self-approval prevention for department managers', () => {
       expect(a2.body.data.status).toBe('dept_approved');
     });
 
-    test('E: warehouse_manager can now approve pending requests (wm_approved flow)', async () => {
+    test('E: sub_warehouse_manager can now approve pending requests (wm_approved flow)', async () => {
       const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemId, quantity: 1, unit_code: unitCode }]);
       expect(r.status).toBe(201);
 

@@ -104,10 +104,10 @@ describe('Custody creation during issue + security', () => {
       [consumableItemId, mainWhA]
     );
 
-    admin = await seedRoleUser('system_admin');
+    admin = await seedRoleUser('admin');
     supA = await seedRoleUser('supervisor', { department_id: deptA });
     supB = await seedRoleUser('supervisor', { department_id: deptA });
-    wmA = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
+    wmA = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
 
     admin.token = await login(admin);
     supA.token = await login(supA);

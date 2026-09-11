@@ -1,6 +1,7 @@
 import { pool } from '../../src/config/database';
 import { hashPassword } from '../../src/utils/crypto';
 import { AuthController } from '../../src/modules/auth/auth.controller';
+import { usersRepository } from '../../src/modules/users/users.repository';
 import { authenticate } from '../../src/middlewares/auth.middleware';
 import { generateToken } from '../../src/utils/jwt';
 import { Request, Response, NextFunction } from 'express';
@@ -17,7 +18,7 @@ beforeAll(async () => {
   username = `${prefix}${shortId()}`;
   const res = await pool.query(
     `INSERT INTO users (username, password_hash, full_name, role, is_active)
-     VALUES ($1, $2, $3, 'system_admin', true) RETURNING id`,
+     VALUES ($1, $2, $3, 'admin', true) RETURNING id`,
     [username, password_hash, username]
   );
   userId = res.rows[0].id;
@@ -85,7 +86,7 @@ describe('Auth Login', () => {
     const inactiveUser = `${prefix}${shortId()}`;
     await pool.query(
       `INSERT INTO users (username, password_hash, full_name, role, is_active)
-       VALUES ($1, $2, $3, 'warehouse_manager', false)`,
+       VALUES ($1, $2, $3, 'sub_warehouse_manager', false)`,
       [inactiveUser, password_hash, inactiveUser]
     );
 
@@ -99,24 +100,35 @@ describe('Auth Login', () => {
     expect(err.status).toBe(401);
   });
 
-  test('should reject login for a deactivated role (storekeeper)', async () => {
-    const password_hash = await hashPassword('legacyPass');
+  test('should reject login when the account holds a deactivated legacy role (storekeeper)', async () => {
     const legacyUser = `${prefix}${shortId()}`;
-    await pool.query(
-      `INSERT INTO users (username, password_hash, full_name, role, is_active)
-       VALUES ($1, $2, $3, 'storekeeper', true)`,
-      [legacyUser, password_hash, legacyUser]
-    );
+    const spy = jest
+      .spyOn(usersRepository, 'findByUsername')
+      .mockResolvedValue({
+        id: 999999,
+        username: legacyUser,
+        password_hash: 'legacyHash',
+        full_name: legacyUser,
+        role: 'storekeeper',
+        department_id: null,
+        is_active: true,
+        token_version: 1,
+        created_at: new Date(),
+        updated_at: new Date(),
+      } as any);
 
     const controller = new AuthController();
-    const { req, res } = mockReqRes({ username: legacyUser, password: 'legacyPass' });
+    const { req, res } = mockReqRes({ username: legacyUser, password: 'irrelevant' });
     const next = jest.fn();
     await controller.login(req as Request, res as Response, next);
 
+    expect(spy).toHaveBeenCalledWith(legacyUser);
     expect(next).toHaveBeenCalled();
     const err = next.mock.calls[0][0];
     expect(err.status).toBe(401);
     expect(err.code).toBe('AUTH_ROLE_DISABLED');
+
+    spy.mockRestore();
   });
 });
 
@@ -155,7 +167,7 @@ describe('Auth Middleware', () => {
   });
 
   test('should accept request with valid token', async () => {
-    const token = generateToken({ userId, username, role: 'system_admin' });
+    const token = generateToken({ userId, username, role: 'admin' });
     const { req, res } = mockReqResWithHeaders(`Bearer ${token}`);
     const next = jest.fn();
     await authenticate(req as any, res as Response, next);

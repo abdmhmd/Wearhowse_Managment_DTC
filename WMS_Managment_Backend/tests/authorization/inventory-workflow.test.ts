@@ -7,12 +7,12 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  * Authorization + inventory workflow tests for migrations 018 + 019.
  *
  * Rules under test:
- *   * ONLY system_admin may directly create/modify stock.
+ *   * ONLY admin may directly create/modify stock.
  *   * Material request state machine:
  *     pending -> dept_approved -> forwarded -> admin_approved -> issued
  *     pending / forwarded -> admin_rejected ; cancellable states per owner/admin.
  *   * department_manager approves + forwards their own department's requests;
- *     system_admin approves forwarded requests and issues stock.
+ *     admin approves forwarded requests and issues stock.
  *   * Issue is atomic with a row lock preventing a double issue.
  */
 const prefix = `${TEST_PREFIX}inventory_workflow_`;
@@ -117,9 +117,9 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
     itemInsufficient = await seedItem(catCode, unitCode, whMainA, 100);
     itemDouble = await seedItem(catCode, unitCode, whMainA, 100);
 
-    admin = await seedRoleUser('system_admin');
-    whManager = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
-    wm2 = await seedRoleUser('warehouse_manager', { warehouse_ids: [whB] });    deptManager = await seedRoleUser('department_manager', { department_id: deptA });
+    admin = await seedRoleUser('admin');
+    whManager = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
+    wm2 = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whB] });    deptManager = await seedRoleUser('department_manager', { department_id: deptA });
     dm2 = await seedRoleUser('department_manager', { department_id: deptB });
 
     admin.token = await login(admin);
@@ -167,8 +167,8 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
     await cleanup(prefix);
   });
 
-  describe('Permission matrix: direct stock modification is system_admin only', () => {
-    test('warehouse_manager cannot create a transaction (403)', async () => {
+  describe('Permission matrix: direct stock modification is admin only', () => {
+    test('sub_warehouse_manager cannot create a transaction (403)', async () => {
       const res = await request(app)
         .post('/api/transactions')
         .set('Authorization', `Bearer ${whManager.token}`)
@@ -191,7 +191,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(res.status).toBe(403);
     });
 
-    test('warehouse_manager cannot approve a transaction (403)', async () => {
+    test('sub_warehouse_manager cannot approve a transaction (403)', async () => {
       const txn = await request(app)
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
@@ -206,7 +206,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(res.status).toBe(403);
     });
 
-    test('system_admin can still create + approve a transaction directly', async () => {
+    test('admin can still create + approve a transaction directly', async () => {
       const before = await pool.query('SELECT current_balance FROM items WHERE id = $1', [itemWorkflow]);
       const balBefore = before.rows[0].current_balance;
       const txn = await request(app)
@@ -225,7 +225,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(Number(after.rows[0].current_balance)).toBe(Number(balBefore) + 2);
     });
 
-    test('warehouse_manager can now approve a request (wm_approved)', async () => {
+    test('sub_warehouse_manager can now approve a request (wm_approved)', async () => {
       const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       expect(r.status).toBe(201);
       const res = await request(app)
@@ -308,7 +308,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(close.status).toBe(403);
     });
 
-    test('system_admin can open an inventory session (smoke test)', async () => {
+    test('admin can open an inventory session (smoke test)', async () => {
       const res = await request(app)
         .post('/api/inventory/sessions')
         .set('Authorization', `Bearer ${admin.token}`)
@@ -317,7 +317,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(res.body.data.session_no).toBeDefined();
     });
 
-    test('warehouse_manager cannot create item master data (403)', async () => {
+    test('sub_warehouse_manager cannot create item master data (403)', async () => {
       const res = await request(app)
         .post('/api/items')
         .set('Authorization', `Bearer ${whManager.token}`)
@@ -333,7 +333,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
     });
 
-    test('warehouse_manager cannot modify an item balance via update (403)', async () => {
+    test('sub_warehouse_manager cannot modify an item balance via update (403)', async () => {
       const created = await request(app)
         .post('/api/items')
         .set('Authorization', `Bearer ${admin.token}`)
@@ -582,7 +582,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(res.status).toBe(403);
     });
 
-    test('warehouse_manager can cancel their own pending request', async () => {
+    test('sub_warehouse_manager can cancel their own pending request', async () => {
       const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
       const res = await request(app)
@@ -595,7 +595,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
   });
 
   describe('Request scoping', () => {
-    test('warehouse_manager targeting an unassigned warehouse is rejected (400)', async () => {
+    test('sub_warehouse_manager targeting an unassigned warehouse is rejected (400)', async () => {
       // A WM has one warehouse assignment. A spoofed/conflicting warehouse_id in
       // the payload must NOT escalate: the request is rejected outright.
       const res = await createRequest(whManager.token, deptA, whB, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
@@ -609,7 +609,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
     });
 
-    test('warehouse_manager can view their own request', async () => {
+    test('sub_warehouse_manager can view their own request', async () => {
       const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       expect(r.status).toBe(201);
       const id = r.body.data.id;
@@ -621,7 +621,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(res.body.data.id).toBe(id);
     });
 
-    test('another warehouse_manager cannot view that request (404)', async () => {
+    test('another sub_warehouse_manager cannot view that request (404)', async () => {
       const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
       const res = await request(app)
@@ -630,7 +630,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(res.status).toBe(404);
     });
 
-    test('warehouse_manager only lists requests for assigned warehouses', async () => {
+    test('sub_warehouse_manager only lists requests for assigned warehouses', async () => {
       const rA = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       expect(rA.status).toBe(201);
       const rB = await createRequest(admin.token, deptB, whB, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);

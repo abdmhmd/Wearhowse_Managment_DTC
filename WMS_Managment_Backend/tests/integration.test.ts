@@ -19,7 +19,7 @@ beforeAll(async () => {
   const password_hash = await hashPassword('testPass123');
   const userRes = await pool.query(
     `INSERT INTO users (username, password_hash, full_name, role, is_active)
-     VALUES ($1, $2, $3, 'system_admin', true) RETURNING id`,
+     VALUES ($1, $2, $3, 'admin', true) RETURNING id`,
     [username, password_hash, username]
   );
   userId = userRes.rows[0].id;
@@ -302,7 +302,7 @@ describe('API Integration Tests', () => {
       const wmHash = await hashPassword('wmPass123');
       await pool.query(
         `INSERT INTO users (username, password_hash, full_name, role, is_active)
-         VALUES ($1, $2, $3, 'warehouse_manager', true)`,
+         VALUES ($1, $2, $3, 'sub_warehouse_manager', true)`,
         [wmUsername, wmHash, wmUsername]
       );
       const loginRes = await request(app)
@@ -311,7 +311,7 @@ describe('API Integration Tests', () => {
       whManagerToken = loginRes.body.data?.token;
     });
 
-    test('warehouse_manager cannot create categories (403)', async () => {
+    test('sub_warehouse_manager cannot create categories (403)', async () => {
       const res = await request(app)
         .post('/api/categories')
         .set('Authorization', `Bearer ${whManagerToken}`)
@@ -320,14 +320,14 @@ describe('API Integration Tests', () => {
       expect(res.body.success).toBe(false);
     });
 
-    test('warehouse_manager cannot approve transactions (403)', async () => {
+    test('sub_warehouse_manager cannot approve transactions (403)', async () => {
       const res = await request(app)
         .post('/api/transactions/1/approve')
         .set('Authorization', `Bearer ${whManagerToken}`);
       expect(res.status).toBe(403);
     });
 
-    test('warehouse_manager can view reports', async () => {
+    test('sub_warehouse_manager can view reports', async () => {
       const res = await request(app)
         .get('/api/reports/inventory')
         .set('Authorization', `Bearer ${whManagerToken}`);

@@ -7,7 +7,7 @@ import { shortId, TEST_PREFIX, seedDepartment, seedWarehouse, cleanup } from '..
  * Admin User-Management regression tests:
  *
  *  ISSUE 1 — department_id must be persisted for department_manager,
- *            warehouse_manager and supervisor on create and edit, and an
+ *            sub_warehouse_manager and supervisor on create and edit, and an
  *            unknown/inactive department is rejected cleanly (400).
  *  ISSUE 2 — delete must be PHYSICAL. The schema is designed for it:
  *            refresh_tokens / user_warehouses cascade, audit_logs null the
@@ -58,8 +58,8 @@ describe('Admin user management (department + physical delete)', () => {
     deptA = await seedDepartment();
     deptB = await seedDepartment();
     whA = await seedWarehouse({ department_id: deptA });
-    admin = await seedAuthUser('system_admin');
-    wmActor = await seedAuthUser('warehouse_manager');
+    admin = await seedAuthUser('admin');
+    wmActor = await seedAuthUser('sub_warehouse_manager');
     await pool.query(
       'INSERT INTO user_warehouses (user_id, warehouse_id) VALUES ($1, $2)',
       [wmActor.id, whA]
@@ -103,9 +103,9 @@ describe('Admin user management (department + physical delete)', () => {
     expect(row.rows[0].department_id).toBe(deptA);
   });
 
-  test('create warehouse_manager persists an optional department_id', async () => {
+  test('create sub_warehouse_manager persists an optional department_id', async () => {
     const res = await createUser({
-      role: 'warehouse_manager',
+      role: 'sub_warehouse_manager',
       department_id: deptA,
       warehouse_ids: [whA],
     });
@@ -146,7 +146,7 @@ describe('Admin user management (department + physical delete)', () => {
 
   test('update can clear an optional department_id (WM)', async () => {
     const created = await createUser({
-      role: 'warehouse_manager',
+      role: 'sub_warehouse_manager',
       department_id: deptA,
       warehouse_ids: [whA],
     });
@@ -174,7 +174,7 @@ describe('Admin user management (department + physical delete)', () => {
 
   test('users list includes department fields', async () => {
     const wm = await createUser({
-      role: 'warehouse_manager',
+      role: 'sub_warehouse_manager',
       department_id: deptA,
       warehouse_ids: [whA],
     });
@@ -198,7 +198,7 @@ describe('Admin user management (department + physical delete)', () => {
 
   test('delete physically removes the user row and cascades user_warehouses', async () => {
     const created = await createUser({
-      role: 'warehouse_manager',
+      role: 'sub_warehouse_manager',
       department_id: deptA,
       warehouse_ids: [whA],
     });
@@ -249,7 +249,7 @@ describe('Admin user management (department + physical delete)', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  test('warehouse_manager is denied user creation (403)', async () => {
+  test('sub_warehouse_manager is denied user creation (403)', async () => {
     const res = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${wmActor.token}`)

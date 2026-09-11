@@ -22,8 +22,8 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *   S8  delete: own 200 (deactivated), another supervisor's project 404
  *   S9  supervisor uses OWN project in a material request  -> 201
  *   S10 supervisor material request with another's project -> 400 (rejected)
- *   R1  regression: system_admin creates project for any supervisor -> 201
- *   R2  regression: warehouse_manager creates project in own dept -> 201
+ *   R1  regression: admin creates project for any supervisor -> 201
+ *   R2  regression: sub_warehouse_manager creates project in own dept -> 201
  *   R3  regression: department_manager still cannot create projects (403)
  */
 const prefix = `${TEST_PREFIX}supProj_`;
@@ -104,10 +104,10 @@ describe('Supervisor graduation-project management', () => {
     whB = await seedWarehouse({ department_id: deptB });
     itemId = await seedItem(catCode, unitCode, whA, 100);
 
-    admin = await seedRoleUser('system_admin');
+    admin = await seedRoleUser('admin');
     supA = await seedRoleUser('supervisor', { department_id: deptA });
     supB = await seedRoleUser('supervisor', { department_id: deptA });
-    wmA = await seedRoleUser('warehouse_manager', { department_id: deptA, warehouse_ids: [whA] });
+    wmA = await seedRoleUser('sub_warehouse_manager', { department_id: deptA, warehouse_ids: [whA] });
     dmA = await seedRoleUser('department_manager', { department_id: deptA });
 
     admin.token = await login(admin);
@@ -301,7 +301,7 @@ describe('Supervisor graduation-project management', () => {
     expect(res.body.error.message).toMatch(/project you supervise/i);
   });
 
-  test('R1: regression — system_admin creates a project for any supervisor -> 201', async () => {
+  test('R1: regression — admin creates a project for any supervisor -> 201', async () => {
     const res = await createProject(admin.token, {
       name: `${prefix}admin_${shortId()}`,
       department_id: deptB,
@@ -313,7 +313,7 @@ describe('Supervisor graduation-project management', () => {
     expect(res.body.data.supervisor_id).toBe(supB.id);
   });
 
-  test('R2: regression — warehouse_manager creates a project in own department -> 201', async () => {
+  test('R2: regression — sub_warehouse_manager creates a project in own department -> 201', async () => {
     const res = await createProject(wmA.token, {
       name: `${prefix}wm_${shortId()}`,
       department_id: deptA,

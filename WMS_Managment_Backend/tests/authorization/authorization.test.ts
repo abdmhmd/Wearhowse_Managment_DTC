@@ -74,9 +74,9 @@ describe('Authorization (RBAC + Data Scope)', () => {
     whB = await seedWarehouse({ department_id: deptB });
     itemId = await seedItem(catCode, unitCode, whA, 100);
 
-    admin = await seedRoleUser('system_admin');
-    whManager = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
-    wm2 = await seedRoleUser('warehouse_manager', { warehouse_ids: [whB] });
+    admin = await seedRoleUser('admin');
+    whManager = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
+    wm2 = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whB] });
     deptManager = await seedRoleUser('department_manager', { department_id: deptA });
     dm2 = await seedRoleUser('department_manager', { department_id: deptB });
 
@@ -118,7 +118,7 @@ describe('Authorization (RBAC + Data Scope)', () => {
       expect(res.body.data.user.permissions).toContain('users:create');
     });
 
-    test('warehouse_manager has assigned warehouse ids', async () => {
+    test('sub_warehouse_manager has assigned warehouse ids', async () => {
       const res = await request(app)
         .get('/api/auth/me')
         .set('Authorization', `Bearer ${whManager.token}`);
@@ -140,7 +140,7 @@ describe('Authorization (RBAC + Data Scope)', () => {
   });
 
   describe('Permission matrix (route-level guards)', () => {
-    test('system_admin can create categories', async () => {
+    test('admin can create categories', async () => {
       const res = await request(app)
         .post('/api/categories')
         .set('Authorization', `Bearer ${admin.token}`)
@@ -148,7 +148,7 @@ describe('Authorization (RBAC + Data Scope)', () => {
       expect(res.status).toBe(201);
     });
 
-    test('warehouse_manager cannot create categories (403)', async () => {
+    test('sub_warehouse_manager cannot create categories (403)', async () => {
       const res = await request(app)
         .post('/api/categories')
         .set('Authorization', `Bearer ${whManager.token}`)
@@ -163,7 +163,7 @@ describe('Authorization (RBAC + Data Scope)', () => {
       expect(res.status).toBe(403);
     });
 
-    test('system_admin can delete categories', async () => {
+    test('admin can delete categories', async () => {
       const res = await request(app)
         .delete(`/api/categories/${catCode}`)
         .set('Authorization', `Bearer ${admin.token}`);
@@ -265,7 +265,7 @@ describe('Authorization (RBAC + Data Scope)', () => {
   });
 
   describe('Warehouse isolation (transactions)', () => {
-    test('warehouse_manager only sees transactions in assigned warehouses', async () => {
+    test('sub_warehouse_manager only sees transactions in assigned warehouses', async () => {
       // transaction in whB (not assigned to whManager)
       await request(app)
         .post('/api/transactions')
@@ -288,7 +288,7 @@ describe('Authorization (RBAC + Data Scope)', () => {
 
   describe('token_version revocation', () => {
     test('stale access token is rejected after token_version bump', async () => {
-      const stale = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
+      const stale = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
       const staleToken = await login(stale);
 
       const ok = await request(app)

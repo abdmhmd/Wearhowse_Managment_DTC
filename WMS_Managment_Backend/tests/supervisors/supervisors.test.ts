@@ -25,8 +25,8 @@ import { shortId, TEST_PREFIX, seedDepartment, cleanup } from '../helpers';
  *   SUP-M10 a department_manager is not a supervisor record (own id -> 404)
  *   SUP-M11 delete works for own-department supervisors; a department_manager's
  *           own id is not a supervisor record (404)
- *   SUP-M12 system_admin sees all departments and can scope creates
- *   SUP-M13 warehouse_manager has no access to /api/supervisors (403)
+ *   SUP-M12 admin sees all departments and can scope creates
+ *   SUP-M13 sub_warehouse_manager has no access to /api/supervisors (403)
  *   SUP-M14 unauthenticated access is rejected (401)
  *   SUP-M15 department_manager users remain department_manager (never converted)
  */
@@ -85,10 +85,10 @@ describe('Supervisors management', () => {
     deptA = await seedDepartment();
     deptB = await seedDepartment();
 
-    admin = await seedRoleUser('system_admin');
+    admin = await seedRoleUser('admin');
     dmA = await seedRoleUser('department_manager', { department_id: deptA });
     dmNoDept = await seedRoleUser('department_manager');
-    wmA = await seedRoleUser('warehouse_manager', { department_id: deptA });
+    wmA = await seedRoleUser('sub_warehouse_manager', { department_id: deptA });
 
     supA1 = await seedRoleUser('supervisor', { department_id: deptA });
     supA2 = await seedRoleUser('supervisor', { department_id: deptA });
@@ -230,7 +230,7 @@ describe('Supervisors management', () => {
       const res = await request(app)
         .patch(`/api/supervisors/${supA2.id}`)
         .set('Authorization', `Bearer ${dmA.token}`)
-        .send({ role: 'system_admin', department_id: deptB, full_name: 'Stripped' });
+        .send({ role: 'admin', department_id: deptB, full_name: 'Stripped' });
       expect(res.status).toBe(200);
       expect(res.body.data.role).toBe('supervisor');
       expect(res.body.data.department_id).toBe(target.department_id);
@@ -271,7 +271,7 @@ describe('Supervisors management', () => {
     });
   });
 
-  describe('SUP-M12: system_admin has global scope', () => {
+  describe('SUP-M12: admin has global scope', () => {
     test('sees supervisors of every department', async () => {
       const res = await request(app)
         .get('/api/supervisors')
@@ -294,7 +294,7 @@ describe('Supervisors management', () => {
     });
   });
 
-  describe('SUP-M13: warehouse_manager has no access', () => {
+  describe('SUP-M13: sub_warehouse_manager has no access', () => {
     test('GET /api/supervisors returns 403', async () => {
       const res = await request(app)
         .get('/api/supervisors')

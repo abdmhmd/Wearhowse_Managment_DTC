@@ -100,10 +100,10 @@ export async function seedPoWorld() {
   const itemId = await seedItem(catCode, unitCode, mainWhA, 0);
   const itemId2 = await seedItem(catCode, unitCode, mainWhA, 0);
 
-  const admin = await seedRoleUser('system_admin');
+  const admin = await seedRoleUser('admin');
   // WM owns the main warehouse + ONE sub-warehouse (subWhA2 intentionally NOT assigned).
-  const wmMain = await seedRoleUser('warehouse_manager', { warehouse_ids: [mainWhA, subWhA1] });
-  const wmB = await seedRoleUser('warehouse_manager', { warehouse_ids: [mainWhB] });
+  const wmMain = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [mainWhA, subWhA1] });
+  const wmB = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [mainWhB] });
   const supervisor = await seedRoleUser('supervisor', { department_id: deptA });
   const deptMgr = await seedRoleUser('department_manager', { department_id: deptA });
 

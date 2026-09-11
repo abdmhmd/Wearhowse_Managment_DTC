@@ -7,15 +7,15 @@ import { shortId, TEST_PREFIX, seedWarehouse, seedDepartment, cleanup } from '..
  * GET /api/users/supervisors department-scoping regression tests.
  *
  * Root cause fixed: the route was guarded by `users:view` (revoked from
- * warehouse_manager in migration 019), so the Projects page supervisor
+ * sub_warehouse_manager in migration 019), so the Projects page supervisor
  * dropdown got 403 for warehouse managers. The route now uses a dedicated
  * `projects:supervisors` permission and the SERVICE scopes the result to the
  * caller's department:
  *
- *   SUP-1  a warehouse_manager sees only supervisors of their own department
- *   SUP-2  a warehouse_manager never sees another department's supervisors
- *   SUP-3  a warehouse_manager with no department gets an empty list (fail-closed)
- *   SUP-4  system_admin still sees ALL supervisors (GLOBAL scope unchanged)
+ *   SUP-1  a sub_warehouse_manager sees only supervisors of their own department
+ *   SUP-2  a sub_warehouse_manager never sees another department's supervisors
+ *   SUP-3  a sub_warehouse_manager with no department gets an empty list (fail-closed)
+ *   SUP-4  admin still sees ALL supervisors (GLOBAL scope unchanged)
  *   SUP-5  department_manager keeps its existing access (403) — unchanged
  *
  * Note: with the dedicated `supervisor` role (migration 027) the candidate
@@ -84,9 +84,9 @@ describe('Project supervisor lookup scoping', () => {
     deptB = await seedDepartment();
     whAMain = await seedWarehouse({ department_id: deptA, is_main: true });
 
-    admin = await seedRoleUser('system_admin');
-    wmA = await seedRoleUser('warehouse_manager', { department_id: deptA, warehouse_ids: [whAMain] });
-    wmNoDept = await seedRoleUser('warehouse_manager', { warehouse_ids: [whAMain] });
+    admin = await seedRoleUser('admin');
+    wmA = await seedRoleUser('sub_warehouse_manager', { department_id: deptA, warehouse_ids: [whAMain] });
+    wmNoDept = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whAMain] });
     dmA = await seedRoleUser('department_manager', { department_id: deptA });
 
     supA = await seedRoleUser('supervisor', { department_id: deptA });
@@ -150,7 +150,7 @@ describe('Project supervisor lookup scoping', () => {
     });
   });
 
-  describe('SUP-4: system_admin global scope is unchanged', () => {
+  describe('SUP-4: admin global scope is unchanged', () => {
     test('returns all supervisors across departments', async () => {
       const res = await request(app)
         .get('/api/users/supervisors')

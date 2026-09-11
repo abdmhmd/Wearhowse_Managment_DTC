@@ -20,8 +20,8 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *   5. supervisor, another supervisor's project (same dept) -> 400 (rejected)
  *   6. supervisor, project of another department         -> 409 PROJECT_DEPARTMENT_MISMATCH
  *   7. department_manager POST /api/requests             -> 403 (approver rule unchanged, 022)
- *   8. warehouse_manager create                          -> 400 (unassigned target rejected)
- *   9. system_admin create                               -> 201 (any warehouse, unchanged)
+ *   8. sub_warehouse_manager create                          -> 400 (unassigned target rejected)
+ *   9. admin create                               -> 201 (any warehouse, unchanged)
  *  10. supervisor list scopes to OWN requests only (requests:view_own)
  *  11. supervisor detail: own request 200, other user's request 404
  *  12. supervisor catalog: dept + own warehouses + dept items + units (no 403)
@@ -124,11 +124,11 @@ describe('Create request: supervisor department + project enforcement', () => {
     itemId = await seedItem(catCode, unitCode, whA, 100);
     itemBId = await seedItem(catCode, unitCode, whB, 50);
 
-    admin = await seedRoleUser('system_admin');
+    admin = await seedRoleUser('admin');
     supA = await seedRoleUser('supervisor', { department_id: deptA });
     supB = await seedRoleUser('supervisor', { department_id: deptB });
     dmA = await seedRoleUser('department_manager', { department_id: deptA });
-    wmA = await seedRoleUser('warehouse_manager', { warehouse_ids: [whA] });
+    wmA = await seedRoleUser('sub_warehouse_manager', { warehouse_ids: [whA] });
 
     admin.token = await login(admin);
     supA.token = await login(supA);
@@ -223,13 +223,13 @@ describe('Create request: supervisor department + project enforcement', () => {
     expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
   });
 
-  test('8: warehouse_manager targeting an unassigned warehouse is rejected (400)', async () => {
+  test('8: sub_warehouse_manager targeting an unassigned warehouse is rejected (400)', async () => {
     const res = await createRequest(wmA.token, whB, items());
     expect(res.status).toBe(400);
     expect(res.body.error.message).toContain('not in your assigned eligible warehouses');
   });
 
-  test('9: system_admin behavior unchanged (any warehouse)', async () => {
+  test('9: admin behavior unchanged (any warehouse)', async () => {
     const res = await createRequest(admin.token, whB, items());
     expect(res.status).toBe(201);
     expect(res.body.data.warehouse_id).toBe(whB);

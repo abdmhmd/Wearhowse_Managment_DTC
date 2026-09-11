@@ -13,7 +13,7 @@ describe('custodies:view_own (phase 0 safety net, migration 037)', () => {
     expect(res.rowCount).toBe(1);
   });
 
-  it('is granted to every role that can hold a custody (supervisor, warehouse_manager, system_admin)', async () => {
+  it('is granted to every role that can hold a custody (supervisor, sub_warehouse_manager, admin)', async () => {
     const res = await pool.query(
       `SELECT r.code
          FROM role_permissions rp
@@ -24,7 +24,7 @@ describe('custodies:view_own (phase 0 safety net, migration 037)', () => {
     );
     const codes = res.rows.map((row: { code: string }) => row.code);
     expect(codes).toEqual(
-      expect.arrayContaining(['supervisor', 'warehouse_manager', 'system_admin'])
+      expect.arrayContaining(['supervisor', 'sub_warehouse_manager', 'admin'])
     );
   });
 

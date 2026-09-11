@@ -4,7 +4,7 @@ import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, poTeardown, type PoWor
 
 /**
  * Permission matrix: every purchase-orders permission is enforced server-side
- * via the authorize() middleware. system_admin + warehouse_manager hold the
+ * via the authorize() middleware. admin + sub_warehouse_manager hold the
  * grants; supervisor / department_manager do not.
  */
 
@@ -62,7 +62,7 @@ describe('Purchase orders â€” permissions', () => {
     const admin = await pool.query(
       `SELECT p.code FROM role_permissions rp
        JOIN roles r ON r.id = rp.role_id JOIN permissions p ON p.id = rp.permission_id
-       WHERE r.code = 'system_admin' AND p.code LIKE 'purchase-orders:%'
+       WHERE r.code = 'admin' AND p.code LIKE 'purchase-orders:%'
        ORDER BY p.code`
     );
     expect(admin.rows.map(r => r.code)).toEqual([
