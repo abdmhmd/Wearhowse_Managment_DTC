@@ -93,6 +93,7 @@ export const PERMISSIONS = {
   PROJECTS_SUPERVISORS: 'projects:supervisors',
 
   CUSTODIES_VIEW: 'custodies:view',
+  CUSTODIES_VIEW_OWN: 'custodies:view_own',
   CUSTODIES_RETURN: 'custodies:return',
 } as const;
 

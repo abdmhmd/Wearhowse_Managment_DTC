@@ -30,6 +30,7 @@ export type AuditAction =
   | 'ITEM_DELETED'
   | 'PROJECT_CREATED'
   | 'PROJECT_UPDATED'
+  | 'PROJECT_CLOSURE_INITIATED'
   | 'PROJECT_CLOSED'
   | 'PROJECT_CANCELLED'
   | 'PROJECT_STUDENTS_UPDATED'
@@ -45,8 +46,11 @@ export type AuditAction =
   | 'PO_CANCELLED'
   | 'PO_CLOSED'
   | 'PO_RECEIVED'
+  | 'PO_RECEIVE_CONFIRMED'
   | 'PO_ALLOCATED'
+  | 'PO_ALLOCATION_CANCELLED'
   | 'PO_TRANSFERRED'
+  | 'PO_TRANSFER_CONFIRMED'
   | 'GENERIC';
 
 export interface AuditEntry {
