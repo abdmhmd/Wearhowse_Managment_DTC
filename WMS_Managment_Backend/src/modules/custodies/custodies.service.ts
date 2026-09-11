@@ -167,10 +167,15 @@ export class CustodiesService {
       }
 
       // Good condition: restore the returned quantity through the RTI workflow.
+      // The RTI is credited to the item's PRIMARY warehouse (items.warehouse_id)
+      // so items.current_balance is updated; crediting the custody warehouse
+      // would only touch a per-warehouse row and leave the balance unchanged.
+      const home = await client.query('SELECT warehouse_id FROM items WHERE id = $1', [custody.item_id]);
+      const rtiWarehouseId = home.rows[0]?.warehouse_id ?? custody.warehouse_id;
       const transaction = await transactionsService.createDraft(
         {
           type: 'RTI',
-          warehouse_id: custody.warehouse_id,
+          warehouse_id: rtiWarehouseId,
           department_id: null,
           created_by: returnedBy,
           notes: `Return to inventory from custody #${id}${opts.notes ? ` - ${opts.notes}` : ''}`,
@@ -247,10 +252,13 @@ export class CustodiesService {
       }
 
       // Good condition: restore the returned quantity through the RTI workflow.
+      // Credit the item's PRIMARY warehouse so items.current_balance moves.
+      const home = await client.query('SELECT warehouse_id FROM items WHERE id = $1', [custody.item_id]);
+      const rtiWarehouseId = home.rows[0]?.warehouse_id ?? custody.warehouse_id;
       const transaction = await transactionsService.createDraft(
         {
           type: 'RTI',
-          warehouse_id: custody.warehouse_id,
+          warehouse_id: rtiWarehouseId,
           department_id: null,
           created_by: receivedBy,
           notes: `Return to inventory from custody #${id}${custody.return_notes ? ` - ${custody.return_notes}` : ''}`,
