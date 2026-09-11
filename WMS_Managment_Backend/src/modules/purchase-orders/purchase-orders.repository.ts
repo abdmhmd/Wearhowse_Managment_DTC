@@ -69,7 +69,7 @@ const PO_SELECT = `
   SELECT po.id, po.po_number, po.supplier_id, po.warehouse_id, po.department_id,
          po.status, po.order_date, po.expected_date, po.notes,
          po.created_by, po.approved_by, po.approved_at,
-         po.cancelled_by, po.cancelled_at, po.is_active,
+         po.cancelled_by, po.cancelled_at, po.received_at, po.is_active,
          po.created_at, po.updated_at,
          s.name_ar AS supplier_name_ar, s.name_en AS supplier_name_en,
          w.code AS warehouse_code, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,

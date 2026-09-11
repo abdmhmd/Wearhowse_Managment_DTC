@@ -218,6 +218,66 @@ export class PurchaseOrdersController {
       next(err);
     }
   }
+
+  async cancelAllocation(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const allocationId = Number(req.params.id);
+      if (isNaN(allocationId)) throw new ValidationError('Invalid allocation ID');
+      const result = await purchaseOrdersService.cancelAllocation(allocationId, req.user);
+      await writeAudit({
+        user_id: req.user!.id,
+        action: 'PO_ALLOCATION_CANCELLED',
+        resource: 'purchase_order_allocations',
+        resource_id: allocationId,
+        details: { allocation_id: allocationId, released_quantity: result.released_quantity },
+        ip_address: req.ip,
+        user_agent: req.headers?.['user-agent'] ?? null,
+      });
+      sendData(res, result, { message: 'Allocation cancelled successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async confirmReceive(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid purchase order ID');
+      const result = await purchaseOrdersService.confirmReceive(id, req.user);
+      await writeAudit({
+        user_id: req.user!.id,
+        action: 'PO_RECEIVE_CONFIRMED',
+        resource: 'purchase_orders',
+        resource_id: id,
+        details: { po_number: result.po_number },
+        ip_address: req.ip,
+        user_agent: req.headers?.['user-agent'] ?? null,
+      });
+      sendData(res, result, { message: 'Purchase order receipt confirmed successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async confirmTransfer(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const allocationId = Number(req.params.id);
+      if (isNaN(allocationId)) throw new ValidationError('Invalid allocation ID');
+      const result = await purchaseOrdersService.confirmTransfer(allocationId, req.user);
+      await writeAudit({
+        user_id: req.user!.id,
+        action: 'PO_TRANSFER_CONFIRMED',
+        resource: 'purchase_order_allocations',
+        resource_id: allocationId,
+        details: { allocation_id: allocationId },
+        ip_address: req.ip,
+        user_agent: req.headers?.['user-agent'] ?? null,
+      });
+      sendData(res, result, { message: 'Transfer confirmed successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const purchaseOrdersController = new PurchaseOrdersController();

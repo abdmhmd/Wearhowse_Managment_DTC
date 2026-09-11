@@ -65,6 +65,13 @@ router.post(
   purchaseOrdersController.receive.bind(purchaseOrdersController)
 );
 
+// POST /api/purchase-orders/:id/confirm-receive — confirm physical receipt from supplier
+router.post(
+  '/:id/confirm-receive',
+  authorize('purchase-orders:receive'),
+  purchaseOrdersController.confirmReceive.bind(purchaseOrdersController)
+);
+
 // POST /api/purchase-orders/:id/allocations — reserve received stock for a destination
 router.post(
   '/:id/allocations',
@@ -79,6 +86,27 @@ router.post(
   '/allocations/:id/transfer',
   authorize('purchase-orders:transfer'),
   purchaseOrdersController.transfer.bind(purchaseOrdersController)
+);
+
+// DELETE /api/purchase-orders/allocations/:id — cancel/release allocated stock
+router.delete(
+  '/allocations/:id',
+  authorize('purchase-orders:allocate'),
+  purchaseOrdersController.cancelAllocation.bind(purchaseOrdersController)
+);
+
+// POST /api/purchase-orders/allocations/:id/cancel — cancel/release allocated stock
+router.post(
+  '/allocations/:id/cancel',
+  authorize('purchase-orders:allocate'),
+  purchaseOrdersController.cancelAllocation.bind(purchaseOrdersController)
+);
+
+// POST /api/purchase-orders/allocations/:id/confirm-transfer — confirm transfer movement
+router.post(
+  '/allocations/:id/confirm-transfer',
+  authorize('purchase-orders:transfer'),
+  purchaseOrdersController.confirmTransfer.bind(purchaseOrdersController)
 );
 
 export default router;
