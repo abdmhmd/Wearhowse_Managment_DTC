@@ -94,11 +94,11 @@ export class ItemsService {
     sap_material_number?: string | null;
     gl_account?: string | null;
   }, user?: AuthUserContext) {
-    // Direct stock creation is reserved for system_admin: a non-admin may only
+    // Direct stock creation is reserved for admin: a non-admin may only
     // register an item master record (opening balance stays zero and any stock
     // arrives through the Material Request -> Approve -> Issue workflow).
     const openingBalance = data.current_balance ?? 0;
-    if (user && user.role !== 'system_admin' && openingBalance > 0) {
+    if (user && user.role !== 'admin' && openingBalance > 0) {
       throw new ForbiddenError(
         'Only the system administrator can set an opening stock balance. Use a material request instead.',
         { current_balance: openingBalance }
@@ -130,8 +130,8 @@ export class ItemsService {
 
   async updateItem(id: number, data: Partial<any>, user?: AuthUserContext) {
     // Direct balance edits are a stock modification and are reserved for
-    // system_admin; other users manage master data only.
-    if (user && user.role !== 'system_admin' && data.current_balance !== undefined) {
+    // admin; other users manage master data only.
+    if (user && user.role !== 'admin' && data.current_balance !== undefined) {
       throw new ForbiddenError(
         'Only the system administrator can modify an item balance directly. Use a material request instead.',
         { current_balance: data.current_balance }

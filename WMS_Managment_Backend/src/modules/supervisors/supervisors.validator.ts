@@ -11,7 +11,7 @@ export const createSupervisorSchema = z.object({
 // role / department_id are intentionally NOT present: a supervisor is by
 // definition a user with role `supervisor` (set by the repository) and the
 // department is resolved from the actor (department_manager) or from the
-// payload (system_admin only). Zod's default object parsing strips unknown
+// payload (admin only). Zod's default object parsing strips unknown
 // keys, so a client cannot smuggle `role` / `department_id` through an
 // update request.
 export const updateSupervisorSchema = z.object({

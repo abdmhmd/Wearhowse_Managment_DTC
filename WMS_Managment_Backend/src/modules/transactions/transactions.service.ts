@@ -75,7 +75,7 @@ export class TransactionsService {
         params.push(user.warehouse_ids, user.warehouse_ids);
       } else if (scope !== 'GLOBAL') {
         // Fail closed: a user with no resolvable department or warehouse scope
-        // (e.g. a misconfigured warehouse_manager with zero assignments) must
+        // (e.g. a misconfigured sub_warehouse_manager with zero assignments) must
         // never fall through to seeing all transactions.
         const cond = where ? ' AND ' : ' WHERE ';
         where += `${cond} FALSE`;

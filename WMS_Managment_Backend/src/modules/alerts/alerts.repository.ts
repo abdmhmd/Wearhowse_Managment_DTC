@@ -14,9 +14,9 @@ export class AlertsRepository {
     limit?: number;
     offset?: number;
     /** Current authenticated user — restricts alerts to their accessible
-     *  warehouses (warehouse_manager -> assigned, department_manager ->
-     *  department-owned warehouses, system_admin -> all). Alerts without a
-     *  warehouse are only visible to a system_admin. */
+     *  warehouses (sub_warehouse_manager -> assigned, department_manager ->
+     *  department-owned warehouses, admin -> all). Alerts without a
+     *  warehouse are only visible to an admin. */
     user?: AuthUserContext;
   }) {
     let where = 'WHERE 1=1';

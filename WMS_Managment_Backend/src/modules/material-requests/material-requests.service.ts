@@ -24,7 +24,7 @@ import type { AuthUserContext } from '../authorization/authorization.service';
  *
  * - department_manager approves and forwards ONLY requests of their own department
  *   (requests:approve / requests:forward).
- * - system_admin drives the final steps: approve (of forwarded requests), reject
+ * - admin drives the final steps: approve (of forwarded requests), reject
  *   and issue (requests:approve / requests:reject / requests:issue).
  */
 export class MaterialRequestsService {
@@ -50,14 +50,14 @@ export class MaterialRequestsService {
     const scope: DataScope | null = user ? scopeForUser(user) : null;
     if (user) {
       // A department_manager is the APPROVAL layer, never the creator: the
-      // intended creator is the warehouse_manager of the department warehouse,
-      // a supervisor of the department, or the system_admin. Enforced
+      // intended creator is the sub_warehouse_manager of the department warehouse,
+      // a supervisor of the department, or the admin. Enforced
       // server-side so a hand-crafted payload (or a future permission
       // regrant) cannot bypass it.
-      if (scope === 'DEPARTMENT') {
+      if (user.role === 'department_manager') {
         throw new ValidationError('Only warehouse managers, supervisors or system administrators can create material requests', {});
       }
-      // Fail closed for every NONE-scope user EXCEPT a warehouse_manager with
+      // Fail closed for every NONE-scope user EXCEPT a sub_warehouse_manager with
       // zero assignments (who resolves to NONE but is allowed through to the
       // zero-assignment fallback below) and a supervisor (handled in the
       // dedicated supervisor branch further down).
@@ -132,7 +132,7 @@ export class MaterialRequestsService {
         warehouseId = data.warehouse_id;
       }
     } else if (data.warehouse_id != null) {
-      // system_admin (GLOBAL scope) or an internal caller without a user context
+      // admin (GLOBAL scope) or an internal caller without a user context
       // may pick an explicit warehouse; it is still validated below.
       warehouseId = data.warehouse_id;
     } else {
@@ -324,7 +324,7 @@ export class MaterialRequestsService {
    *                  warehouses, each carrying its authoritative BASE unit
    *                  (unit is derived from the item — never freely chosen)
    *
-   * Callers without a department (e.g. a global system_admin) receive
+   * Callers without a department (e.g. a global admin) receive
    * department=null and empty warehouse/item lists.
    */
   async getRequestCatalog(user: AuthUserContext) {
@@ -389,7 +389,7 @@ export class MaterialRequestsService {
   }
 
   private assertAdmin(user?: AuthUserContext) {
-    if (user && user.role !== 'system_admin') {
+    if (user && user.role !== 'admin') {
       throw new AppError('Only the system administrator can perform this action', 403, 'AUTH_FORBIDDEN');
     }
   }
@@ -428,9 +428,9 @@ export class MaterialRequestsService {
 
   /**
    * Department-level approval of a 'pending' request (department_manager /
-   * system_admin) OR warehouse-manager approval of a 'pending' request from a
-   * supervisor (warehouse_manager) OR admin approval of a 'forwarded' request
-   * (system_admin).
+   * admin) OR warehouse-manager approval of a 'pending' request from a
+   * supervisor (sub_warehouse_manager) OR admin approval of a 'forwarded' request
+   * (admin).
    */
   async approveRequest(requestId: number, approvedBy: number, user?: AuthUserContext) {
     return runInTransaction(async (client) => {
@@ -456,7 +456,7 @@ export class MaterialRequestsService {
       if (request.status === 'pending') {
         // Warehouse manager approves a supervisor-originated request directly
         // into wm_approved (skip dept manager / forward / admin-approve chain).
-        if (user?.role === 'warehouse_manager') {
+        if (user?.role === 'sub_warehouse_manager') {
           return materialRequestsRepository.updateStatus(client, requestId, 'wm_approved', {
             dept_approved_by: approvedBy,
           });
@@ -543,7 +543,7 @@ export class MaterialRequestsService {
 
       // Admin can issue from admin_approved; warehouse manager can issue from
       // wm_approved (supervisor-originated requests routed directly to them).
-      if (user?.role === 'warehouse_manager') {
+      if (user?.role === 'sub_warehouse_manager') {
         if (request.status !== 'wm_approved') {
           logger.warn('[ISSUE_FAILED] Invalid status for WM issue', 'material-requests', {
             requestId, issuedBy, requestStatus: request.status, expectedStatus: 'wm_approved',
@@ -739,9 +739,9 @@ export class MaterialRequestsService {
       const cancellableByOwner = ['pending', 'dept_approved', 'wm_approved', 'forwarded'].includes(request.status);
       const cancellableByAdmin = ['pending', 'dept_approved', 'wm_approved', 'forwarded', 'admin_approved'].includes(request.status);
 
-      // Ownership check: only system_admin may cancel someone else's request;
+      // Ownership check: only admin may cancel someone else's request;
       // every other user may only cancel their own cancellable requests.
-      const isAdmin = cancellerRole === 'system_admin';
+      const isAdmin = cancellerRole === 'admin';
       if (isAdmin) {
         if (!cancellableByAdmin) {
           throw new ValidationError(`Cannot cancel a request with status '${request.status}'`, { status: request.status }, 'INVALID_REQUEST_STATUS');

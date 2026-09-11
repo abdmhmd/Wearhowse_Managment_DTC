@@ -6,30 +6,32 @@ export type DataScope = 'GLOBAL' | 'DEPARTMENT' | 'WAREHOUSE' | 'NONE';
  * Determines the data scope a user has over a resource owned by a department
  * and/or a warehouse.
  *
- * - system_admin sees everything (GLOBAL).
+ * - admin sees everything (GLOBAL).
  * - department_manager sees rows of their own department (DEPARTMENT).
- * - warehouse_manager sees rows of their assigned warehouses (WAREHOUSE).
- * - Any other (legacy, deactivated) role resolves to NONE.
+ * - sub_warehouse_manager resolves to their department when they have one
+ *   (DEPARTMENT), otherwise to their explicitly assigned warehouses
+ *   (WAREHOUSE), otherwise NONE (the zero-assignment request fallback applies).
+ * - Any other (removed, deactivated) role resolves to NONE.
  */
 export function scopeForUser(user: AuthUserContext): DataScope {
-  if (user.role === 'system_admin') return 'GLOBAL';
+  if (user.role === 'admin') return 'GLOBAL';
   if (user.role === 'department_manager') return user.department_id ? 'DEPARTMENT' : 'NONE';
-  if (user.role === 'warehouse_manager') {
+  if (user.role === 'sub_warehouse_manager') {
+    if (user.department_id != null) return 'DEPARTMENT';
     return user.warehouse_ids.length > 0 ? 'WAREHOUSE' : 'NONE';
   }
   return 'NONE';
 }
 
 /**
- * True when the user is a creator role (warehouse_manager) holding NO explicit
- * warehouse assignments. Such users use the zero-assignment fallback: they may
- * pick a destination warehouse from the eligible pool instead of being locked
- * out until an admin seeds `user_warehouses`. (storekeeper is a legacy role
- * deactivated in migration 019 and cannot log in.) Users WITH assignments
- * always fall into the strict auto-assignment path.
+ * True when the user is a creator role (sub_warehouse_manager) holding NO
+ * explicit warehouse assignments. Such users use the zero-assignment
+ * fallback: they may pick a destination warehouse from the eligible pool
+ * instead of being locked out until an admin seeds `user_warehouses`. Users
+ * WITH assignments always fall into the strict auto-assignment path.
  */
 export function isWarehouseFallbackUser(user: AuthUserContext): boolean {
-  return user.role === 'warehouse_manager' && user.warehouse_ids.length === 0;
+  return user.role === 'sub_warehouse_manager' && user.warehouse_ids.length === 0;
 }
 
 /**
@@ -38,7 +40,7 @@ export function isWarehouseFallbackUser(user: AuthUserContext): boolean {
  * Both `departmentCol` and `warehouseCol` may be `null` when the table has no
  * such column. When both are provided the fragment matches either a
  * department-owned OR a warehouse-owned row (a user may hold both scopes,
- * e.g. system_admin + department_manager).
+ * e.g. admin + department_manager).
  *
  * `startIndex` is the 1-based index of the first query parameter so the
  * generated placeholders never collide with placeholders already consumed by
@@ -83,8 +85,8 @@ export function scopeClause(
  * user may access. Used for warehouse-owned tables (items, stock movements).
  * `warehouseCol` may be qualified, e.g. `'i.warehouse_id'`.
  *
- * - GLOBAL (system_admin): all warehouses.
- * - WAREHOUSE (warehouse_manager): the explicitly assigned warehouses.
+ * - GLOBAL (admin): all warehouses.
+ * - WAREHOUSE (sub_warehouse_manager): the explicitly assigned warehouses.
  * - DEPARTMENT (department_manager): warehouses owned by the user's department
  *   (warehouses.department_id) plus any explicitly assigned warehouses.
  *

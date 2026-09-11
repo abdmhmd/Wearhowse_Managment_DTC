@@ -22,7 +22,7 @@ export class PurchaseOrdersService {
   /**
    * View/mutation scope for a single PO. Out-of-scope resources are hidden as
    * 404 (project convention — see custodies/material-requests services).
-   * A warehouse_manager additionally sees POs whose receiving warehouse
+   * A sub_warehouse_manager additionally sees POs whose receiving warehouse
    * belongs to his department (department-derived procurement requests).
    */
   private assertPoInScope(
@@ -37,7 +37,7 @@ export class PurchaseOrdersService {
       // Department-derived requests: a manager sees POs of his own
       // department's main warehouse even without an explicit assignment.
       if (
-        user.role === 'warehouse_manager' &&
+        user.role === 'sub_warehouse_manager' &&
         user.department_id != null &&
         po.department_id === user.department_id
       ) return;
@@ -79,9 +79,9 @@ export class PurchaseOrdersService {
   /**
    * Role-aware creation.
    *
-   * - system_admin keeps full procurement control: explicit receiving main
+   * - admin keeps full procurement control: explicit receiving main
    *   warehouse, optional supplier, optional per-line unit price.
-   * - warehouse_manager expresses a pure MATERIAL REQUEST: item + quantity +
+   * - sub_warehouse_manager expresses a pure MATERIAL REQUEST: item + quantity +
    *   unit (+ notes). The receiving main warehouse is DERIVED SERVER-SIDE
    *   from the authenticated user (department main warehouse first, then a
    *   uniquely-assigned main via user_warehouses). Client-supplied
@@ -94,7 +94,7 @@ export class PurchaseOrdersService {
   ): Promise<any> {
     if (!user) throw new AppError('Authentication required', 401);
 
-    const isManagerCreator = user.role === 'warehouse_manager';
+    const isManagerCreator = user.role === 'sub_warehouse_manager';
     let receivingWarehouseId = data.warehouse_id;
     let supplierId = data.supplier_id ?? null;
     let lines = data.lines;
@@ -235,7 +235,7 @@ export class PurchaseOrdersService {
         const wh = whRes.rows[0];
         if (!wh) throw new ValidationError('The selected receiving warehouse does not exist', { warehouse_id: data.warehouse_id });
         if (!wh.is_main) throw new ValidationError('Purchase orders must receive into a MAIN warehouse', { warehouse_id: data.warehouse_id }, 'MAIN_WAREHOUSE_REQUIRED');
-        if (user.role === 'warehouse_manager' && !user.warehouse_ids.includes(data.warehouse_id)) {
+        if (user.role === 'sub_warehouse_manager' && !user.warehouse_ids.includes(data.warehouse_id)) {
           throw new ForbiddenError('The selected warehouse is not assigned to you');
         }
         fields.warehouse_id = data.warehouse_id;
@@ -524,7 +524,7 @@ export class PurchaseOrdersService {
           po_department: po.department_id,
         }, 'INVALID_DESTINATION_WAREHOUSE');
       }
-      if (user!.role === 'warehouse_manager' && !user!.warehouse_ids.includes(payload.dest_warehouse_id)) {
+      if (user!.role === 'sub_warehouse_manager' && !user!.warehouse_ids.includes(payload.dest_warehouse_id)) {
         throw new ForbiddenError('Destination warehouse is not assigned to you');
       }
 

@@ -5,7 +5,7 @@ const router = Router();
 
 router.use(authenticate);
 
-// Only system_admin can view full stock movement history
+// Only admin can view full stock movement history
 router.get('/', authorize('stock-movements:view-all'), stockMovementsController.getAll);
 router.get('/item/:itemId', authorize('stock-movements:view'), stockMovementsController.getByItemId);
 router.get('/transaction/:transactionId', authorize('stock-movements:view'), stockMovementsController.getByTransactionId);

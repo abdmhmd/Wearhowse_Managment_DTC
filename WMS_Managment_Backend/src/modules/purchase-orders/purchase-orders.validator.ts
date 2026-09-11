@@ -18,7 +18,7 @@ export const createPurchaseOrderSchema = z
     supplier_id: z.number().int().positive().optional().nullable(),
     // warehouse_id is OPTIONAL at the schema level: warehouse managers never
     // send it (the backend derives their department main warehouse), while
-    // system_admin must provide it — enforced in the service per role.
+    // admin must provide it — enforced in the service per role.
     warehouse_id: z.number().int().positive().optional().nullable(),
     order_date: z.string().nullable().optional(),
     // nullable: clients may send explicit nulls for absent optionals

@@ -11,7 +11,7 @@ export const createProjectSchema = z.object({
   department_id: z.number({ message: 'department_id is required' }).int().positive(),
   // Optional: a `supervisor` creating a project omits it — the service derives
   // supervisor_id from the authenticated user (a forged value cannot transfer
-  // ownership). warehouse_manager / system_admin must still provide it.
+  // ownership). sub_warehouse_manager / admin must still provide it.
   supervisor_id: z.number({ message: 'supervisor_id is required' }).int().positive().optional(),
   warehouse_id: z.number().int().positive().optional(),
   academic_year: z.string().max(20).optional().nullable(),

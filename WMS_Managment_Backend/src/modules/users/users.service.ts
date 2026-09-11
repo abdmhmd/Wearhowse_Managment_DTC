@@ -6,7 +6,7 @@ import type { AuthUserContext } from '../authorization/authorization.service';
 
 interface User {
   username: string; password_hash: string; full_name: string;
-  role: 'system_admin' | 'warehouse_manager' | 'department_manager' | 'supervisor';
+  role: 'admin' | 'sub_warehouse_manager' | 'department_manager' | 'supervisor';
   department_id?: number | null;
   warehouse_ids?: number[];
 }
@@ -31,11 +31,11 @@ export class UsersService {
   }
 
   async create(data: User) {
-    // Service-level enforcement (defense in depth): a warehouse_manager MUST
+    // Service-level enforcement (defense in depth): a sub_warehouse_manager MUST
     // be assigned to at least one warehouse, otherwise their data scope would
     // silently resolve to NONE and they could see nothing.
-    if (data.role === 'warehouse_manager' && (!data.warehouse_ids || data.warehouse_ids.length === 0)) {
-      throw new ValidationError('warehouse_manager must be assigned at least one warehouse', { role: data.role });
+    if (data.role === 'sub_warehouse_manager' && (!data.warehouse_ids || data.warehouse_ids.length === 0)) {
+      throw new ValidationError('sub_warehouse_manager must be assigned at least one warehouse', { role: data.role });
     }
     await this.validateDepartment(data.department_id);
     const client = await pool.connect();
@@ -68,13 +68,13 @@ export class UsersService {
   }
 
   async update(id: number, data: Partial<User> & { is_active?: boolean }) {
-    // Guard: prevent disabling or demoting the last active system_admin
-    if (data.is_active === false || (data.role && data.role !== 'system_admin')) {
+    // Guard: prevent disabling or demoting the last active admin
+    if (data.is_active === false || (data.role && data.role !== 'admin')) {
       const currentRes = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
       const current = currentRes.rows[0];
-      if (current?.role === 'system_admin') {
+      if (current?.role === 'admin') {
         const countRes = await pool.query(
-          "SELECT COUNT(*)::int AS total FROM users WHERE role = 'system_admin' AND is_active = true"
+          "SELECT COUNT(*)::int AS total FROM users WHERE role = 'admin' AND is_active = true"
         );
         if (countRes.rows[0].total <= 1) {
           throw new ValidationError(
@@ -88,7 +88,7 @@ export class UsersService {
     const { warehouse_ids, ...restData } = data;
     await this.validateDepartment((restData as any).department_id);
 
-    // Service-level enforcement: a warehouse_manager must keep at least one
+    // Service-level enforcement: a sub_warehouse_manager must keep at least one
     // warehouse assignment. Checked against the FINAL state of the user (the
     // update may be changing either the role or the assignments).
     {
@@ -98,8 +98,8 @@ export class UsersService {
       const finalAssignments = warehouse_ids !== undefined
         ? warehouse_ids
         : await usersRepository.getWarehouseAssignments(id);
-      if (finalRole === 'warehouse_manager' && finalAssignments.length === 0) {
-        throw new ValidationError('warehouse_manager must be assigned at least one warehouse', { user_id: id });
+      if (finalRole === 'sub_warehouse_manager' && finalAssignments.length === 0) {
+        throw new ValidationError('sub_warehouse_manager must be assigned at least one warehouse', { user_id: id });
       }
     }
 
@@ -171,12 +171,12 @@ export class UsersService {
     if (actorId !== undefined && id === actorId) {
       throw new ValidationError('You cannot delete your own account.', { user_id: id });
     }
-    // Guard: prevent deleting the last active system_admin
+    // Guard: prevent deleting the last active admin
     const currentRes = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
     const current = currentRes.rows[0];
-    if (current?.role === 'system_admin') {
+    if (current?.role === 'admin') {
       const countRes = await pool.query(
-        "SELECT COUNT(*)::int AS total FROM users WHERE role = 'system_admin' AND is_active = true"
+        "SELECT COUNT(*)::int AS total FROM users WHERE role = 'admin' AND is_active = true"
       );
       if (countRes.rows[0].total <= 1) {
         throw new ValidationError(
@@ -210,14 +210,14 @@ export class UsersService {
   /**
    * Supervisors for the project create/edit form, scoped to the caller.
    *
-   *   * warehouse_manager -> only supervisors in THEIR OWN department; a manager
+   *   * sub_warehouse_manager -> only supervisors in THEIR OWN department; a manager
    *     with no department_id gets an empty list (fail-closed).
-   *   * system_admin      -> all supervisors (GLOBAL, unchanged).
+   *   * admin      -> all supervisors (GLOBAL, unchanged).
    * Other roles never reach this endpoint (route is guarded by
    * `projects:supervisors`).
    */
   async getSupervisors(actor?: AuthUserContext) {
-    if (actor?.role === 'warehouse_manager') {
+    if (actor?.role === 'sub_warehouse_manager') {
       if (!actor.department_id) return [];
       return usersRepository.findSupervisors(actor.department_id);
     }

@@ -22,20 +22,20 @@ export interface UpdateSupervisorData {
 export class SupervisorsService {
   /**
    * List supervisors (role = supervisor), scoped to the caller:
-   *   * system_admin      -> all departments
+   *   * admin      -> all departments
    *   * department_manager-> own department only (empty if the actor has no department)
    * The list deliberately INCLUDES inactive supervisors so a department head
    * can re-activate a colleague. Search matches username / full_name.
    */
   async getAll(actor: AuthUserContext, page = 1, limit = 20, search?: string) {
     // Fail-closed: a department_manager with no department can see nothing.
-    if (actor.role !== 'system_admin' && !actor.department_id) {
+    if (actor.role !== 'admin' && !actor.department_id) {
       return {
         items: [],
         pagination: { page, limit, total: 0, totalPages: 0 } as PaginationMeta,
       };
     }
-    const departmentId = actor.role === 'system_admin' ? undefined : actor.department_id;
+    const departmentId = actor.role === 'admin' ? undefined : actor.department_id;
     const filters = { departmentId, search: search?.trim() || undefined };
     const [items, total] = await Promise.all([
       supervisorsRepository.findAll(filters, limit, (page - 1) * limit),
@@ -54,7 +54,7 @@ export class SupervisorsService {
     // A supervisor is always a user with role `supervisor` (set by the
     // repository) assigned to the caller's department.
     let departmentId: number;
-    if (actor.role === 'system_admin') {
+    if (actor.role === 'admin') {
       if (data.department_id === undefined || data.department_id === null) {
         throw new ValidationError('department_id is required');
       }
@@ -85,7 +85,7 @@ export class SupervisorsService {
   async update(actor: AuthUserContext, id: number, data: UpdateSupervisorData): Promise<SupervisorRow> {
     const row = await this.findInScopeOrThrow(actor, id);
 
-    if (actor.role !== 'system_admin' && actor.userId === id && data.is_active === false) {
+    if (actor.role !== 'admin' && actor.userId === id && data.is_active === false) {
       throw new ForbiddenError('You cannot deactivate your own account');
     }
 
@@ -104,7 +104,7 @@ export class SupervisorsService {
   async remove(actor: AuthUserContext, id: number): Promise<SupervisorRow> {
     const row = await this.findInScopeOrThrow(actor, id);
 
-    if (actor.role !== 'system_admin' && actor.userId === id) {
+    if (actor.role !== 'admin' && actor.userId === id) {
       throw new ForbiddenError('You cannot delete your own account');
     }
 
@@ -121,7 +121,7 @@ export class SupervisorsService {
   private async findInScopeOrThrow(actor: AuthUserContext, id: number): Promise<SupervisorRow> {
     const row = await supervisorsRepository.findById(id);
     if (!row) throw new NotFoundError('Supervisor', 'SUPERVISOR_NOT_FOUND', { id });
-    if (actor.role !== 'system_admin') {
+    if (actor.role !== 'admin') {
       if (actor.department_id == null || row.department_id !== actor.department_id) {
         throw new NotFoundError('Supervisor', 'SUPERVISOR_NOT_FOUND', { id });
       }

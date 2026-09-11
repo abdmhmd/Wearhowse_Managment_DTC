@@ -11,8 +11,8 @@ export interface ItemsFilter {
   search?: string;
   is_active?: boolean;
   /** Current authenticated user — used to restrict visible items to their
-   *  accessible warehouses (warehouse_manager -> assigned, department_manager
-   *  -> department-owned warehouses). */
+   *  accessible warehouses (sub_warehouse_manager -> assigned,
+   *  department_manager -> department-owned warehouses). */
   user?: AuthUserContext;
 }
 
@@ -68,8 +68,9 @@ export class ItemsRepository {
           paramIndex += scope.params.length;
         }
       }
-      // Zero-assignment warehouse_manager: no scope clause -> the full active
-      // item catalog is exposed so the create-request fallback can be used.
+      // Zero-assignment sub_warehouse_manager: no scope clause -> the full
+      // active item catalog is exposed so the create-request fallback can be
+      // used.
     }
 
     query += ' ORDER BY i.id';

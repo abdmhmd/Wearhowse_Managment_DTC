@@ -30,7 +30,7 @@ router.get(
   materialRequestsController.getById.bind(materialRequestsController)
 );
 
-// POST /api/requests — create new request (warehouse_manager or system_admin;
+// POST /api/requests — create new request (sub_warehouse_manager or admin;
 // department_manager is the approval layer and cannot create requests)
 router.post(
   '/',

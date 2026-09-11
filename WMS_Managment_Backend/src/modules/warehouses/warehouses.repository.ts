@@ -10,8 +10,9 @@ export class WarehousesRepository {
 
     if (user) {
       if (isWarehouseFallbackUser(user)) {
-        // Zero-assignment warehouse_manager: expose the eligible destination
-        // pool (active, non-main) so the create-request fallback can list them.
+        // Zero-assignment sub_warehouse_manager: expose the eligible
+        // destination pool (active, non-main) so the create-request fallback
+        // can list them.
         query += ' AND is_main = false';
       } else {
         const scope = warehouseAccessClause(user, 'id', paramIndex);
@@ -50,8 +51,8 @@ export class WarehousesRepository {
 
   /**
    * Fetches a single warehouse by id, restricted to the current user's scope.
-   * - system_admin sees every warehouse (GLOBAL).
-   * - warehouse_manager sees only their explicitly assigned warehouses.
+   * - admin sees every warehouse (GLOBAL).
+   * - sub_warehouse_manager sees only their explicitly assigned warehouses.
    * - department_manager sees warehouses owned by their department plus any
    *   warehouses they are explicitly assigned to.
    * - Any other (deactivated) role resolves to NONE and can read nothing.
@@ -149,7 +150,7 @@ export class WarehousesRepository {
     return res.rows;
   }
 
-  /** First active, non-main warehouse in the system (system_admin default). */
+  /** First active, non-main warehouse in the system (admin default). */
   async findFirstActiveNonMain() {
     const res = await pool.query(
       'SELECT id, code, name_ar, name_en, department_id, is_main, is_active FROM warehouses WHERE is_active = true AND is_main = false ORDER BY id LIMIT 1'

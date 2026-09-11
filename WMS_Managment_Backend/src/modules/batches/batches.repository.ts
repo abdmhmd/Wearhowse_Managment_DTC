@@ -68,9 +68,10 @@ export class BatchesRepository {
       i++;
     }
 
-    // Data-scope enforcement: warehouse_manager sees batches of their assigned
-    // warehouses, department_manager sees batches of their department's
-    // warehouses (plus explicitly assigned ones), system_admin sees everything.
+    // Data-scope enforcement: sub_warehouse_manager sees batches of their
+    // assigned warehouses, department_manager sees batches of their
+    // department's warehouses (plus explicitly assigned ones), admin sees
+    // everything.
     if (filters.user) {
       const scope = warehouseAccessClause(filters.user, 'b.warehouse_id', i);
       if (scope.clause !== 'TRUE') {

@@ -7,11 +7,11 @@ import type { PurchaseOrderStatus } from './purchase-orders.types';
 /**
  * Scope clause for purchase orders.
  *
- * - system_admin sees every PO (GLOBAL).
- * - warehouse_manager sees only POs whose RECEIVING (main) warehouse is
- *   explicitly assigned to them; zero-assignment warehouse managers resolve
- *   to FALSE (fail closed) — the material-request zero-assignment fallback
- *   does not apply to procurement.
+ * - admin sees every PO (GLOBAL).
+ * - sub_warehouse_manager sees only POs whose RECEIVING (main) warehouse is
+ *   explicitly assigned to them; zero-assignment sub-warehouse managers
+ *   resolve to FALSE (fail closed) — the material-request zero-assignment
+ *   fallback does not apply to procurement.
  * - department_manager / supervisor hold no purchase-orders permissions, so
  *   they never reach this clause in practice; if a future grant is added,
  *   DEPARTMENT resolves to the department's warehouses.

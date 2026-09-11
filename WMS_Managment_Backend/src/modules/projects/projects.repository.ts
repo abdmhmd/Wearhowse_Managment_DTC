@@ -82,7 +82,7 @@ export class ProjectsRepository {
     if (filters.search)         { where += ` AND (p.name ILIKE $${i} OR p.project_no ILIKE $${i})`; params.push(`%${filters.search}%`); i++; }
     if (filters.user) {
       // The list must use the EXACT same scope rules as `ProjectsService.inScope`
-      // used by getById — otherwise a warehouse_manager who can open a project
+      // used by getById — otherwise a sub_warehouse_manager who can open a project
       // by id would never see it in the list.
       const scope = scopeForUser(filters.user);
       if (scope === 'GLOBAL') {

@@ -52,7 +52,7 @@ export class ProjectsService {
         }
         supervisorId = user.id;
         departmentId = user.department_id;
-      } else if (scope === 'WAREHOUSE') {
+      } else if (user?.role === 'sub_warehouse_manager') {
         // A warehouse manager can only create a project for their own
         // department — derived from the authenticated user.
         if (!user || user.department_id == null) {
@@ -157,7 +157,7 @@ export class ProjectsService {
    *   callers that only pass department_id).
    * - The project's warehouse MUST belong to the project's department (the
    *   backend enforces this — never rely on frontend filtering).
-   * - warehouse_managers can only create projects for warehouses they are
+   * - sub_warehouse_managers can only create projects for warehouses they are
    *   assigned to.
    */
   private async resolveAndValidateWarehouse(
@@ -167,7 +167,7 @@ export class ProjectsService {
   ): Promise<number> {
     let id = warehouseId;
     const scope = user ? scopeForUser(user) : 'GLOBAL';
-    if (!id && scope === 'WAREHOUSE' && user && user.warehouse_ids.length > 0) {
+    if (!id && user?.role === 'sub_warehouse_manager' && user && user.warehouse_ids.length > 0) {
       // Warehouse managers default to one of their assigned warehouses in the
       // department (preferring the department main warehouse when assigned) —
       // never to a warehouse they are not assigned to.
@@ -202,7 +202,7 @@ export class ProjectsService {
       });
     }
 
-    if (user && scopeForUser(user) === 'WAREHOUSE' && !user.warehouse_ids.includes(id)) {
+    if (user && user.role === 'sub_warehouse_manager' && !user.warehouse_ids.includes(id)) {
       throw new ValidationError('You can only create projects for a warehouse you are assigned to.', {
         warehouse_id: id,
       });
@@ -277,7 +277,7 @@ export class ProjectsService {
       // Department managers stay view-only on the project's department/warehouse
       // assignment — their projects:update permission only covers metadata and
       // the student roster, never warehouse moves.
-      if (user && scopeForUser(user) === 'DEPARTMENT') {
+      if (user && user.role === 'department_manager') {
         throw new ForbiddenError('Department managers cannot change the project warehouse.');
       }
       const resolved = await this.resolveAndValidateWarehouse(project.department_id, data.warehouse_id, user);

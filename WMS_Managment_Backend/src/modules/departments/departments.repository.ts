@@ -67,7 +67,7 @@ export class DepartmentsRepository {
   /**
    * Fetches a department by code restricted to the user's scope. A user
    * outside the scope gets `null` (treated as 404 by the controller), so a
-   * department_manager / warehouse_manager cannot read another department.
+   * department_manager / sub_warehouse_manager cannot read another department.
    */
   async findByCode(code: string, user?: AuthUserContext) {
     let query = 'SELECT id, code, name_ar, name_en, created_at, updated_at FROM departments WHERE code = $1 AND is_active = true';

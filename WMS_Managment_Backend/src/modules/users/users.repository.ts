@@ -1,20 +1,20 @@
 import { pool } from '../../config/database';
 import { ConflictError } from '../../utils/AppError';
 
-// All active roles in the system (storekeeper/accountant/viewer were
-// deactivated in migration 019; legacy users keep their role value for data
-// continuity but cannot log in until reassigned).
+// The complete, canonical role set. Legacy roles (storekeeper/accountant/
+// viewer) were removed entirely by migration 038 (users were reassigned, the
+// user_role enum now contains only these four values).
 export type UserRole =
-  | 'system_admin'
-  | 'warehouse_manager'
+  | 'admin'
+  | 'sub_warehouse_manager'
   | 'department_manager'
   | 'supervisor';
 
-/** Roles that may log in. Legacy roles (storekeeper/accountant/viewer) were
- *  deactivated in migration 019; users holding them must be reassigned. */
+/** Roles that may log in. Exactly the four enum values — kept as a defensive
+ *  check in case a future migration temporarily widens the enum. */
 export const ACTIVE_ROLES: readonly string[] = [
-  'system_admin',
-  'warehouse_manager',
+  'admin',
+  'sub_warehouse_manager',
   'department_manager',
   'supervisor',
 ];

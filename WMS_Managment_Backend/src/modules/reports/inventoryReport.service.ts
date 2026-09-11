@@ -14,8 +14,8 @@ export interface InventoryReportFilters {
   page?: number;
   limit?: number;
   /** Current authenticated user — restricts the report to the user's
-   *  accessible warehouses (warehouse_manager -> assigned, department_manager
-   *  -> department-owned warehouses). */
+   *  accessible warehouses (sub_warehouse_manager -> assigned,
+   *  department_manager -> department-owned warehouses). */
   user?: AuthUserContext;
 }
 
@@ -140,7 +140,7 @@ export class InventoryReportService {
     let movements: any[] = [];
     if (itemIds.length > 0) {
       // The stock summary must include ONLY movements from warehouses the
-      // current user may access (system_admin = all). Otherwise a
+      // current user may access (admin = all). Otherwise a
       // warehouse/department manager would leak other warehouses' movement
       // totals through the aggregated counters.
       const movementParams: any[] = [itemIds];
