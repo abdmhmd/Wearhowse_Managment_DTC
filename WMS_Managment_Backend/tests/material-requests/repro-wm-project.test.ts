@@ -164,7 +164,11 @@ describe('REPRO: WM creates a material issue request for a graduation project', 
   });
 
   test('S5 needed_by = today -> allowed (201)', async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    // Build "today" in the SERVER's local timezone: the validator compares the
+    // date against server-local midnight. A UTC-sourced (toISOString) "today"
+    // can become "yesterday" when the server TZ is behind UTC.
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const res = await request(app)
       .post('/api/requests')
       .set('Authorization', `Bearer ${wmAssigned.token}`)
