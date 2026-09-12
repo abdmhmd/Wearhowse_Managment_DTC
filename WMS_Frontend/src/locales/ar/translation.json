@@ -129,7 +129,6 @@
     "parentCategory": "الفئة الرئيسية",
     "department": "القسم",
     "physicalStock": "المخزون الفعلي",
-    "allocatedStock": "المخزون المخصص",
     "availableStock": "المخزون المتاح"
   },
   "form": {
@@ -626,17 +625,11 @@
       "createdBy": "أنشئ بواسطة",
       "approvedAt": "تاريخ الاعتماد",
       "lines": "بنود الأمر",
-      "allocations": "التخصيصات",
-      "noAllocations": "لا توجد تخصيصات بعد",
       "quantityOrdered": "الكمية المطلوبة",
       "quantityReceived": "الكمية المستلمة",
       "remainingToReceive": "المتبقي للاستلام",
-      "quantityAllocated": "المخصصة",
-      "quantityTransferred": "المنقولة",
-      "remainingToTransfer": "المتبقي للنقل",
       "unitPrice": "سعر الوحدة",
       "unit": "الوحدة",
-      "destination": "المستودع الوجهة",
       "statuses": {
         "draft": "مسودة",
         "approved": "معتمد",
@@ -645,19 +638,20 @@
         "closed": "مغلق",
         "cancelled": "ملغي"
       },
-      "allocStatuses": {
-        "allocated": "مخصص",
-        "partially_transferred": "نقل جزئي",
-        "transferred": "منقول بالكامل",
-        "cancelled": "ملغي",
-        "pending_confirmation": "بانتظار التأكيد"
+      "linkedTransfer": {
+        "title": "تحويل تلقائي إلى المستودع الفرعي",
+        "transferNo": "رقم التحويل",
+        "status": "حالة التحويل",
+        "destination": "المستودع الوجهة",
+        "statuses": {
+          "draft": "بانتظار التأكيد",
+          "approved": "مؤكد"
+        }
       },
       "actions": {
         "approve": "اعتماد",
         "cancel": "إلغاء الأمر",
         "receive": "استلام",
-        "allocate": "تخصيص",
-        "transfer": "نقل",
         "close": "إغلاق",
         "editDraft": "تعديل",
         "confirmTransfer": "تأكيد النقل",
@@ -666,12 +660,6 @@
       "receiveTitle": "استلام المخزون (سند استلام)",
       "receiveQuantity": "كمية الاستلام",
       "receiveProgress": "تم استلام {{received}} من {{ordered}} — المتبقي {{remaining}}",
-      "allocateTitle": "تخصيص المخزون",
-      "allocateQuantity": "كمية التخصيص",
-      "allocatableHint": "القابل للتخصيص: {{value}}",
-      "transferTitle": "نقل المخزون المخصص",
-      "transferQuantity": "كمية النقل",
-      "transferableHint": "الحد الأقصى للنقل: {{value}}",
       "receiveIntoHint": "سيتم استلام المخزون في المستودع الرئيسي: {{warehouse}}",
       "confirm": {
         "approve": {
@@ -684,7 +672,7 @@
         },
         "close": {
           "title": "إغلاق أمر الشراء",
-          "message": "إغلاق هذا الأمر المُستلم بالكامل؟ يبقى المخزون غير المحجوز في المستودع الرئيسي كمخزون عام."
+          "message": "إغلاق هذا الأمر المُستلم بالكامل؟"
         }
       },
       "validation": {
@@ -709,20 +697,17 @@
       "noValidWarehouseWarning": "لا يمكن تحديد مستودع رئيسي صالح لحسابك. يرجى التواصل مع المسؤول.",
       "ambiguousWarehouseWarning": "تم تعيين أكثر من مستودع رئيسي لحسابك؛ يرجى التواصل مع المسؤول.",
       "errors": {
-        "insufficientAllocation": "الكمية المتاحة للتخصيص غير كافية.",
-        "insufficientAllocationWithQty": "الكمية المتاحة للتخصيص هي {{available}} فقط، بينما تم طلب تخصيص {{requested}}.",
-        "exceedsReceived": "لا يمكن تخصيص كمية أكبر من الكمية المستلمة.",
-        "exceedsAllocated": "لا يمكن نقل كمية أكبر من الكمية المخصصة.",
+        "noTransferDestination": "لا يمكن التحويل التلقائي لسند الاستلام: لا يوجد مستودع فرعي نشط معين لطالب الشراء في القسم.",
+        "ambiguousTransferDestination": "لا يمكن التحويل التلقائي لسند الاستلام: تم تعيين أكثر من مستودع فرعي لطالب الشراء في القسم.",
+        "noLinkedTransfer": "لا يوجد تحويل مرتبط بهذا الأمر لتأكيده.",
+        "linkedTransferAlreadyConfirmed": "لا توجد تحويلات مسودة متبقية لتأكيدها لهذا الأمر.",
         "exceedsOrdered": "لا يمكن استلام كمية أكبر من الكمية المطلوبة في أمر الشراء.",
-        "allocationTransferred": "تم نقل كامل الكمية المخصصة مسبقاً.",
         "notFound": "أمر الشراء غير موجود.",
         "invalidStatus": "لا يمكن تنفيذ هذا الإجراء على أمر الشراء في حالته الحالية.",
         "forbidden": "ليس لديك صلاحية لتنفيذ هذا الإجراء على أمر الشراء.",
         "warehouseScope": "لا يمكنك تنفيذ هذا الإجراء على هذا المستودع.",
         "mainWarehouseRequired": "يجب أن يكون المستودع المستلم مستودعاً رئيسياً.",
-        "invalidDestination": "يجب أن يكون مستودع التوزيع مستودعاً فرعياً تابعاً للقسم.",
         "cannotCancel": "لا يمكن إلغاء أمر الشراء بعد استلام مواد منه.",
-        "cannotClose": "لا يمكن إغلاق أمر الشراء قبل اكتمال عمليات التخصيص والنقل المطلوبة.",
         "receiveFailed": "تعذر استلام المواد. يرجى التحقق من الكميات والمحاولة مرة أخرى."
       }
     }

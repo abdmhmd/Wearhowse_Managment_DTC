@@ -54,25 +54,16 @@ export const purchaseOrdersApi = {
     api.post<ApiResponse<PurchaseOrder>>(`/purchase-orders/${id}/close`),
 
   receive: (id: number, lines: ReceiveLinePayload[]) =>
-    api.post<ApiResponse<{ message: string; transaction_id: number; transaction_no: string; status: PurchaseOrderStatus }>>(
+    api.post<ApiResponse<{ message: string; transaction_id: number; transaction_no: string; status: PurchaseOrderStatus; auto_transfer_created: boolean; linked_transfer_id: number | null; linked_transfer_no: string | null }>>(
       `/purchase-orders/${id}/receive`,
       { lines }
-    ),
-
-  allocate: (id: number, payload: { detail_id: number; dest_warehouse_id: number; quantity: number }) =>
-    api.post<ApiResponse<{ id: number }>>(`/purchase-orders/${id}/allocations`, payload),
-
-  transfer: (allocationId: number, quantity: number) =>
-    api.post<ApiResponse<{ message: string; transaction_no: string; status: string; remaining: number }>>(
-      `/purchase-orders/allocations/${allocationId}/transfer`,
-      { quantity }
     ),
 
   confirmReceive: (id: number) =>
     api.post<ApiResponse<PurchaseOrder>>(`/purchase-orders/${id}/confirm-receive`),
 
-  confirmTransfer: (allocationId: number) =>
-    api.post<ApiResponse<{ message: string; status: string; transfer_confirmed_by: number }>>(
-      `/purchase-orders/allocations/${allocationId}/confirm-transfer`
+  confirmTransfer: (id: number) =>
+    api.post<ApiResponse<{ message: string; transfer_count: number; transaction_no: string | null }>>(
+      `/purchase-orders/${id}/confirm-transfer`
     ),
 };

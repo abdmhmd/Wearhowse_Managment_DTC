@@ -7,28 +7,31 @@ import {
   useCancelPurchaseOrder,
   useClosePurchaseOrder,
   useReceivePurchaseOrder,
-  useAllocateStock,
-  useTransferAllocation,
   useConfirmPurchaseOrderReceive,
-  useConfirmTransferAllocation,
+  useConfirmPurchaseOrderTransfer,
 } from '@/hooks/usePurchaseOrders';
-import { useAllWarehouses } from '@/hooks/useWarehouses';
-import { PageHeader, Button, Badge, Modal, Input, Select, ConfirmDialog } from '@/components/ui';
+import { PageHeader, Button, Badge, Modal, Input, ConfirmDialog } from '@/components/ui';
 import { formatDate } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useAuthStore } from '@/store/auth.store';
-import type { AllocationStatus, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus } from '@/types';
+import type { PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus } from '@/types';
 
 const statusVariant = (status: string) => {
   switch (status) {
     case 'draft': return 'default' as const;
     case 'approved': return 'info' as const;
     case 'partially_received': return 'warning' as const;
-    case 'partially_transferred': return 'warning' as const;
     case 'received':
-    case 'transferred':
     case 'closed': return 'success' as const;
     case 'cancelled': return 'danger' as const;
+    default: return 'default' as const;
+  }
+};
+
+const trfStatusVariant = (status: string | null | undefined) => {
+  switch (status) {
+    case 'approved': return 'success' as const;
+    case 'draft': return 'warning' as const;
     default: return 'default' as const;
   }
 };
@@ -47,32 +50,14 @@ export default function PurchaseOrderDetailPage() {
   const cancelMutation = useCancelPurchaseOrder();
   const closeMutation = useClosePurchaseOrder();
   const receiveMutation = useReceivePurchaseOrder();
-  const allocateMutation = useAllocateStock();
-  const transferMutation = useTransferAllocation();
   const confirmReceiveMutation = useConfirmPurchaseOrderReceive();
-  const confirmTransferMutation = useConfirmTransferAllocation();
+  const confirmTransferMutation = useConfirmPurchaseOrderTransfer();
 
   const [confirmAction, setConfirmAction] = useState<'approve' | 'cancel' | 'close' | null>(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
-  const [allocateFor, setAllocateFor] = useState<PurchaseOrderLine | null>(null);
-  const [transferFor, setTransferFor] = useState<{ allocationId: number; remaining: number } | null>(null);
 
   // Receive dialog state: per-line quantities
   const [receiveQtys, setReceiveQtys] = useState<Record<number, string>>({});
-  // Allocate dialog state
-  const [allocQty, setAllocQty] = useState('');
-  const [allocDest, setAllocDest] = useState('');
-  // Transfer dialog state
-  const [transferQty, setTransferQty] = useState('');
-
-  const isManager = user?.role === 'sub_warehouse_manager';
-
-  // Destination picker: active non-main warehouses. Managers see only their
-  // own assignments; admins see every departmental warehouse.
-  const { data: warehousesData } = useAllWarehouses(can('warehouses:view') || isManager);
-  const destWarehouses = (warehousesData?.items || [])
-    .filter((w: any) => !w.is_main && w.is_active !== false)
-    .filter((w: any) => (isManager ? (user?.warehouse_ids ?? []).includes(w.id) : true));
 
   if (isLoading || !po) {
     return <div className="p-6 text-gray-500">{t('common.loading')}</div>;
@@ -81,7 +66,6 @@ export default function PurchaseOrderDetailPage() {
   const order = po as PurchaseOrder;
   const status: PurchaseOrderStatus = order.status;
   const details: PurchaseOrderLine[] = order.details || [];
-  const allocations = order.allocations || [];
 
   const canEditNow = can('purchase-orders:update') && status === 'draft';
   const canApproveNow = can('purchase-orders:approve') && status === 'draft';
@@ -89,8 +73,6 @@ export default function PurchaseOrderDetailPage() {
     can('purchase-orders:cancel') && ['draft', 'approved', 'partially_received'].includes(status);
   const canReceiveNow =
     can('purchase-orders:receive') && ['approved', 'partially_received'].includes(status);
-  const canAllocateNow =
-    can('purchase-orders:allocate') && ['approved', 'partially_received', 'received'].includes(status);
 
   const openReceive = () => {
     const initial: Record<number, string> = {};
@@ -110,37 +92,6 @@ export default function PurchaseOrderDetailPage() {
     if (lines.length === 0) return;
     await receiveMutation.mutateAsync({ id: poId, lines });
     setReceiveOpen(false);
-  };
-
-  const openAllocate = (line: PurchaseOrderLine) => {
-    setAllocateFor(line);
-    setAllocQty('');
-    setAllocDest(destWarehouses.length === 1 ? String(destWarehouses[0].id) : '');
-  };
-
-  const handleAllocate = async () => {
-    if (!poId || !allocateFor || !allocDest) return;
-    await allocateMutation.mutateAsync({
-      id: poId,
-      detail_id: allocateFor.id,
-      dest_warehouse_id: Number(allocDest),
-      quantity: Number(allocQty),
-    });
-    setAllocateFor(null);
-  };
-
-  const openTransfer = (allocationId: number, remaining: number) => {
-    setTransferFor({ allocationId, remaining });
-    setTransferQty(String(remaining));
-  };
-
-  const handleTransfer = async () => {
-    if (!transferFor) return;
-    await transferMutation.mutateAsync({
-      allocationId: transferFor.allocationId,
-      quantity: Number(transferQty),
-    });
-    setTransferFor(null);
   };
 
   return (
@@ -228,6 +179,38 @@ export default function PurchaseOrderDetailPage() {
         </div>
       )}
 
+      {/* Linked auto-transfer (D8) */}
+      {order.linked_transfer_id && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+          <h3 className="font-medium text-gray-900">{t('pages.purchaseOrders.linkedTransfer.title')}</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <p className="text-gray-500">{t('pages.purchaseOrders.linkedTransfer.transferNo')}</p>
+              <p className="font-medium">{order.linked_transfer_no || '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">{t('pages.purchaseOrders.linkedTransfer.status')}</p>
+              <Badge variant={trfStatusVariant(order.linked_transfer_status)}>
+                {t(`pages.purchaseOrders.linkedTransfer.statuses.${order.linked_transfer_status ?? 'draft'}`)}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-gray-500">{t('pages.purchaseOrders.linkedTransfer.destination')}</p>
+              <p className="font-medium">
+                {getLocalizedName({ name_ar: order.linked_transfer_dest_warehouse_name_ar, name_en: order.linked_transfer_dest_warehouse_name_en })}
+              </p>
+            </div>
+          </div>
+          {order.linked_transfer_status === 'draft' && can('purchase-orders:receive') && (
+            <div className="flex justify-end">
+              <Button onClick={() => confirmTransferMutation.mutate(order.id)} disabled={confirmTransferMutation.isPending}>
+                {t('pages.purchaseOrders.actions.confirmTransfer')}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Lines */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -237,16 +220,12 @@ export default function PurchaseOrderDetailPage() {
               <th className="px-4 py-2 text-end font-medium text-gray-500">{t('pages.purchaseOrders.quantityOrdered')}</th>
               <th className="px-4 py-2 text-end font-medium text-gray-500">{t('pages.purchaseOrders.quantityReceived')}</th>
               <th className="px-4 py-2 text-end font-medium text-gray-500">{t('pages.purchaseOrders.remainingToReceive')}</th>
-              <th className="px-4 py-2 text-end font-medium text-gray-500">{t('pages.purchaseOrders.quantityAllocated')}</th>
-              <th className="px-4 py-2 text-end font-medium text-gray-500">{t('pages.purchaseOrders.quantityTransferred')}</th>
               <th className="px-4 py-2 text-end font-medium text-gray-500">{t('pages.purchaseOrders.unitPrice')}</th>
-              <th className="px-4 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {details.map((d) => {
               const remaining = num(d.quantity_ordered) - num(d.quantity_received);
-              const allocatable = num(d.quantity_received) - num(d.quantity_allocated);
               return (
                 <tr key={d.id}>
                   <td className="px-4 py-2">
@@ -255,78 +234,7 @@ export default function PurchaseOrderDetailPage() {
                   <td className="px-4 py-2 text-end">{num(d.quantity_ordered)}</td>
                   <td className="px-4 py-2 text-end">{num(d.quantity_received)}</td>
                   <td className="px-4 py-2 text-end">{remaining}</td>
-                  <td className="px-4 py-2 text-end">{num(d.quantity_allocated)}</td>
-                  <td className="px-4 py-2 text-end">{num(d.quantity_transferred)}</td>
                   <td className="px-4 py-2 text-end">{num(d.unit_price)}</td>
-                  <td className="px-4 py-2 text-end">
-                    {canAllocateNow && allocatable > 0 && (
-                      <Button variant="secondary" onClick={() => openAllocate(d)}>
-                        {t('pages.purchaseOrders.actions.allocate')}
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Allocations */}
-      <h3 className="font-medium text-gray-900">{t('pages.purchaseOrders.allocations')}</h3>
-      <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-2 text-start font-medium text-gray-500">{t('pages.items.title')}</th>
-              <th className="px-4 py-2 text-start font-medium text-gray-500">{t('pages.purchaseOrders.destination')}</th>
-              <th className="px-4 py-2 text-end font-medium text-gray-500">{t('pages.purchaseOrders.quantityAllocated')}</th>
-              <th className="px-4 py-2 text-end font-medium text-gray-500">{t('pages.purchaseOrders.quantityTransferred')}</th>
-              <th className="px-4 py-2 text-end font-medium text-gray-500">{t('pages.purchaseOrders.remainingToTransfer')}</th>
-              <th className="px-4 py-2 text-start font-medium text-gray-500">{t('common.status')}</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {allocations.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">{t('pages.purchaseOrders.noAllocations')}</td></tr>
-            )}
-            {allocations.map((a) => {
-              const allocated = num(a.quantity_allocated);
-              const transferred = num(a.quantity_transferred);
-              const remaining = allocated - transferred;
-              const open = ['allocated', 'partially_transferred'].includes(a.status as AllocationStatus);
-              const canTransfer =
-                can('purchase-orders:transfer') && open && remaining > 0 &&
-                (!isManager || (user?.warehouse_ids ?? []).includes(Number((a as any).source_warehouse_id)));
-              const canConfirmTransfer =
-                can('purchase-orders:transfer') &&
-                a.status === 'pending_confirmation' &&
-                a.transferred_by !== user?.id;
-              return (
-                <tr key={a.id}>
-                  <td className="px-4 py-2">
-                    <span className="font-medium">{a.item_code}</span> — {getLocalizedName({ name_ar: a.item_name_ar, name_en: a.item_name_en })}
-                  </td>
-                  <td className="px-4 py-2">{getLocalizedName({ name_ar: a.dest_warehouse_name_ar, name_en: a.dest_warehouse_name_en })}</td>
-                  <td className="px-4 py-2 text-end">{allocated}</td>
-                  <td className="px-4 py-2 text-end">{transferred}</td>
-                  <td className="px-4 py-2 text-end">{remaining}</td>
-                  <td className="px-4 py-2">
-                    <Badge variant={statusVariant(a.status)}>{t(`pages.purchaseOrders.allocStatuses.${a.status}`)}</Badge>
-                  </td>
-                  <td className="px-4 py-2 text-end">
-                    {canTransfer && (
-                      <Button variant="secondary" onClick={() => openTransfer(a.id, remaining)}>
-                        {t('pages.purchaseOrders.actions.transfer')}
-                      </Button>
-                    )}
-                    {canConfirmTransfer && (
-                      <Button variant="secondary" onClick={() => confirmTransferMutation.mutate(a.id)} disabled={confirmTransferMutation.isPending}>
-                        {t('pages.purchaseOrders.actions.confirmTransfer')}
-                      </Button>
-                    )}
-                  </td>
                 </tr>
               );
             })}
@@ -353,6 +261,9 @@ export default function PurchaseOrderDetailPage() {
       {/* Receive dialog */}
       <Modal isOpen={receiveOpen} onClose={() => setReceiveOpen(false)} title={t('pages.purchaseOrders.receiveTitle')} size="lg">
         <div className="space-y-3">
+          <p className="text-sm text-gray-500">
+            {t('pages.purchaseOrders.receiveIntoHint', { warehouse: getLocalizedName({ name_ar: order.warehouse_name_ar, name_en: order.warehouse_name_en }) })}
+          </p>
           {details.filter((d) => num(d.quantity_ordered) - num(d.quantity_received) > 0).map((d) => {
             const ordered = num(d.quantity_ordered);
             const received = num(d.quantity_received);
@@ -379,56 +290,6 @@ export default function PurchaseOrderDetailPage() {
             <Button onClick={handleReceive} disabled={receiveMutation.isPending}>{t('pages.purchaseOrders.actions.receive')}</Button>
           </div>
         </div>
-      </Modal>
-
-      {/* Allocate dialog */}
-      <Modal isOpen={allocateFor !== null} onClose={() => setAllocateFor(null)} title={t('pages.purchaseOrders.allocateTitle')}>
-        {allocateFor && (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600">
-              {allocateFor.item_code} — {getLocalizedName({ name_ar: allocateFor.item_name_ar, name_en: allocateFor.item_name_en })}
-            </p>
-            <p className="text-sm text-gray-500">
-              {t('pages.purchaseOrders.allocatableHint', {
-                value: num(allocateFor.quantity_received) - num(allocateFor.quantity_allocated),
-              })}
-            </p>
-            <Select label={t('pages.purchaseOrders.destination')} value={allocDest}
-              onChange={(e) => setAllocDest(e.target.value)}
-              options={[
-                { value: '', label: t('common.select') },
-                ...destWarehouses.map((w: any) => ({ value: String(w.id), label: getLocalizedName(w) || w.code })),
-              ]} />
-            <Input type="number" min="0" step="any" label={t('pages.purchaseOrders.allocateQuantity')}
-              value={allocQty} onChange={(e) => setAllocQty(e.target.value)} />
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setAllocateFor(null)}>{t('common.cancel')}</Button>
-              <Button onClick={handleAllocate} disabled={allocateMutation.isPending}>
-                {t('pages.purchaseOrders.actions.allocate')}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Transfer dialog */}
-      <Modal isOpen={transferFor !== null} onClose={() => setTransferFor(null)} title={t('pages.purchaseOrders.transferTitle')}>
-        {transferFor && (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-500">
-              {t('pages.purchaseOrders.transferableHint', { value: transferFor.remaining })}
-            </p>
-            <Input type="number" min="0" max={transferFor.remaining} step="any"
-              label={t('pages.purchaseOrders.transferQuantity')}
-              value={transferQty} onChange={(e) => setTransferQty(e.target.value)} />
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setTransferFor(null)}>{t('common.cancel')}</Button>
-              <Button onClick={handleTransfer} disabled={transferMutation.isPending}>
-                {t('pages.purchaseOrders.actions.transfer')}
-              </Button>
-            </div>
-          </div>
-        )}
       </Modal>
     </div>
   );

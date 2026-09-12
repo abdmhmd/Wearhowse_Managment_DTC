@@ -63,32 +63,29 @@ describe('mapApiError — purchase orders', () => {
       .toBe('pages.purchaseOrders.errors.exceedsOrdered');
   });
 
-  it('maps ALLOCATE_EXCEEDS_RECEIVED', () => {
-    expect(mapApiError(apiError('ALLOCATE_EXCEEDS_RECEIVED', 400)).key)
-      .toBe('pages.purchaseOrders.errors.exceedsReceived');
+  it('maps NO_TRANSFER_DESTINATION', () => {
+    expect(mapApiError(apiError('NO_TRANSFER_DESTINATION', 400)).key)
+      .toBe('pages.purchaseOrders.errors.noTransferDestination');
   });
 
-  it('maps ALLOCATE_EXCEEDS_AVAILABLE with quantities', () => {
-    const m = mapApiError(apiError('ALLOCATE_EXCEEDS_AVAILABLE', 400, { available: 5, requested: 8 }));
-    expect(m.key).toBe('pages.purchaseOrders.errors.insufficientAllocationWithQty');
-    expect(m.params).toEqual({ available: '5', requested: '8' });
+  it('maps AMBIGUOUS_TRANSFER_DESTINATION', () => {
+    expect(mapApiError(apiError('AMBIGUOUS_TRANSFER_DESTINATION', 400)).key)
+      .toBe('pages.purchaseOrders.errors.ambiguousTransferDestination');
   });
 
-  it('maps TRANSFER_EXCEEDS_ALLOCATED', () => {
-    expect(mapApiError(apiError('TRANSFER_EXCEEDS_ALLOCATED', 400)).key)
-      .toBe('pages.purchaseOrders.errors.exceedsAllocated');
+  it('maps NO_LINKED_TRANSFER', () => {
+    expect(mapApiError(apiError('NO_LINKED_TRANSFER', 400)).key)
+      .toBe('pages.purchaseOrders.errors.noLinkedTransfer');
+  });
+
+  it('maps LINKED_TRANSFER_ALREADY_CONFIRMED', () => {
+    expect(mapApiError(apiError('LINKED_TRANSFER_ALREADY_CONFIRMED', 409)).key)
+      .toBe('pages.purchaseOrders.errors.linkedTransferAlreadyConfirmed');
   });
 
   it('maps INVALID_PURCHASE_ORDER_STATUS', () => {
     expect(mapApiError(apiError('INVALID_PURCHASE_ORDER_STATUS', 400)).key)
       .toBe('pages.purchaseOrders.errors.invalidStatus');
-  });
-
-  it('maps MAIN_WAREHOUSE_REQUIRED and INVALID_DESTINATION_WAREHOUSE', () => {
-    expect(mapApiError(apiError('MAIN_WAREHOUSE_REQUIRED', 400)).key)
-      .toBe('pages.purchaseOrders.errors.mainWarehouseRequired');
-    expect(mapApiError(apiError('INVALID_DESTINATION_WAREHOUSE', 400)).key)
-      .toBe('pages.purchaseOrders.errors.invalidDestination');
   });
 
   it('maps PURCHASE_ORDER_NOT_FOUND', () => {
@@ -115,10 +112,11 @@ describe('getApiErrorMessage', () => {
 describe('translations completeness', () => {
   const mrKeys = ['insufficientStock', 'insufficientStockWithQty', 'invalidItem', 'invalidUnit',
     'notFound', 'invalidStatus', 'forbidden', 'warehouseScope', 'mainWarehouseDestination', 'noMainWarehouse'];
-  const poKeys = ['insufficientAllocation', 'insufficientAllocationWithQty', 'exceedsReceived',
-    'exceedsAllocated', 'exceedsOrdered', 'allocationTransferred', 'notFound', 'invalidStatus',
-    'forbidden', 'warehouseScope', 'mainWarehouseRequired', 'invalidDestination',
-    'cannotCancel', 'cannotClose'];
+  const poKeys = ['noTransferDestination', 'ambiguousTransferDestination',
+    'noLinkedTransfer', 'linkedTransferAlreadyConfirmed',
+    'exceedsOrdered', 'notFound', 'invalidStatus',
+    'forbidden', 'warehouseScope', 'mainWarehouseRequired',
+    'cannotCancel', 'receiveFailed'];
 
   function collect(obj: any, prefix = ''): string[] {
     return Object.entries(obj).flatMap(([k, v]) =>

@@ -29,7 +29,7 @@ export type Permission =
   | 'batches:view'
   | 'projects:view' | 'projects:create' | 'projects:update' | 'projects:close' | 'projects:delete' | 'projects:supervisors'
   | 'custodies:view' | 'custodies:view_own' | 'custodies:return'
-  | 'purchase-orders:view' | 'purchase-orders:create' | 'purchase-orders:update' | 'purchase-orders:approve' | 'purchase-orders:cancel' | 'purchase-orders:receive' | 'purchase-orders:allocate' | 'purchase-orders:transfer'
+  | 'purchase-orders:view' | 'purchase-orders:create' | 'purchase-orders:update' | 'purchase-orders:approve' | 'purchase-orders:cancel' | 'purchase-orders:receive'
   | 'purchase-requests:view'
   | 'purchase-requests:view_own'
   | 'purchase-requests:create'
@@ -40,7 +40,6 @@ export type Permission =
   | 'purchase-requests:reject-admin';
 
 export type PurchaseOrderStatus = 'draft' | 'approved' | 'partially_received' | 'received' | 'closed' | 'cancelled';
-export type AllocationStatus = 'allocated' | 'partially_transferred' | 'transferred' | 'cancelled' | 'pending_confirmation';
 
 export interface PurchaseOrderLine {
   id: number;
@@ -51,37 +50,11 @@ export interface PurchaseOrderLine {
   item_name_en?: string;
   quantity_ordered: number | string;
   quantity_received: number | string;
-  quantity_allocated: number | string;
-  quantity_transferred: number | string;
   unit_code: string;
   unit_name_ar?: string;
   unit_name_en?: string;
   unit_price?: number | string;
   notes?: string | null;
-}
-
-export interface PurchaseOrderAllocation {
-  id: number;
-  po_detail_id: number;
-  po_id: number;
-  source_warehouse_id: number;
-  dest_warehouse_id: number;
-  dest_warehouse_code?: string;
-  dest_warehouse_name_ar?: string;
-  dest_warehouse_name_en?: string;
-  item_id?: number;
-  item_code?: string;
-  item_name_ar?: string;
-  item_name_en?: string;
-  quantity_allocated: number | string;
-  quantity_transferred: number | string;
-  status: AllocationStatus;
-  allocated_by_name?: string | null;
-  transferred_by?: number | null;
-  transferred_by_name?: string | null;
-  transfer_confirmed_by?: number | null;
-  transfer_transaction_no?: string | null;
-  created_at?: string;
 }
 
 export interface PurchaseOrder {
@@ -108,14 +81,23 @@ export interface PurchaseOrder {
   lines_count?: number;
   quantity_ordered?: number | string;
   quantity_received?: number | string;
-  quantity_allocated?: number | string;
-  quantity_transferred?: number | string;
   details?: PurchaseOrderLine[];
-  allocations?: PurchaseOrderAllocation[];
   created_at?: string;
   /** Set when the PO was AUTO-CREATED from a purchase request (1-to-1). */
   purchase_request_id?: number | null;
   purchase_request_no?: string | null;
+  /** Auto-created draft transfer drafted by the receive action. */
+  linked_transfer_id?: number | null;
+  linked_transfer_no?: string | null;
+  linked_transfer_status?: string | null;
+  linked_transfer_dest_warehouse_id?: number | null;
+  linked_transfer_dest_warehouse_code?: string | null;
+  linked_transfer_dest_warehouse_name_ar?: string | null;
+  linked_transfer_dest_warehouse_name_en?: string | null;
+  /** Set when the receipt was confirmed (two-party). */
+  receive_confirmed_by?: number | null;
+  receive_confirmed_by_name?: string | null;
+  receive_confirmed_at?: string | null;
 }
 
 export type PurchaseRequestStatus = 'pending' | 'dept_approved' | 'admin_approved' | 'rejected' | 'cancelled';

@@ -95,26 +95,6 @@ export function useReceivePurchaseOrder() {
   });
 }
 
-export function useAllocateStock() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, detail_id, dest_warehouse_id, quantity }: { id: number; detail_id: number; dest_warehouse_id: number; quantity: number }) =>
-      purchaseOrdersApi.allocate(id, { detail_id, dest_warehouse_id, quantity }),
-    onSuccess: () => invalidatePos(queryClient),
-    onError: (error: Error) => showError(getErrorMessage(error, 'Failed to allocate stock')),
-  });
-}
-
-export function useTransferAllocation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ allocationId, quantity }: { allocationId: number; quantity: number }) =>
-      purchaseOrdersApi.transfer(allocationId, quantity),
-    onSuccess: () => invalidatePos(queryClient),
-    onError: (error: Error) => showError(getErrorMessage(error, 'Failed to transfer stock')),
-  });
-}
-
 export function useConfirmPurchaseOrderReceive() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -127,10 +107,10 @@ export function useConfirmPurchaseOrderReceive() {
   });
 }
 
-export function useConfirmTransferAllocation() {
+export function useConfirmPurchaseOrderTransfer() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (allocationId: number) => purchaseOrdersApi.confirmTransfer(allocationId),
+    mutationFn: (id: number) => purchaseOrdersApi.confirmTransfer(id),
     onSuccess: (data) => {
       invalidatePos(queryClient);
       showSuccess(data.data?.message || 'Transfer confirmed');

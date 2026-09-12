@@ -78,20 +78,14 @@ export function mapApiError(error: any): MappedApiError {
     // ── purchase orders ─────────────────────────────────────────────────────
     case 'RECEIVE_EXCEEDS_ORDERED':
       return { key: 'pages.purchaseOrders.errors.exceedsOrdered', params: qty.requested !== undefined ? { attempted: qty.requested } : undefined };
-    case 'ALLOCATE_EXCEEDS_RECEIVED':
-      return { key: 'pages.purchaseOrders.errors.exceedsReceived' };
-    case 'ALLOCATE_EXCEEDS_AVAILABLE':
-      return qty.available !== undefined && qty.requested !== undefined
-        ? { key: 'pages.purchaseOrders.errors.insufficientAllocationWithQty', params: qty }
-        : { key: 'pages.purchaseOrders.errors.insufficientAllocation' };
-    case 'TRANSFER_EXCEEDS_ALLOCATED':
-      return { key: 'pages.purchaseOrders.errors.exceedsAllocated' };
-    case 'ALLOCATION_ALREADY_TRANSFERRED':
-      return { key: 'pages.purchaseOrders.errors.allocationTransferred' };
-    case 'INVALID_DESTINATION_WAREHOUSE':
-      return { key: 'pages.purchaseOrders.errors.invalidDestination' };
-    case 'PO_CANNOT_CLOSE':
-      return { key: 'pages.purchaseOrders.errors.cannotClose' };
+    case 'NO_TRANSFER_DESTINATION':
+      return { key: 'pages.purchaseOrders.errors.noTransferDestination' };
+    case 'AMBIGUOUS_TRANSFER_DESTINATION':
+      return { key: 'pages.purchaseOrders.errors.ambiguousTransferDestination' };
+    case 'NO_LINKED_TRANSFER':
+      return { key: 'pages.purchaseOrders.errors.noLinkedTransfer' };
+    case 'LINKED_TRANSFER_ALREADY_CONFIRMED':
+      return { key: 'pages.purchaseOrders.errors.linkedTransferAlreadyConfirmed' };
     case 'PURCHASE_ORDER_NOT_FOUND':
       return { key: 'pages.purchaseOrders.errors.notFound' };
 
