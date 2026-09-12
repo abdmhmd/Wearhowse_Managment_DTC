@@ -59,7 +59,7 @@ describe('Auth Login', () => {
     expect(err.status).toBe(401);
   });
 
-  test('should reject missing fields', async () => {
+  test('should reject missing fields with the generic credentials error (no leak)', async () => {
     const controller = new AuthController();
     const { req, res } = mockReqRes({ username: '' });
     const next = jest.fn();
@@ -67,7 +67,8 @@ describe('Auth Login', () => {
 
     expect(next).toHaveBeenCalled();
     const err = next.mock.calls[0][0];
-    expect(err.status).toBe(400);
+    expect(err.status).toBe(401);
+    expect(err.code).toBe('AUTH_INVALID_CREDENTIALS');
   });
 
   test('should reject unknown username', async () => {

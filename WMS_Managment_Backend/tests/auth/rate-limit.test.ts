@@ -1,5 +1,10 @@
+// A 6 s window keeps the limit reachable even though every failed login now
+// carries a ~200 ms constant-time floor (login hardening): with a 1 s window
+// the first attempts expire before a fourth arrives, so the 429 could never
+// fire. The semantics under test (max allowed -> 429 on the next -> free after
+// the window) are unchanged.
 process.env.LOGIN_RATE_LIMIT_MAX = '3';
-process.env.LOGIN_RATE_LIMIT_WINDOW_MS = '1000';
+process.env.LOGIN_RATE_LIMIT_WINDOW_MS = '6000';
 
 import request from 'supertest';
 import type { Application } from 'express';
@@ -35,7 +40,7 @@ describe('Login rate limiting', () => {
   });
 
   it('allows login again after the window resets', async () => {
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await new Promise((resolve) => setTimeout(resolve, 6200));
 
     const res = await request(app)
       .post('/api/auth/login')

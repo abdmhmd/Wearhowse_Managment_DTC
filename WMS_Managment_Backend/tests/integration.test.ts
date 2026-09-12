@@ -84,12 +84,13 @@ describe('API Integration Tests', () => {
       expect(res.body.success).toBe(false);
     });
 
-    test('login with missing fields returns 400', async () => {
+    test('login with missing fields returns the generic credentials code (no leak)', async () => {
       const res = await request(app)
         .post('/api/auth/login')
         .send({});
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(401);
       expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('AUTH_INVALID_CREDENTIALS');
     });
   });
 

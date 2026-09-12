@@ -6,33 +6,68 @@ import { verifyPassword } from '../../utils/crypto';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken, hashToken } from '../../utils/jwt';
 import { sendData } from '../../utils/response';
 import { loginSchema } from './auth.validator';
-import { AuthError, ValidationError } from '../../utils/AppError';
+import { AuthError } from '../../utils/AppError';
 import { logger } from '../../utils/logger';
 import { loadAuthContext } from '../authorization/authorization.service';
 import { writeAudit } from '../authorization/audit.service';
 import { AuthenticatedRequest } from '../../middlewares/auth.middleware';
+import { loginAttempts } from './loginAttempts';
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Dummy bcrypt hash used ONLY for timing equalization: when the username does
+ * not exist the server still runs a bcrypt compare against this fixed hash so
+ * the response time matches the wrong-password path — nobody can tell whether
+ * a username exists by measuring latency.
+ */
+const DUMMY_TIMING_HASH = '$2b$10$TS011iN3//m7y0sinqGYzOFelH6p.cr5d148EW3feH66BNPCiEMHe';
+
+/** Scoping key for the progressive-delay tracker: username + IP combined. */
+const loginFailureKey = (username: string, ip?: string): string =>
+  `${(username ?? '').trim().toLowerCase()}|${ip ?? 'unknown'}`;
 
 export class AuthController {
   async login(req: Request, _res: Response, next: NextFunction) {
     try {
       const parsed = loginSchema.safeParse(req.body);
-      if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
+      // Generic code for malformed credentials as well: the client validates
+      // format locally, and the server must never hint at which field is wrong.
+      if (!parsed.success) throw new AuthError('Invalid credentials', 'AUTH_INVALID_CREDENTIALS');
 
       const { username, password } = parsed.data;
+      const loginKey = loginFailureKey(username, req.ip);
       logger.debug(`Login attempt for username "${username}"`, 'Auth');
+
+      // ── Unified failure pipeline ────────────────────────────────────────
+      // Every failure path registers the progressive-delay streak for this
+      // username+IP, waits the (progressive) response delay, then throws.
+      // Success resets the streak. The helper returns `never` so TypeScript
+      // keeps control-flow narrowing after each guarded branch.
+      const fail = async (message: string, code: string): Promise<never> => {
+        const attempt = loginAttempts.register(loginKey);
+        await sleep(loginAttempts.delayFor(attempt.count));
+        throw new AuthError(message, code);
+      };
 
       const user = await usersRepository.findByUsername(username);
       if (!user) {
+        // Timing equalization: run a real bcrypt compare against a fixed
+        // dummy hash so an unknown username answers in the same time as a
+        // wrong password, before the generic failure is raised.
+        await verifyPassword(password, DUMMY_TIMING_HASH);
         logger.debug(`Login rejected: no user found for username "${username}"`, 'Auth');
+        const attempt = loginAttempts.register(loginKey);
+        await sleep(loginAttempts.delayFor(attempt.count));
         throw new AuthError('Invalid credentials', 'AUTH_INVALID_CREDENTIALS');
       }
       if (!user.is_active) {
         logger.debug(`Login rejected: account "${username}" is inactive`, 'Auth');
-        throw new AuthError('Account is disabled. Contact an administrator.', 'AUTH_ACCOUNT_DISABLED');
+        await fail('Account is disabled. Contact an administrator.', 'AUTH_ACCOUNT_DISABLED');
       }
       if (!ACTIVE_ROLES.includes(user.role)) {
         logger.debug(`Login rejected: role "${user.role}" of "${username}" is deactivated`, 'Auth');
-        throw new AuthError(
+        await fail(
           'Your role is no longer active. Contact an administrator.',
           'AUTH_ROLE_DISABLED'
         );
@@ -49,8 +84,11 @@ export class AuthController {
           ip_address: req.ip,
           user_agent: req.headers?.['user-agent'] ?? null,
         });
-        throw new AuthError('Invalid credentials', 'AUTH_INVALID_CREDENTIALS');
+        await fail('Invalid credentials', 'AUTH_INVALID_CREDENTIALS');
       }
+
+      // ── Success: clear the failure streak for this username+IP ───────────
+      loginAttempts.reset(loginKey);
 
       const payload = {
         userId: user.id,
