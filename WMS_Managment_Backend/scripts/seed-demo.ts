@@ -72,12 +72,6 @@ const UNITS = [
   { code: 'BOX', name_ar: 'صندوق', name_en: 'Box' },
 ];
 
-const SUPPLIERS = [
-  { name_ar: 'شركة ABC للصناعات', name_en: 'ABC Industries', phone: '+966501234501', email: 'sales@abc-industries.com', address: 'Riyadh, KSA' },
-  { name_ar: 'شركة الإمداد العالمية', name_en: 'Global Supply Co.', phone: '+966501234502', email: 'orders@globalsupply.com', address: 'Jeddah, KSA' },
-  { name_ar: 'شركة المواد المحلية', name_en: 'Local Materials Ltd.', phone: '+966501234503', email: 'info@localmaterials.com', address: 'Dammam, KSA' },
-];
-
 // Hierarchical categories: parent -> children
 const CATEGORIES = [
   { code: 'RAW', name_ar: 'مواد خام', name_en: 'Raw Materials', prefix: 'RAW', parent_code: null },
@@ -354,16 +348,6 @@ async function seedDemo(): Promise<void> {
     }
     stats['units'] = UNITS.length;
 
-    log('🤝 Suppliers...');
-    for (const s of SUPPLIERS) {
-      await q(client,
-        `INSERT INTO suppliers (name_ar, name_en, phone, email, address)
-         SELECT $1::varchar, $2::varchar, $3::varchar, $4::varchar, $5::text
-         WHERE NOT EXISTS (SELECT 1 FROM suppliers WHERE name_en = $2::varchar)`,
-        [s.name_ar, s.name_en, s.phone, s.email, s.address]);
-    }
-    stats['suppliers'] = SUPPLIERS.length;
-
     log('📁 Categories (hierarchical)...');
     for (const c of CATEGORIES) {
       await q(client,
@@ -448,10 +432,6 @@ async function seedDemo(): Promise<void> {
     const userId: Record<string, number> = {};
     for (const r of userRows.rows) userId[r.username] = r.id;
 
-    const supRows = await q(client, `SELECT id, name_en FROM suppliers`);
-    const supId: Record<string, number> = {};
-    for (const r of supRows.rows) supId[r.name_en] = r.id;
-
     const adminId = userId['admin'];
 
     const itemUnit: Record<string, string> = {};
@@ -473,12 +453,11 @@ async function seedDemo(): Promise<void> {
       txnDate.setDate(txnDate.getDate() - t.days_ago);
 
       const hdr = await q(client,
-        `INSERT INTO transactions (transaction_no, type, status, transaction_date, supplier_id, department_id, warehouse_id, to_warehouse_id, created_by, approved_by, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `INSERT INTO transactions (transaction_no, type, status, transaction_date, department_id, warehouse_id, to_warehouse_id, created_by, approved_by, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
         [
           txnNo, t.type, t.status, txnDate,
-          t.supplier ? supId[t.supplier] ?? null : null,
           t.department ? deptId[t.department] ?? null : null,
           whId[t.warehouse],
           t.to_warehouse ? whId[t.to_warehouse] ?? null : null,
@@ -639,19 +618,17 @@ async function seedDemo(): Promise<void> {
       const [whCode, itemCode, batchNo] = k.split('|');
       const meta = batchMeta.get(k);
       await q(client,
-        `INSERT INTO batches (item_id, warehouse_id, batch_number, production_date, expiry_date, quantity, unit_code, supplier_id, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO batches (item_id, warehouse_id, batch_number, production_date, expiry_date, quantity, unit_code, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (item_id, warehouse_id, batch_number) DO UPDATE SET
            production_date = EXCLUDED.production_date,
            expiry_date = EXCLUDED.expiry_date,
            quantity = EXCLUDED.quantity,
-           unit_code = EXCLUDED.unit_code,
-           supplier_id = EXCLUDED.supplier_id`,
+           unit_code = EXCLUDED.unit_code`,
         [
           itemId[itemCode], whId[whCode], batchNo,
           meta?.production_date ?? null, meta?.expiry_date ?? null,
           qty, itemUnit[itemCode],
-          meta?.supplier ? supId[meta.supplier] ?? null : null,
           SEED_MARKER,
         ]);
       stats['batches'] = (stats['batches'] || 0) + 1;

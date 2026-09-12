@@ -272,11 +272,6 @@ async function main() {
       );
       for (const r of res.rows) user[r.username] = r;
     }
-    const supplier: Record<string, Row> = {};
-    {
-      const res = await client.query(`SELECT id, name_en FROM suppliers`);
-      for (const r of res.rows) supplier[r.name_en] = r;
-    }
     const subcat: Record<string, Row> = {};
     {
       const res = await client.query(`SELECT id, category_code, code FROM subcategories WHERE is_active = true`);
@@ -561,8 +556,7 @@ async function main() {
         console.warn(`  warehouse ${stock.warehouse_code} not found, skipping stock`);
         continue;
       }
-      const sup = supplier[stock.supplier_name_en];
-      if (!sup) {
+      if (!stock.supplier_name_en) {
         console.warn(`  supplier ${stock.supplier_name_en} not found, skipping stock for ${stock.warehouse_code}`);
         continue;
       }
@@ -625,7 +619,6 @@ async function main() {
           {
             type: 'RV',
             warehouse_id: whId,
-            supplier_id: sup.id,
             created_by: user['admin'].id,
             notes: `DEMO-WMS استلام بضاعة - ${it.name_en}`,
           },

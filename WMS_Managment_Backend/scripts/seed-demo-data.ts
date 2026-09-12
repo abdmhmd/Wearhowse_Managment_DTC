@@ -49,13 +49,6 @@ const WAREHOUSES = [
   { code: 'WH-DAM', name_ar: 'مستودع التالف', name_en: 'Damaged Goods Warehouse', location: 'المبنى الرئيسي - القبو', is_main: false, department: null },
 ];
 
-const SUPPLIERS = [
-  { name_ar: 'شركة تكنولوجيا التوريد', name_en: 'TechSupply Co.', phone: '+966501234567', email: 'info@techsupply.com', address: 'الرياض، المملكة العربية السعودية' },
-  { name_ar: 'الأثاث العالمي المحدودة', name_en: 'Global Furniture Ltd.', phone: '+966502345678', email: 'sales@globalfurniture.com', address: 'جدة، المملكة العربية السعودية' },
-  { name_ar: 'أوفيس مارت', name_en: 'OfficeMart', phone: '+966503456789', email: 'orders@officemart.com', address: 'الدمام، المملكة العربية السعودية' },
-  { name_ar: 'الموزعون المحليون', name_en: 'Local Distributors', phone: '+966504567890', email: 'contact@localdist.com', address: 'الخبر، المملكة العربية السعودية' },
-];
-
 const DEPARTMENTS = [
   { code: 'IT', name_ar: 'قسم تقنية المعلومات', name_en: 'IT Department' },
   { code: 'HR', name_ar: 'الموارد البشرية', name_en: 'Human Resources' },
@@ -146,23 +139,7 @@ async function seedDemoData(): Promise<void> {
     logSummary('Warehouses', whCount);
     totalInserted += whCount;
 
-    // ── 4. Suppliers ────────────────────────────────────────────────
-    log('🤝 Seeding suppliers...');
-    let supCount = 0;
-    for (const s of SUPPLIERS) {
-      const existing = await client.query('SELECT name_ar FROM suppliers WHERE name_ar = $1', [s.name_ar]);
-      if (existing.rows.length === 0) {
-        await client.query(
-          'INSERT INTO suppliers (name_ar, name_en, phone, email, address) VALUES ($1, $2, $3, $4, $5)',
-          [s.name_ar, s.name_en, s.phone, s.email, s.address]
-        );
-        supCount++;
-      }
-    }
-    logSummary('Suppliers', supCount);
-    totalInserted += supCount;
-
-    // ── 5. Departments ──────────────────────────────────────────────
+    // ── 4. Departments ──────────────────────────────────────────────
     log('🏢 Seeding departments...');
     let deptCount = 0;
     for (const d of DEPARTMENTS) {
@@ -178,7 +155,7 @@ async function seedDemoData(): Promise<void> {
     logSummary('Departments', deptCount);
     totalInserted += deptCount;
 
-    // ── 6. Users ────────────────────────────────────────────────────
+    // ── 5. Users ────────────────────────────────────────────────────
     log('👤 Seeding users...');
     const passwordHash = await bcrypt.hash(PASSWORD, SALT_ROUNDS);
     let userCount = 0;
@@ -195,7 +172,7 @@ async function seedDemoData(): Promise<void> {
     logSummary('Users', userCount);
     totalInserted += userCount;
 
-    // ── 7. Items ────────────────────────────────────────────────────
+    // ── 6. Items ────────────────────────────────────────────────────
     log('📦 Seeding items...');
     const whRows = await client.query('SELECT id, code FROM warehouses');
     const whMap: Record<string, number> = {};
@@ -216,7 +193,7 @@ async function seedDemoData(): Promise<void> {
     logSummary('Items', itemCount);
     totalInserted += itemCount;
 
-    // ── 8. Unit Conversions ─────────────────────────────────────────
+    // ── 7. Unit Conversions ─────────────────────────────────────────
     log('🔄 Seeding unit conversions...');
     const itemRows = await client.query('SELECT id, item_code FROM items');
     const itemMap: Record<string, number> = {};
@@ -243,7 +220,7 @@ async function seedDemoData(): Promise<void> {
     logSummary('Unit Conversions', convCount);
     totalInserted += convCount;
 
-    // ── 9. Transactions ─────────────────────────────────────────────
+    // ── 8. Transactions ─────────────────────────────────────────────
     log('📝 Seeding transactions...');
 
     // Create sequence if it doesn't exist
@@ -252,10 +229,6 @@ async function seedDemoData(): Promise<void> {
     const userRows = await client.query('SELECT id, username FROM users');
     const userMap: Record<string, number> = {};
     for (const row of userRows.rows) userMap[row.username] = row.id;
-
-    const supRows = await client.query('SELECT id, name_ar FROM suppliers');
-    const supNameToId: Record<string, number> = {};
-    for (const row of supRows.rows) supNameToId[row.name_ar] = row.id;
 
     // Helper to generate transaction number
     async function nextTxnNo(type: string): Promise<string> {
@@ -287,10 +260,10 @@ async function seedDemoData(): Promise<void> {
     if (!(await txnExists('RV', 'approved', notes1))) {
       const txn1No = await nextTxnNo('RV');
       const txn1 = await client.query(
-        `INSERT INTO transactions (transaction_no, type, status, supplier_id, warehouse_id, created_by, approved_by, notes)
-         VALUES ($1, 'RV', 'approved', $2, $3, $4, $5, $6)
+        `INSERT INTO transactions (transaction_no, type, status, warehouse_id, created_by, approved_by, notes)
+         VALUES ($1, 'RV', 'approved', $2, $3, $4, $5)
          RETURNING id`,
-        [txn1No, supNameToId['شركة تكنولوجيا التوريد'], whMap['WH-MAIN'], userMap['admin'], userMap['admin'], notes1]
+        [txn1No, whMap['WH-MAIN'], userMap['admin'], userMap['admin'], notes1]
       );
       const txn1Id = txn1.rows[0].id;
 
@@ -361,10 +334,10 @@ async function seedDemoData(): Promise<void> {
     if (!(await txnExists('RV', 'draft', notes3))) {
       const txn3No = await nextTxnNo('RV');
       const txn3 = await client.query(
-        `INSERT INTO transactions (transaction_no, type, status, supplier_id, warehouse_id, created_by, notes)
-         VALUES ($1, 'RV', 'draft', $2, $3, $4, $5)
+        `INSERT INTO transactions (transaction_no, type, status, warehouse_id, created_by, notes)
+         VALUES ($1, 'RV', 'draft', $2, $3, $4)
          RETURNING id`,
-        [txn3No, supNameToId['أوفيس مارت'], whMap['WH-MAIN'], userMap['admin'], notes3]
+        [txn3No, whMap['WH-MAIN'], userMap['admin'], notes3]
       );
       const txn3Id = txn3.rows[0].id;
 
@@ -425,7 +398,6 @@ async function seedDemoData(): Promise<void> {
       tableCount(client, 'categories'),
       tableCount(client, 'units'),
       tableCount(client, 'warehouses'),
-      tableCount(client, 'suppliers'),
       tableCount(client, 'departments'),
       tableCount(client, 'users'),
       tableCount(client, 'items'),
@@ -439,14 +411,13 @@ async function seedDemoData(): Promise<void> {
     log(`    Categories:       ${finalCounts[0]}`);
     log(`    Units:            ${finalCounts[1]}`);
     log(`    Warehouses:       ${finalCounts[2]}`);
-    log(`    Suppliers:        ${finalCounts[3]}`);
-    log(`    Departments:      ${finalCounts[4]}`);
-    log(`    Users:            ${finalCounts[5]}`);
-    log(`    Items:            ${finalCounts[6]}`);
-    log(`    Unit Conversions: ${finalCounts[7]}`);
-    log(`    Transactions:     ${finalCounts[8]}`);
-    log(`    Txn Details:      ${finalCounts[9]}`);
-    log(`    Stock Movements:  ${finalCounts[10]}`);
+    log(`    Departments:      ${finalCounts[3]}`);
+    log(`    Users:            ${finalCounts[4]}`);
+    log(`    Items:            ${finalCounts[5]}`);
+    log(`    Unit Conversions: ${finalCounts[6]}`);
+    log(`    Transactions:     ${finalCounts[7]}`);
+    log(`    Txn Details:      ${finalCounts[8]}`);
+    log(`    Stock Movements:  ${finalCounts[9]}`);
     log('');
     log('  🔐 Demo Credentials:');
     log('  ┌──────────────┬────────────┬─────────────────────┐');

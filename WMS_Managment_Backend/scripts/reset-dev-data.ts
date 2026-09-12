@@ -29,7 +29,6 @@ const ALL_TABLES = [
   'refresh_tokens',
   'stock_movements',
   'subcategories',
-  'suppliers',
   'system_settings',
   'transaction_details',
   'transactions',
@@ -60,7 +59,6 @@ const DELETE_ORDER: Array<[string, string]> = [
   ['categories', ''],
   ['units', ''],
   ['warehouses', ''],
-  ['suppliers', ''],
   ['departments', ''],
   ['system_settings', ''],
 ];
@@ -70,7 +68,7 @@ const IDENTITY_SEQ_TABLES = [
   'alerts', 'batches', 'custodies', 'departments', 'inventory_counts',
   'inventory_sessions', 'item_warehouse_stock', 'items', 'journal_entries',
   'locations', 'material_request_details', 'material_requests', 'projects',
-  'refresh_tokens', 'stock_movements', 'subcategories', 'suppliers',
+  'refresh_tokens', 'stock_movements', 'subcategories',
   'transaction_details', 'transactions', 'unit_conversions', 'warehouses',
 ];
 

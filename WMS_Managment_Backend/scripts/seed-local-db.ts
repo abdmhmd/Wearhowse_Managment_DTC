@@ -52,12 +52,6 @@ const DEPARTMENTS = [
   { code: 'FIN', name_ar: 'المالية', name_en: 'Finance' },
 ];
 
-const SUPPLIERS = [
-  { name_ar: 'شركة تكنولوجيا التوريد', name_en: 'TechSupply Co.', phone: '+966501234567', email: 'info@techsupply.com', address: 'الرياض، المملكة العربية السعودية' },
-  { name_ar: 'الأثاث العالمي المحدودة', name_en: 'Global Furniture Ltd.', phone: '+966502345678', email: 'sales@globalfurniture.com', address: 'جدة، المملكة العربية السعودية' },
-  { name_ar: 'أوفيس مارت', name_en: 'OfficeMart', phone: '+966503456789', email: 'orders@officemart.com', address: 'الدمام، المملكة العربية السعودية' },
-];
-
 const ITEMS = [
   { item_code: 'LAPTOP-PRO', name_ar: 'لابتوب برو', name_en: 'Laptop Pro', description: 'لابتوب أعمال 14 بوصة', category_code: 'ELEC', unit_code: 'PC', warehouse: 'WH-MAIN', min: 10, max: 100, balance: 50, location: 'رف A1' },
   { item_code: 'OFFICE-CHAIR', name_ar: 'كرسي مكتب', name_en: 'Office Chair', description: 'كرسي مكتب مريح قابل للتعديل', category_code: 'FURN', unit_code: 'PC', warehouse: 'WH-MAIN', min: 5, max: 50, balance: 30, location: 'رف B2' },
@@ -151,25 +145,7 @@ async function seedLocalDb(): Promise<void> {
     logStep('Departments', deptInserted, deptSkipped);
     totalInserted += deptInserted;
 
-    // ── 5. Suppliers ────────────────────────────────────────────────
-    log('🤝 Seeding suppliers...');
-    let supInserted = 0, supSkipped = 0;
-    for (const s of SUPPLIERS) {
-      const existing = await client.query('SELECT name_ar FROM suppliers WHERE name_ar = $1', [s.name_ar]);
-      if (existing.rows.length === 0) {
-        await client.query(
-          'INSERT INTO suppliers (name_ar, name_en, phone, email, address) VALUES ($1, $2, $3, $4, $5)',
-          [s.name_ar, s.name_en, s.phone, s.email, s.address]
-        );
-        supInserted++;
-      } else {
-        supSkipped++;
-      }
-    }
-    logStep('Suppliers', supInserted, supSkipped);
-    totalInserted += supInserted;
-
-    // ── 6. Users ────────────────────────────────────────────────────
+    // ── 5. Users ────────────────────────────────────────────────────
     log('👤 Seeding admin user...');
     const passwordHash = await bcrypt.hash(PASSWORD, SALT_ROUNDS);
     let userInserted = 0, userSkipped = 0;
@@ -186,7 +162,7 @@ async function seedLocalDb(): Promise<void> {
     logStep('Users', userInserted, userSkipped);
     totalInserted += userInserted;
 
-    // ── 7. Items ────────────────────────────────────────────────────
+    // ── 6. Items ────────────────────────────────────────────────────
     log('📦 Seeding items...');
     const whRows = await client.query('SELECT id, code FROM warehouses');
     const whMap: Record<string, number> = {};
@@ -209,17 +185,13 @@ async function seedLocalDb(): Promise<void> {
     logStep('Items', itemInserted, itemSkipped);
     totalInserted += itemInserted;
 
-    // ── 8. Transactions ─────────────────────────────────────────────
+    // ── 7. Transactions ─────────────────────────────────────────────
     log('📝 Seeding transactions...');
     await client.query("CREATE SEQUENCE IF NOT EXISTS transaction_no_seq START 1");
 
     const userRows = await client.query('SELECT id, username FROM users');
     const userMap: Record<string, number> = {};
     for (const row of userRows.rows) userMap[row.username] = row.id;
-
-    const supRows = await client.query('SELECT id, name_en FROM suppliers');
-    const supMap: Record<string, number> = {};
-    for (const row of supRows.rows) supMap[row.name_en] = row.id;
 
     const deptRows = await client.query('SELECT id, code FROM departments');
     const deptMap: Record<string, number> = {};
@@ -256,10 +228,10 @@ async function seedLocalDb(): Promise<void> {
     if (!(await txnExists('RV', 'approved', notes1))) {
       const txn1No = await nextTxnNo('RV');
       const txn1 = await client.query(
-        `INSERT INTO transactions (transaction_no, type, status, supplier_id, warehouse_id, created_by, approved_by, notes)
-         VALUES ($1, 'RV', 'approved', $2, $3, $4, $5, $6)
+        `INSERT INTO transactions (transaction_no, type, status, warehouse_id, created_by, approved_by, notes)
+         VALUES ($1, 'RV', 'approved', $2, $3, $4, $5)
          RETURNING id`,
-        [txn1No, supMap['TechSupply Co.'], whMap['WH-MAIN'], userMap['admin'], userMap['admin'], notes1]
+        [txn1No, whMap['WH-MAIN'], userMap['admin'], userMap['admin'], notes1]
       );
       const txn1Id = txn1.rows[0].id;
 
@@ -339,7 +311,6 @@ async function seedLocalDb(): Promise<void> {
       tableCount(client, 'units'),
       tableCount(client, 'warehouses'),
       tableCount(client, 'departments'),
-      tableCount(client, 'suppliers'),
       tableCount(client, 'users'),
       tableCount(client, 'items'),
       tableCount(client, 'transactions'),
@@ -352,12 +323,11 @@ async function seedLocalDb(): Promise<void> {
     log(`    Units:             ${finalCounts[1]}`);
     log(`    Warehouses:        ${finalCounts[2]}`);
     log(`    Departments:       ${finalCounts[3]}`);
-    log(`    Suppliers:         ${finalCounts[4]}`);
-    log(`    Users:             ${finalCounts[5]}`);
-    log(`    Items:             ${finalCounts[6]}`);
-    log(`    Transactions:      ${finalCounts[7]}`);
-    log(`    Txn Details:       ${finalCounts[8]}`);
-    log(`    Stock Movements:   ${finalCounts[9]}`);
+    log(`    Users:             ${finalCounts[4]}`);
+    log(`    Items:             ${finalCounts[5]}`);
+    log(`    Transactions:      ${finalCounts[6]}`);
+    log(`    Txn Details:       ${finalCounts[7]}`);
+    log(`    Stock Movements:   ${finalCounts[8]}`);
     log('');
     log('  🔐 Login Credentials:');
     log('  ┌──────────────┬────────────┬─────────────────────┐');

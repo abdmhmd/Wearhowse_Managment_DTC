@@ -20,7 +20,6 @@ const { subcategoriesRepository } = require('../src/modules/categories/subcatego
 const { unitsRepository } = require('../src/modules/units/units.repository');
 const { warehousesRepository } = require('../src/modules/warehouses/warehouses.repository');
 const { departmentsRepository } = require('../src/modules/departments/departments.repository');
-const { suppliersRepository } = require('../src/modules/suppliers/suppliers.repository');
 const { unitConversionsRepository } = require('../src/modules/unit-conversions/unit-conversions.repository');
 
 const UNITS = [
@@ -74,14 +73,6 @@ const LOCATIONS = [
   { warehouse_code: 'DEMO-WH-4', rack: 'D', shelf: '04', bin: '004', barcode: 'DEMO-LOC-004' },
   { warehouse_code: 'DEMO-WH-5', rack: 'E', shelf: '05', bin: '005', barcode: 'DEMO-LOC-005' },
   { warehouse_code: 'DEMO-WH-6', rack: 'F', shelf: '01', bin: '001', barcode: 'DEMO-LOC-006' },
-];
-
-const SUPPLIERS = [
-  { name_ar: 'شركة النور للتوريدات', name_en: 'Al-Noor Trading Company', phone: '0112345678', email: 'info@alnoor-trading.example', address: 'المنطقة الصناعية الأولى - القاهرة' },
-  { name_ar: 'مجموعة الخليج الصناعية', name_en: 'Gulf Industrial Group', phone: '0118765432', email: 'sales@gulf-industrial.example', address: 'المنطقة الصناعية - جدة' },
-  { name_ar: 'مؤسسة الأفق التجارية', name_en: 'Al-Ofoq Trading Establishment', phone: '0123456789', email: 'contact@alofoq-trading.example', address: 'حي الملز - الرياض' },
-  { name_ar: 'شركة اليمامة للكهرباء', name_en: 'Al-Yamamah Electric Company', phone: '0551234567', email: 'orders@yamamah-electric.example', address: 'المنطقة الصناعية الثانية - الدمام' },
-  { name_ar: 'شركة السلامة الحديثة', name_en: 'Modern Safety Company', phone: '0559876543', email: 'info@modern-safety.example', address: 'المنطقة الصناعية - جدة' },
 ];
 
 const ITEMS = [
@@ -200,7 +191,7 @@ const SETTINGS = [
 
 const REPORT_TABLES = [
   'units', 'departments', 'categories', 'subcategories', 'warehouses', 'locations',
-  'suppliers', 'items', 'item_warehouse_stock', 'unit_conversions', 'projects',
+  'items', 'item_warehouse_stock', 'unit_conversions', 'projects',
   'transactions', 'transaction_details', 'stock_movements', 'batches', 'journal_entries',
   'material_requests', 'material_request_details', 'custodies', 'inventory_sessions',
   'inventory_counts', 'alerts', 'system_settings',
@@ -211,7 +202,6 @@ interface DemoIds {
   warehouses: number[];
   departments: number[];
   categories: string[];
-  suppliers: number[];
   projects: number[];
   requests: number[];
   sessions: number[];
@@ -219,12 +209,11 @@ interface DemoIds {
 }
 
 async function collectDemoIds(): Promise<DemoIds> {
-  const [items, warehouses, departments, categories, suppliers, projects, requests, sessions] = await Promise.all([
+  const [items, warehouses, departments, categories, projects, requests, sessions] = await Promise.all([
     pool.query("SELECT id FROM items WHERE item_code LIKE 'DEMO-WMS%' OR category_code LIKE 'DEMO-%'"),
     pool.query("SELECT id FROM warehouses WHERE code LIKE 'DEMO-WH%'"),
     pool.query("SELECT id FROM departments WHERE code LIKE 'DEMO-%'"),
     pool.query("SELECT code FROM categories WHERE code LIKE 'DEMO-%'"),
-    pool.query('SELECT id FROM suppliers WHERE name_en = ANY($1)', [SUPPLIERS.map(s => s.name_en)]),
     pool.query("SELECT id FROM projects WHERE notes LIKE 'DEMO-WMS%'"),
     pool.query("SELECT id FROM material_requests WHERE notes LIKE 'DEMO-WMS%'"),
     pool.query("SELECT id FROM inventory_sessions WHERE notes LIKE 'DEMO-WMS%'"),
@@ -232,14 +221,13 @@ async function collectDemoIds(): Promise<DemoIds> {
 
   const wh = warehouses.rows.map((r: any) => r.id as number);
   const dept = departments.rows.map((r: any) => r.id as number);
-  const sup = suppliers.rows.map((r: any) => r.id as number);
 
   let transactions: number[] = [];
-  if (wh.length + dept.length + sup.length > 0) {
+  if (wh.length + dept.length > 0) {
     const txRes = await pool.query(
       `SELECT id FROM transactions
-       WHERE warehouse_id = ANY($1) OR to_warehouse_id = ANY($1) OR department_id = ANY($2) OR supplier_id = ANY($3)`,
-      [wh.length ? wh : [-1], dept.length ? dept : [-1], sup.length ? sup : [-1]]
+       WHERE warehouse_id = ANY($1) OR to_warehouse_id = ANY($1) OR department_id = ANY($2)`,
+      [wh.length ? wh : [-1], dept.length ? dept : [-1]]
     );
     transactions = txRes.rows.map((r: any) => r.id as number);
   }
@@ -249,7 +237,6 @@ async function collectDemoIds(): Promise<DemoIds> {
     warehouses: wh,
     departments: dept,
     categories: categories.rows.map((r: any) => r.code as string),
-    suppliers: sup,
     projects: projects.rows.map((r: any) => r.id as number),
     requests: requests.rows.map((r: any) => r.id as number),
     sessions: sessions.rows.map((r: any) => r.id as number),
@@ -269,7 +256,7 @@ async function cleanupDemo(ids: DemoIds): Promise<void> {
     total += await del('DELETE FROM journal_entries WHERE transaction_id = ANY($1)', [ids.transactions]);
     total += await del('DELETE FROM transaction_details WHERE transaction_id = ANY($1)', [ids.transactions]);
     total += await del('DELETE FROM stock_movements WHERE transaction_id = ANY($1)', [ids.transactions]);
-    total += await del('DELETE FROM batches WHERE item_id = ANY($1) OR warehouse_id = ANY($2) OR supplier_id = ANY($3)', [ids.items, ids.warehouses, ids.suppliers]);
+    total += await del('DELETE FROM batches WHERE item_id = ANY($1) OR warehouse_id = ANY($2)', [ids.items, ids.warehouses]);
     total += await del('DELETE FROM item_warehouse_stock WHERE item_id = ANY($1)', [ids.items]);
     total += await del('DELETE FROM alerts WHERE item_id = ANY($1)', [ids.items]);
     total += await del('DELETE FROM inventory_counts WHERE session_id = ANY($1)', [ids.sessions]);
@@ -286,7 +273,6 @@ async function cleanupDemo(ids: DemoIds): Promise<void> {
     total += await del('DELETE FROM categories WHERE code = ANY($1)', [ids.categories]);
     total += await del('DELETE FROM warehouses WHERE id = ANY($1)', [ids.warehouses]);
     total += await del('DELETE FROM departments WHERE id = ANY($1)', [ids.departments]);
-    total += await del('DELETE FROM suppliers WHERE id = ANY($1)', [ids.suppliers]);
     await pool.query('COMMIT');
     console.log(`  cleaned up ${total} existing demo rows`);
   } catch (err: any) {
@@ -330,12 +316,6 @@ async function ensureWarehouse(w: any) {
     is_main: w.is_main ?? false,
     department_id: w.department_id ?? null,
   });
-}
-
-async function ensureSupplier(s: any) {
-  const existing = await pool.query('SELECT * FROM suppliers WHERE name_en = $1', [s.name_en]);
-  if (existing.rows.length > 0) return existing.rows[0];
-  return suppliersRepository.create(s);
 }
 
 async function ensureLocation(l: any, warehouseId: number) {
@@ -410,7 +390,7 @@ async function seed(): Promise<void> {
 
   if (!EXECUTE) {
     console.log('Planned inserts:');
-    console.log(`  5 x units, departments, categories, subcategories, suppliers, items`);
+    console.log(`  5 x units, departments, categories, subcategories, items`);
     console.log(`  6 x warehouses, locations`);
     console.log(`  5 x unit_conversions, projects, material_requests, transactions, custodies`);
     console.log(`  6 x inventory_sessions`);
@@ -470,12 +450,6 @@ async function seed(): Promise<void> {
     locIds[l.barcode] = await ensureLocation(l, whIds[l.warehouse_code].id);
   }
   console.log(`  locations: ${LOCATIONS.length}`);
-
-  const supplierIds: Record<string, any> = {};
-  for (const s of SUPPLIERS) {
-    supplierIds[s.name_en] = await ensureSupplier(s);
-  }
-  console.log(`  suppliers: ${SUPPLIERS.length}`);
 
   for (const s of SETTINGS) {
     await pool.query('INSERT INTO system_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', [s.key, s.value]);
@@ -542,7 +516,6 @@ async function seed(): Promise<void> {
     {
       type: 'RV',
       warehouse_id: wh1,
-      supplier_id: supplierIds['Al-Noor Trading Company'].id,
       created_by: ADMIN.id,
       notes: 'DEMO-WMS استلام بضاعة من المورد',
     },

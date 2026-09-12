@@ -210,12 +210,12 @@ async function main(): Promise<void> {
     }
 
     const untouched = await Promise.all(
-      ['categories', 'items', 'units', 'warehouses', 'departments', 'suppliers',
+      ['categories', 'items', 'units', 'warehouses', 'departments',
        'transactions', 'transaction_details', 'stock_movements', 'material_requests',
        'projects', 'custodies', 'journal_entries', 'inventory_sessions', 'inventory_counts',
        'alerts', 'batches', 'audit_logs'].map((t) => tableCount(client, t))
     );
-    const untouchedNames = ['categories', 'items', 'units', 'warehouses', 'departments', 'suppliers',
+    const untouchedNames = ['categories', 'items', 'units', 'warehouses', 'departments',
       'transactions', 'transaction_details', 'stock_movements', 'material_requests',
       'projects', 'custodies', 'journal_entries', 'inventory_sessions', 'inventory_counts',
       'alerts', 'batches', 'audit_logs'];

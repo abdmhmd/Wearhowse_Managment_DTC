@@ -18,7 +18,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 //     projects, requests, custodies, inventory sessions, journal entries,
 //     locations, unit conversions, refresh tokens).
 //   * PRESERVES master / system data: categories, subcategories, units,
-//     suppliers, system_settings, roles/permissions/role_permissions,
+//     system_settings, roles/permissions/role_permissions,
 //     migrations, and the audit trail (audit_logs.user_id is NULLed by the
 //     existing ON DELETE SET NULL FK — history stays intact).
 //   * Creates exactly TWO departments, each with ONE active main warehouse:
@@ -107,7 +107,7 @@ const SEQUENCE_TABLES = [
 const NUMBERING_SEQS = ['transaction_no_seq', 'request_no_seq', 'project_no_seq', 'inventory_session_no_seq'];
 
 const PRESERVED_TABLES = [
-  'categories', 'subcategories', 'units', 'suppliers', 'system_settings',
+  'categories', 'subcategories', 'units', 'system_settings',
   'roles', 'permissions', 'role_permissions', 'audit_logs',
 ];
 

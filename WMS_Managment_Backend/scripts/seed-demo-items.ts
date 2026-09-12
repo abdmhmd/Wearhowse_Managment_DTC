@@ -124,7 +124,7 @@ const ITEMS: SeedItem[] = [
   { item_code: 'OFF-2', name_ar: 'قلم حبر دائم أسود', name_en: 'Permanent Marker Black', description: 'قلم حبر دائم أسود ذو رأس مدبب', category_code: 'DEMO-OFF', subcategory_code: 'SUB-OFF-1', unit_code: 'PC', warehouse_code: WAREHOUSE_IT, min_stock_level: 50, max_stock_level: 500, opening_quantity: 120, unit_price: 3.5, location: 'E2', is_consumable: true },
 ];
 
-// One receiving voucher per warehouse; the supplier is looked up by name.
+// One receiving voucher per warehouse; the supplier name is print metadata only.
 const RECEIVING_PLAN = [
   { warehouse_code: WAREHOUSE_ENG, supplier_name: 'Gulf Industrial Group' },
   { warehouse_code: WAREHOUSE_IT, supplier_name: 'Al-Noor Trading Company' },
@@ -175,15 +175,6 @@ async function main(): Promise<void> {
   for (const w of whRes.rows) whIds[w.code] = w.id;
   if (!whIds[WAREHOUSE_ENG] || !whIds[WAREHOUSE_IT]) {
     throw new Error(`SAFETY STOP: expected warehouses ${WAREHOUSE_ENG} and ${WAREHOUSE_IT} to exist.`);
-  }
-
-  const supRes = await pool.query('SELECT id, name_en FROM suppliers WHERE is_active = true');
-  const supByName: Record<string, number> = {};
-  for (const s of supRes.rows) supByName[s.name_en] = s.id;
-  for (const rp of RECEIVING_PLAN) {
-    if (!supByName[rp.supplier_name]) {
-      throw new Error(`SAFETY STOP: supplier "${rp.supplier_name}" not found.`);
-    }
   }
 
   // ---- Plan / dry-run report ----------------------------------------------
@@ -337,7 +328,6 @@ async function main(): Promise<void> {
     const header = {
       type: 'RV' as const,
       warehouse_id: whId,
-      supplier_id: supByName[rp.supplier_name],
       notes,
       created_by: adminId,
     };
