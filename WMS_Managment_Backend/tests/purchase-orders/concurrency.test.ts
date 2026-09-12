@@ -29,10 +29,11 @@ describe('Purchase orders â€” concurrency protection', () => {
   let app: any;
   let world: PoWorld;
 
-  beforeAll(async () => {
+beforeAll(async () => {
     app = (await import('../../src/app')).default;
     world = await seedPoWorld();
     world.users.admin.token = await login(app, world.users.admin);
+    world.users.wmMain.token = await login(app, world.users.wmMain);
   });
 
   afterAll(async () => { await poTeardown(PO_TEST_PREFIX); });
@@ -97,13 +98,19 @@ const created = await apiCreatePo(app, world.users.admin.token, {
     // must fail on the remaining-quantity guard.
     expect(okCount).toBe(1);
 
-    const row = (await pool.query(
+const row = (await pool.query(
       'SELECT quantity_transferred::float8 AS qt FROM purchase_order_allocations WHERE id = $1',
       [allocationId]
     )).rows[0];
     expect(Number(row.qt)).toBe(15);
     expect(await getStock(world.itemId2, world.subWhA1)).toBe(dstBefore + 15);
     expect(await getStock(world.itemId2, world.mainWhA)).toBeGreaterThanOrEqual(0);
+
+    const confirm = await request(app)
+      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
+      .set('Authorization', `Bearer ${world.users.wmMain.token}`);
+    expect(confirm.status).toBe(200);
+    expect(confirm.body.data.status).toBe('partially_transferred');
   });
 });
 

@@ -38,10 +38,11 @@ describe('Purchase orders â€” availability overlay', () => {
   let app: any;
   let world: PoWorld;
 
-  beforeAll(async () => {
+beforeAll(async () => {
     app = (await import('../../src/app')).default;
     world = await seedPoWorld();
     world.users.admin.token = await login(app, world.users.admin);
+    world.users.wmMain.token = await login(app, world.users.wmMain);
   });
 
   afterAll(async () => { await poTeardown(PO_TEST_PREFIX); });
@@ -102,11 +103,12 @@ const created2 = await apiCreatePo(app, world.users.admin.token, {
     const stockBefore = beforeCard.body.data.warehouse_stock.find((s: any) => s.warehouse_id === world.mainWhA);
     expect(Number(stockBefore.allocated_stock)).toBe(40);
 
-    const tr = await request(app)
+const tr = await request(app)
       .post(`/api/purchase-orders/allocations/${allocOk.body.data.id}/transfer`)
       .set('Authorization', `Bearer ${world.users.admin.token}`)
       .send({ quantity: 40 });
     expect(tr.status).toBe(200);
+    expect(tr.body.data.status).toBe('pending_confirmation');
 
     const afterCard = await request(app).get(`/api/items/${world.itemId2}`).set('Authorization', `Bearer ${world.users.admin.token}`);
     const stockAfter = afterCard.body.data.warehouse_stock.find((s: any) => s.warehouse_id === world.mainWhA);
@@ -116,6 +118,12 @@ const created2 = await apiCreatePo(app, world.users.admin.token, {
     const dst = afterCard.body.data.warehouse_stock.find((s: any) => s.warehouse_id === world.subWhA1);
     expect(dst).toBeDefined();
     expect(Number(dst.physical_stock)).toBe(40);
+
+    const confirm = await request(app)
+      .post(`/api/purchase-orders/allocations/${allocOk.body.data.id}/confirm-transfer`)
+      .set('Authorization', `Bearer ${world.users.wmMain.token}`);
+    expect(confirm.status).toBe(200);
+    expect(confirm.body.data.status).toBe('transferred');
   });
 });
 

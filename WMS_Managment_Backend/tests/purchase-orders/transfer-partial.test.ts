@@ -43,7 +43,7 @@ describe('Purchase orders â€” partial transfer', () => {
 
   afterAll(async () => { await poTeardown(PO_TEST_PREFIX); });
 
-  test('transfer 30 then 20 of 50; over-transfer rejected; physical stock moved', async () => {
+test('transfer 30 then 20 of 50; over-transfer rejected; physical stock moved', async () => {
     await seedStock(world.itemId, world.mainWhA, 100);
     const { allocationId } = await setupAllocation(app, world, 60, 50);
 
@@ -56,13 +56,20 @@ describe('Purchase orders â€” partial transfer', () => {
       .set('Authorization', `Bearer ${world.users.admin.token}`)
       .send({ quantity: 30 });
     expect(t1.status).toBe(200);
-    expect(t1.body.data.status).toBe('partially_transferred');
+    expect(t1.body.data.status).toBe('pending_confirmation');
     expect(Number(t1.body.data.remaining)).toBe(20);
 
     expect(await getStock(world.itemId, world.mainWhA)).toBe(srcBefore - 30);
     expect(await getStock(world.itemId, world.subWhA1)).toBe(dstBefore + 30);
 
-    // transfer 21 â€” exceeds remaining 20
+    // confirm by a different user first so the next transfer is allowed
+    const c1 = await request(app)
+      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
+      .set('Authorization', `Bearer ${world.users.wmMain.token}`);
+    expect(c1.status).toBe(200);
+    expect(c1.body.data.status).toBe('partially_transferred');
+
+    // transfer 21 â€" exceeds remaining 20
     const tBad = await request(app)
       .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
       .set('Authorization', `Bearer ${world.users.admin.token}`)
@@ -75,12 +82,18 @@ describe('Purchase orders â€” partial transfer', () => {
       .set('Authorization', `Bearer ${world.users.admin.token}`)
       .send({ quantity: 20 });
     expect(t2.status).toBe(200);
-    expect(t2.body.data.status).toBe('transferred');
+    expect(t2.body.data.status).toBe('pending_confirmation');
+
+    const c2 = await request(app)
+      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
+      .set('Authorization', `Bearer ${world.users.wmMain.token}`);
+    expect(c2.status).toBe(200);
+    expect(c2.body.data.status).toBe('transferred');
 
     expect(await getStock(world.itemId, world.mainWhA)).toBe(srcBefore - 50);
     expect(await getStock(world.itemId, world.subWhA1)).toBe(dstBefore + 50);
 
-    // fully transferred â†’ nothing left to move
+    // fully transferred â†' nothing left to move
     const t3 = await request(app)
       .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
       .set('Authorization', `Bearer ${world.users.admin.token}`)
@@ -92,11 +105,12 @@ describe('Purchase orders â€” partial transfer', () => {
     await seedStock(world.itemId, world.mainWhA, 80);
     const { allocationId, poId } = await setupAllocation(app, world, 25, 10, world.subWhA2);
 
-    const res = await request(app)
+const res = await request(app)
       .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
       .set('Authorization', `Bearer ${world.users.admin.token}`)
       .send({ quantity: 10 });
     expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('pending_confirmation');
 
     const txnRes = await pool.query('SELECT * FROM transactions WHERE id = $1', [res.body.data.transaction_id]);
     const txn = txnRes.rows[0];
@@ -115,6 +129,12 @@ describe('Purchase orders â€” partial transfer', () => {
     expect(movements.rows[0].warehouse_id).toBe(world.mainWhA);
     expect(movements.rows[1].movement_type).toBe('IN');
     expect(movements.rows[1].warehouse_id).toBe(world.subWhA2);
+
+    const confirm = await request(app)
+      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
+      .set('Authorization', `Bearer ${world.users.wmMain.token}`);
+    expect(confirm.status).toBe(200);
+    expect(confirm.body.data.status).toBe('transferred');
   });
 
   test('WM transfers only from their own source main warehouse', async () => {
@@ -132,12 +152,13 @@ describe('Purchase orders â€” partial transfer', () => {
       .send({ quantity: 1 });
     expect([403, 404]).toContain(forbidden.status);
 
-    // owner WM can transfer
+// owner WM can transfer
     const ok = await request(app)
       .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
       .set('Authorization', `Bearer ${world.users.wmMain.token}`)
       .send({ quantity: 2 });
     expect(ok.status).toBe(200);
+    expect(ok.body.data.status).toBe('pending_confirmation');
   });
 
   test('insufficient physical stock at transfer time rolls the whole transfer back', async () => {

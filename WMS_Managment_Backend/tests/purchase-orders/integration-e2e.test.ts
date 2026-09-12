@@ -69,20 +69,32 @@ describe('Purchase orders â€” full lifecycle e2e', () => {
     const allocationId = alloc.body.data.id;
     expect(await getStock(world.itemId, world.mainWhA)).toBe(srcBefore + 100); // untouched
 
-    // 5. TRANSFER 20 then remaining 30
+// 5. TRANSFER 20 -> confirm (admin) -> TRANSFER 30 -> confirm (admin)
     const t1 = await request(app)
       .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
       .set('Authorization', `Bearer ${world.users.wmMain.token}`)
       .send({ quantity: 20 });
     expect(t1.status).toBe(200);
-    expect(t1.body.data.status).toBe('partially_transferred');
+    expect(t1.body.data.status).toBe('pending_confirmation');
+
+    const c1 = await request(app)
+      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
+      .set('Authorization', `Bearer ${world.users.admin.token}`);
+    expect(c1.status).toBe(200);
+    expect(c1.body.data.status).toBe('partially_transferred');
 
     const t2 = await request(app)
       .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
       .set('Authorization', `Bearer ${world.users.wmMain.token}`)
       .send({ quantity: 30 });
     expect(t2.status).toBe(200);
-    expect(t2.body.data.status).toBe('transferred');
+    expect(t2.body.data.status).toBe('pending_confirmation');
+
+    const c2 = await request(app)
+      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
+      .set('Authorization', `Bearer ${world.users.admin.token}`);
+    expect(c2.status).toBe(200);
+    expect(c2.body.data.status).toBe('transferred');
 
     // Physical movement verified on both sides.
     expect(await getStock(world.itemId, world.mainWhA)).toBe(srcBefore + 100 - 50);
