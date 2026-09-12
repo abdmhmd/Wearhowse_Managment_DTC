@@ -304,7 +304,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(issue.status).toBe(200);
     });
 
-    test('inventory sessions are admin-only (403 for non-admin roles)', async () => {
+    test('inventory open/view/close are admin-only; count is gated by permission + warehouse scope (D10)', async () => {
       const open = await request(app)
         .post('/api/inventory/sessions')
         .set('Authorization', `Bearer ${whManager.token}`)

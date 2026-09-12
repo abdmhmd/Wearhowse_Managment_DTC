@@ -1,6 +1,8 @@
 import { pool, runInTransaction } from '../../config/database';
 import { transactionsService } from '../transactions/transactions.service';
-import { NotFoundError, ValidationError } from '../../utils/AppError';
+import { NotFoundError, ValidationError, ForbiddenError } from '../../utils/AppError';
+import { PERMISSIONS } from '../authorization/permissions';
+import type { AuthUserContext } from '../authorization/authorization.service';
 
 export class InventoryService {
 
@@ -96,10 +98,24 @@ export class InventoryService {
     return { session: res.rows[0], counts: countsRes.rows, summary };
   }
 
-  async recordCount(sessionId: number, itemId: number, countedQty: number, countedBy: number, notes?: string) {
+  async recordCount(sessionId: number, itemId: number, countedQty: number, countedBy: number, notes?: string, user?: AuthUserContext) {
+    // D10: count recording is allowed for anyone holding inventory:count:record
+    // (Admin) OR a sub-warehouse manager recording into one of their own
+    // assigned warehouses. Enforcement lives here (Option B) so the route can
+    // stay open to sub-warehouse managers without a new permission code.
+    let hasRecordPermission = false;
+    let isSubManager = false;
+    if (user) {
+      hasRecordPermission = user.permissions.includes(PERMISSIONS.INVENTORY_COUNT_RECORD);
+      isSubManager = user.role === 'sub_warehouse_manager';
+      if (!hasRecordPermission && !isSubManager) {
+        throw new ForbiddenError('Missing required permission: inventory:count:record');
+      }
+    }
+
     // Verify session is active before allowing count modification
     const sessionRes = await pool.query(
-      `SELECT status FROM inventory_sessions WHERE id = $1`,
+      `SELECT status, warehouse_id FROM inventory_sessions WHERE id = $1`,
       [sessionId]
     );
     if (!sessionRes.rows[0]) {
@@ -109,6 +125,11 @@ export class InventoryService {
     const status = sessionRes.rows[0].status;
     if (status !== 'open' && status !== 'in_progress') {
       throw new ValidationError(`Cannot record count for a session with status '${status}'`, { status });
+    }
+
+    // Sub-warehouse managers are additionally scoped to the session warehouse
+    if (user && !hasRecordPermission && !user.warehouse_ids.includes(sessionRes.rows[0].warehouse_id)) {
+      throw new ForbiddenError('Missing required permission: inventory:count:record');
     }
 
     const res = await pool.query(

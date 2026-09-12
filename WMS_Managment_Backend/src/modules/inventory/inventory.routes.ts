@@ -12,7 +12,10 @@ router.post('/sessions', authorize('inventory:session:open'), (req, res, next) =
 router.get('/sessions/:id', authorize('inventory:session:view'), (req, res, next) => inventoryController.getSession(req, res, next));
 
 // POST /api/inventory/sessions/:id/count — record a physical count for one item
-router.post('/sessions/:id/count', authorize('inventory:count:record'), (req, res, next) => inventoryController.recordCount(req, res, next));
+// No $inventory:count:record$ guard here (D10): a sub-warehouse manager may
+// record into a session opened by the Admin for one of their assigned
+// warehouses. The service enforces permission + warehouse scope instead.
+router.post('/sessions/:id/count', (req, res, next) => inventoryController.recordCount(req, res, next));
 
 // POST /api/inventory/sessions/:id/close — close session and apply ADJ variances
 router.post('/sessions/:id/close', authorize('inventory:session:close'), (req, res, next) => inventoryController.closeSession(req, res, next));

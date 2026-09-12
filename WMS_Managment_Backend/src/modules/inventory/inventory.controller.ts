@@ -47,7 +47,8 @@ export class InventoryController {
         parsed.data.item_id,
         parsed.data.counted_qty,
         req.user!.id,
-        parsed.data.notes
+        parsed.data.notes,
+        req.user
       );
       sendData(res, result, { message: 'تم تسجيل العدّ بنجاح' });
     } catch (err) {
