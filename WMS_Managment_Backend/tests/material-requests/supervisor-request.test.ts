@@ -21,7 +21,7 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *   6. supervisor, project of another department         -> 409 PROJECT_DEPARTMENT_MISMATCH
  *   7. department_manager POST /api/requests             -> 403 (approver rule unchanged, 022)
  *   8. sub_warehouse_manager create                          -> 400 (unassigned target rejected)
- *   9. admin create                               -> 201 (any warehouse, unchanged)
+ *   9. admin create                             -> 403 (no requests:create after phase 2)
  *  10. supervisor list scopes to OWN requests only (requests:view_own)
  *  11. supervisor detail: own request 200, other user's request 404
  *  12. supervisor catalog: dept + own warehouses + dept items + units (no 403)
@@ -107,7 +107,7 @@ describe('Create request: supervisor department + project enforcement', () => {
   let projectSupB: number;
   let projectDeptB: number;
 
-  let adminRequestId: number;
+  let otherRequestId: number;
   let ownRequestId: number;
 
   beforeAll(async () => {
@@ -229,12 +229,16 @@ describe('Create request: supervisor department + project enforcement', () => {
     expect(res.body.error.message).toContain('not in your assigned eligible warehouses');
   });
 
-  test('9: admin behavior unchanged (any warehouse)', async () => {
+  test('9: admin can no longer create requests (403 AUTH_FORBIDDEN)', async () => {
     const res = await createRequest(admin.token, whB, items());
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
+  });
+
+  test('9b: supervisor of another department creates a foreign request (scoping target)', async () => {
+    const res = await createRequest(supB.token, whB, [{ item_id: itemBId, quantity: 1, unit_code: unitCode }]);
     expect(res.status).toBe(201);
-    expect(res.body.data.warehouse_id).toBe(whB);
-    expect(res.body.data.department_id).toBe(deptB);
-    adminRequestId = res.body.data.id;
+    otherRequestId = res.body.data.id;
   });
 
   test('10: supervisor list scopes to OWN requests only (requests:view_own)', async () => {
@@ -253,7 +257,7 @@ describe('Create request: supervisor department + project enforcement', () => {
     const expectedIds = dbRows.rows.map((r: any) => r.id);
     const actualIds = itemsList.map((it: any) => it.id);
     expect(actualIds.every((id: number) => expectedIds.includes(id))).toBe(true);
-    expect(actualIds).not.toContain(adminRequestId);
+    expect(actualIds).not.toContain(otherRequestId);
   });
 
   test('11: supervisor detail — own request 200, another user\'s request 404', async () => {
@@ -264,7 +268,7 @@ describe('Create request: supervisor department + project enforcement', () => {
     expect(own.body.data.requested_by).toBe(supA.id);
 
     const foreign = await request(app)
-      .get(`/api/requests/${adminRequestId}`)
+      .get(`/api/requests/${otherRequestId}`)
       .set('Authorization', `Bearer ${supA.token}`);
     expect(foreign.status).toBe(404);
   });

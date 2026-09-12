@@ -16,8 +16,8 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *   A. dm owns a request -> dm tries to approve own -> 403 SELF_APPROVAL_NOT_ALLOWED
  *   B. dm approves another user's request in the same department -> succeeds
  *   C. dm cannot approve a request from another department -> 404
- *   D. admin behavior remains unchanged
- *   E. sub_warehouse_manager behavior remains unchanged (403 AUTH_FORBIDDEN)
+ *   D. admin can no longer approve requests (phase 2: zero requests:* grants)
+ *   E. sub_warehouse_manager can now approve pending requests (wm_approved)
  *   F. direct service/API call bypassing routes is still rejected (403)
  *   G. department_manager can no longer CREATE requests (route 403 AUTH_FORBIDDEN)
  *   H. direct service call to createRequest is rejected for department_manager
@@ -213,7 +213,7 @@ describe('Self-approval prevention for department managers', () => {
     });
 
     test('C: department_manager cannot approve a request from another department (404)', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemId, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(wmA.token, deptA, whA, [{ item_id: itemId, quantity: 1, unit_code: unitCode }]);
       expect(r.status).toBe(201);
       const id = r.body.data.id;
 
@@ -224,28 +224,29 @@ describe('Self-approval prevention for department managers', () => {
       expect(res.body.error.code).toBe('REQUEST_NOT_FOUND');
     });
 
-    test('D: admin approval behavior remains unchanged', async () => {
-      // Admin can approve a pending request (dept approval step)...
-      const r1 = await createRequest(admin.token, deptA, whA, [{ item_id: itemId, quantity: 1, unit_code: unitCode }]);
+    test('D: admin approval behavior changed — admin can no longer approve (403 AUTH_FORBIDDEN)', async () => {
+      // Phase 2: the system administrator holds no requests:* permission, so
+      // the historical admin approve step is gone even for a plain pending request.
+      const r1 = await createRequest(wmA.token, deptA, whA, [{ item_id: itemId, quantity: 1, unit_code: unitCode }]);
       expect(r1.status).toBe(201);
       const a1 = await request(app)
         .patch(`/api/requests/${r1.body.data.id}/approve`)
         .set('Authorization', `Bearer ${admin.token}`);
-      expect(a1.status).toBe(200);
-      expect(a1.body.data.status).toBe('dept_approved');
+      expect(a1.status).toBe(403);
+      expect(a1.body.error.code).toBe('AUTH_FORBIDDEN');
 
-      // ...and the self-approval rule does not restrict the admin, even when
-      // the request was created by a department_manager.
+      // The old "self-approval does not restrict the admin" premise is moot:
+      // admin cannot approve a department_manager-owned request either.
       const owned = await insertOwnedRequest({ requestedBy: dmA.id, deptId: deptA, whId: whA, itemId, unitCode });
       const a2 = await request(app)
         .patch(`/api/requests/${owned.id}/approve`)
         .set('Authorization', `Bearer ${admin.token}`);
-      expect(a2.status).toBe(200);
-      expect(a2.body.data.status).toBe('dept_approved');
+      expect(a2.status).toBe(403);
+      expect(a2.body.error.code).toBe('AUTH_FORBIDDEN');
     });
 
     test('E: sub_warehouse_manager can now approve pending requests (wm_approved flow)', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemId, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(wmA.token, deptA, whA, [{ item_id: itemId, quantity: 1, unit_code: unitCode }]);
       expect(r.status).toBe(201);
 
       const res = await request(app)

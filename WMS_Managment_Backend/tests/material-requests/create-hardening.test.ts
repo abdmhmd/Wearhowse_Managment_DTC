@@ -21,9 +21,9 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *  10. sub_warehouse_manager, zero assignments + non-existent warehouse -> 400 (FALLBACK)
  *  11. sub_warehouse_manager assigned only to a MAIN warehouse  -> 400 (never an eligible destination)
  *  12. warehouse with no department link                -> 400
- *  13. admin, no department_id                    -> department = warehouse.department_id
- *  14. admin, spoofed foreign department_id       -> 409 conflict
- *  15. admin, MAIN warehouse as destination       -> 400
+ *  13. admin, no department_id                    -> 403 (no requests:create after phase 2)
+ *  14. admin, spoofed foreign department_id       -> 403 (blocked at the route)
+ *  15. admin, MAIN warehouse as destination       -> 403 (blocked at the route)
  *  16. department_manager POST /api/requests             -> 403 (approver-only rule unchanged)
  */
 const prefix = `${TEST_PREFIX}reqhard_`;
@@ -235,23 +235,22 @@ describe('Create request: server-derived warehouse + department enforcement', ()
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  test('13: admin with no department_id -> department derived from warehouse', async () => {
+  test('13: admin with no department_id -> 403 (no requests:create after phase 2)', async () => {
     const res = await createRequest(admin.token, whA, items());
-    expect(res.status).toBe(201);
-    expect(res.body.data.warehouse_id).toBe(whA);
-    expect(res.body.data.department_id).toBe(deptA);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
   });
 
-  test('14: admin with spoofed foreign department_id -> 409 conflict', async () => {
+  test('14: admin with spoofed foreign department_id -> 403 (blocked at the route)', async () => {
     const res = await createRequest(admin.token, whA, items(), deptB);
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('DEPARTMENT_WAREHOUSE_MISMATCH');
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
   });
 
-  test('15: admin targeting the MAIN warehouse as destination -> 400', async () => {
+  test('15: admin targeting the MAIN warehouse as destination -> 403 (blocked at the route)', async () => {
     const res = await createRequest(admin.token, whMain, items(), deptA);
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
   });
 
   test('16: department_manager still cannot create requests (403)', async () => {

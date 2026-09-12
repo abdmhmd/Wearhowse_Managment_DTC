@@ -1,7 +1,7 @@
 import { pool } from '../../src/config/database';
 import { PERMISSIONS } from '../../src/modules/authorization/permissions';
 
-describe('custodies:view_own (phase 0 safety net, migration 037)', () => {
+describe('custodies:view_own (phase 2: custody-holder roles only; admin lost it)', () => {
   it('is present in the backend permission catalog', () => {
     expect(PERMISSIONS.CUSTODIES_VIEW_OWN).toBe('custodies:view_own');
   });
@@ -13,7 +13,7 @@ describe('custodies:view_own (phase 0 safety net, migration 037)', () => {
     expect(res.rowCount).toBe(1);
   });
 
-  it('is granted to every role that can hold a custody (supervisor, sub_warehouse_manager, admin)', async () => {
+  it('is granted to supervisor and sub_warehouse_manager (admin lost view_own in phase 2)', async () => {
     const res = await pool.query(
       `SELECT r.code
          FROM role_permissions rp
@@ -24,8 +24,9 @@ describe('custodies:view_own (phase 0 safety net, migration 037)', () => {
     );
     const codes = res.rows.map((row: { code: string }) => row.code);
     expect(codes).toEqual(
-      expect.arrayContaining(['supervisor', 'sub_warehouse_manager', 'admin'])
+      expect.arrayContaining(['supervisor', 'sub_warehouse_manager'])
     );
+    expect(codes).not.toContain('admin');
   });
 
   it('is NOT granted to department_manager (cannot create requests, never holds custodies)', async () => {

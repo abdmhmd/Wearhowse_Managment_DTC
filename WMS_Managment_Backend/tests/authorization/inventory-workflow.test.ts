@@ -4,15 +4,17 @@ import { hashPassword } from '../../src/utils/crypto';
 import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepartment, seedItem, cleanup } from '../helpers';
 
 /**
- * Authorization + inventory workflow tests for migrations 018 + 019.
+ * Authorization + inventory workflow tests for migrations 018 + 019 + phase 2.
  *
  * Rules under test:
  *   * ONLY admin may directly create/modify stock.
  *   * Material request state machine:
- *     pending -> dept_approved -> forwarded -> admin_approved -> issued
- *     pending / forwarded -> admin_rejected ; cancellable states per owner/admin.
- *   * department_manager approves + forwards their own department's requests;
- *     admin approves forwarded requests and issues stock.
+ *     pending -> wm_approved -> issued (sub-warehouse manager driven)
+ *     pending -> wm_rejected (D13) ; cancellable states per owner.
+ *   * sub_warehouse_manager approves pending requests (wm_approved) and issues
+ *     them; department_manager approves (dept_approved) + forwards only their
+ *     own department's requests. After phase 2 the admin holds zero requests:*
+ *     permissions, so every admin approve/issue/reject step is 403 at the route.
  *   * Issue is atomic with a row lock preventing a double issue.
  */
 const prefix = `${TEST_PREFIX}inventory_workflow_`;
@@ -71,14 +73,10 @@ async function createRequest(token: string, deptId: number, whId: number, items:
     });
 }
 
-/** Drives a request from 'pending' to 'admin_approved' (dept approve -> forward -> admin approve). */
-async function advanceToAdminApproved(id: number, token: string) {
+/** Drives a request from 'pending' to 'wm_approved' (sub-WM approve; issue uses the same token). */
+async function advanceToWmApproved(id: number, token: string) {
   const a1 = await request(app).patch(`/api/requests/${id}/approve`).set('Authorization', `Bearer ${token}`);
   expect(a1.status).toBe(200);
-  const fwd = await request(app).patch(`/api/requests/${id}/forward`).set('Authorization', `Bearer ${token}`);
-  expect(fwd.status).toBe(200);
-  const a2 = await request(app).patch(`/api/requests/${id}/approve`).set('Authorization', `Bearer ${token}`);
-  expect(a2.status).toBe(200);
 }
 
 describe('Inventory authorization workflow (migrations 018 + 019)', () => {
@@ -226,12 +224,13 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
     });
 
     test('sub_warehouse_manager can now approve a request (wm_approved)', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       expect(r.status).toBe(201);
       const res = await request(app)
         .patch(`/api/requests/${r.body.data.id}/approve`)
         .set('Authorization', `Bearer ${whManager.token}`);
       expect(res.status).toBe(200);
+      expect(res.body.data.status).toBe('wm_approved');
     });
 
     test('department_manager can approve own department pending request (dept_approved)', async () => {
@@ -253,7 +252,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
     });
 
     test('department_manager of another department cannot approve (404)', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       expect(r.status).toBe(201);
       const res = await request(app)
         .patch(`/api/requests/${r.body.data.id}/approve`)
@@ -261,27 +260,48 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       expect(res.status).toBe(404);
     });
 
-    test('request reject is admin-only (403 for non-admin roles)', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+    test('request reject is WM-only (403 for roles without requests:reject)', async () => {
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      expect(r.status).toBe(201);
       const id = r.body.data.id;
-      for (const token of [whManager.token, deptManager.token, dm2.token]) {
+
+      const reject = await request(app)
+        .patch(`/api/requests/${id}/reject`)
+        .set('Authorization', `Bearer ${whManager.token}`)
+        .send({ reason: 'no stock' });
+      expect(reject.status).toBe(200);
+      expect(reject.body.data.status).toBe('wm_rejected');
+
+      const r2 = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      expect(r2.status).toBe(201);
+      for (const token of [admin.token, deptManager.token, dm2.token]) {
         const res = await request(app)
-          .patch(`/api/requests/${id}/reject`)
+          .patch(`/api/requests/${r2.body.data.id}/reject`)
           .set('Authorization', `Bearer ${token}`)
           .send({ reason: 'nope' });
         expect(res.status).toBe(403);
       }
     });
 
-    test('request issue is admin/WM-only (403 for unauthorized roles)', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+    test('request issue is WM-only (403 for unauthorized roles)', async () => {
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
-      for (const token of [deptManager.token, dm2.token]) {
+      const approved = await request(app)
+        .patch(`/api/requests/${id}/approve`)
+        .set('Authorization', `Bearer ${whManager.token}`);
+      expect(approved.status).toBe(200);
+
+      for (const token of [admin.token, deptManager.token, dm2.token]) {
         const res = await request(app)
           .post(`/api/requests/${id}/issue`)
           .set('Authorization', `Bearer ${token}`);
         expect(res.status).toBe(403);
       }
+
+      const issue = await request(app)
+        .post(`/api/requests/${id}/issue`)
+        .set('Authorization', `Bearer ${whManager.token}`);
+      expect(issue.status).toBe(200);
     });
 
     test('inventory sessions are admin-only (403 for non-admin roles)', async () => {
@@ -357,9 +377,9 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
     });
   });
 
-  describe('Full workflow: request -> dept approve -> forward -> admin approve -> issue', () => {
+  describe('Full workflow: request -> wm approve -> issue', () => {
     test('end-to-end happy path with stock movement and audit trail', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 3, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 3, unit_code: unitCode }]);
       expect(r.status).toBe(201);
       const reqId = r.body.data.id;
       expect(r.body.data.status).toBe('pending');
@@ -370,45 +390,23 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       );
       expect(auditCreated.rows.length).toBe(1);
 
-      // pending -> dept_approved
-      const approve1 = await request(app)
+      // pending -> wm_approved
+      const approve = await request(app)
         .patch(`/api/requests/${reqId}/approve`)
-        .set('Authorization', `Bearer ${admin.token}`);
-      expect(approve1.status).toBe(200);
-      const afterDept = await request(app)
-        .get(`/api/requests/${reqId}`)
-        .set('Authorization', `Bearer ${admin.token}`);
-      expect(afterDept.body.data.status).toBe('dept_approved');
-      expect(afterDept.body.data.dept_approved_by).toBe(admin.id);
-
-      // dept_approved -> forwarded
-      const forward = await request(app)
-        .patch(`/api/requests/${reqId}/forward`)
-        .set('Authorization', `Bearer ${admin.token}`);
-      expect(forward.status).toBe(200);
-      const afterForward = await request(app)
-        .get(`/api/requests/${reqId}`)
-        .set('Authorization', `Bearer ${admin.token}`);
-      expect(afterForward.body.data.status).toBe('forwarded');
-      expect(afterForward.body.data.forwarded_by).toBe(admin.id);
-
-      // forwarded -> admin_approved
-      const approve2 = await request(app)
-        .patch(`/api/requests/${reqId}/approve`)
-        .set('Authorization', `Bearer ${admin.token}`);
-      expect(approve2.status).toBe(200);
+        .set('Authorization', `Bearer ${whManager.token}`);
+      expect(approve.status).toBe(200);
       const afterApprove = await request(app)
         .get(`/api/requests/${reqId}`)
-        .set('Authorization', `Bearer ${admin.token}`);
-      expect(afterApprove.body.data.status).toBe('admin_approved');
-      expect(afterApprove.body.data.approved_by).toBe(admin.id);
+        .set('Authorization', `Bearer ${whManager.token}`);
+      expect(afterApprove.body.data.status).toBe('wm_approved');
+      expect(afterApprove.body.data.dept_approved_by).toBe(whManager.id);
 
       const before = await pool.query('SELECT current_balance FROM items WHERE id = $1', [itemWorkflow]);
 
-      // admin_approved -> issued
+      // wm_approved -> issued
       const issue = await request(app)
         .post(`/api/requests/${reqId}/issue`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${whManager.token}`);
       expect(issue.status).toBe(200);
       expect(issue.body.data.transaction_id).toBeDefined();
       const txnId = issue.body.data.transaction_id;
@@ -430,9 +428,9 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
       );
       expect(requestRow.rows[0].status).toBe('issued');
       expect(requestRow.rows[0].transaction_id).toBe(txnId);
-      expect(requestRow.rows[0].issued_by).toBe(admin.id);
+      expect(requestRow.rows[0].issued_by).toBe(whManager.id);
 
-      for (const action of ['REQUEST_APPROVED', 'REQUEST_FORWARDED', 'REQUEST_ISSUED']) {
+      for (const action of ['REQUEST_APPROVED', 'REQUEST_ISSUED']) {
         const audit = await pool.query(
           `SELECT 1 FROM audit_logs WHERE action = $1 AND resource_id = $2 LIMIT 1`,
           [action, String(reqId)]
@@ -444,88 +442,88 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
 
   describe('State machine enforcement', () => {
     test('cannot approve a rejected request', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
       await request(app)
         .patch(`/api/requests/${id}/reject`)
-        .set('Authorization', `Bearer ${admin.token}`)
+        .set('Authorization', `Bearer ${whManager.token}`)
         .send({ reason: 'no stock' });
       const res = await request(app)
         .patch(`/api/requests/${id}/approve`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${whManager.token}`);
       expect(res.status).toBe(400);
     });
 
-    test('cannot issue a pending request (must be admin_approved first)', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+    test('cannot issue a pending request (must be approved first)', async () => {
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
       const res = await request(app)
         .post(`/api/requests/${id}/issue`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${whManager.token}`);
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('INVALID_REQUEST_STATUS');
     });
 
     test('cannot cancel an issued request', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
-      await advanceToAdminApproved(id, admin.token);
+      await advanceToWmApproved(id, whManager.token);
       await request(app)
         .post(`/api/requests/${id}/issue`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${whManager.token}`);
       const res = await request(app)
         .patch(`/api/requests/${id}/cancel`)
-        .set('Authorization', `Bearer ${admin.token}`);
-      expect(res.status).toBe(400);
+        .set('Authorization', `Bearer ${whManager.token}`);
+      expect(res.status).toBe(403);
     });
 
     test('cannot approve an already-approved request', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
       await request(app)
         .patch(`/api/requests/${id}/approve`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${whManager.token}`);
       const res = await request(app)
         .patch(`/api/requests/${id}/approve`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${whManager.token}`);
       expect(res.status).toBe(400);
     });
 
     test('cannot forward a request that is not dept_approved', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
       const res = await request(app)
         .patch(`/api/requests/${id}/forward`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${deptManager.token}`);
       expect(res.status).toBe(400);
     });
 
     test('cannot issue an already-issued request', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
-      await advanceToAdminApproved(id, admin.token);
+      await advanceToWmApproved(id, whManager.token);
       await request(app)
         .post(`/api/requests/${id}/issue`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${whManager.token}`);
       const res = await request(app)
         .post(`/api/requests/${id}/issue`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${whManager.token}`);
       expect(res.status).toBe(400);
     });
   });
 
   describe('Double-issue concurrency (row lock)', () => {
     test('concurrent issue requests: exactly one wins, no double stock decrement', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemDouble, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemDouble, quantity: 1, unit_code: unitCode }]);
       expect(r.status).toBe(201);
       const id = r.body.data.id;
-      await advanceToAdminApproved(id, admin.token);
+      await advanceToWmApproved(id, whManager.token);
 
       const before = await pool.query('SELECT current_balance FROM items WHERE id = $1', [itemDouble]);
 
       const [r1, r2] = await Promise.all([
-        request(app).post(`/api/requests/${id}/issue`).set('Authorization', `Bearer ${admin.token}`),
-        request(app).post(`/api/requests/${id}/issue`).set('Authorization', `Bearer ${admin.token}`),
+        request(app).post(`/api/requests/${id}/issue`).set('Authorization', `Bearer ${whManager.token}`),
+        request(app).post(`/api/requests/${id}/issue`).set('Authorization', `Bearer ${whManager.token}`),
       ]);
       expect([r1.status, r2.status].sort()).toEqual([200, 400]);
 
@@ -542,16 +540,16 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
   });
 
   describe('Insufficient stock', () => {
-    test('issue fails atomically and leaves the request admin_approved', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemInsufficient, quantity: 500, unit_code: unitCode }]);
+    test('issue fails atomically and leaves the request wm_approved', async () => {
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemInsufficient, quantity: 500, unit_code: unitCode }]);
       const id = r.body.data.id;
-      await advanceToAdminApproved(id, admin.token);
+      await advanceToWmApproved(id, whManager.token);
 
       const before = await pool.query('SELECT current_balance FROM items WHERE id = $1', [itemInsufficient]);
 
       const issue = await request(app)
         .post(`/api/requests/${id}/issue`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${whManager.token}`);
       expect(issue.status).toBe(400);
 
       const after = await pool.query('SELECT current_balance FROM items WHERE id = $1', [itemInsufficient]);
@@ -561,7 +559,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
         'SELECT status, transaction_id, request_no FROM material_requests WHERE id = $1',
         [id]
       );
-      expect(requestRow.rows[0].status).toBe('admin_approved');
+      expect(requestRow.rows[0].status).toBe('wm_approved');
       expect(requestRow.rows[0].transaction_id).toBeNull();
 
       const lnTxns = await pool.query(
@@ -574,7 +572,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
 
   describe('Cancel ownership', () => {
     test('department_manager cannot cancel someone elses request (403)', async () => {
-      const r = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const r = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       const id = r.body.data.id;
       const res = await request(app)
         .patch(`/api/requests/${id}/cancel`)
@@ -631,9 +629,9 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
     });
 
     test('sub_warehouse_manager only lists requests for assigned warehouses', async () => {
-      const rA = await createRequest(admin.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const rA = await createRequest(whManager.token, deptA, whA, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       expect(rA.status).toBe(201);
-      const rB = await createRequest(admin.token, deptB, whB, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
+      const rB = await createRequest(wm2.token, deptB, whB, [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode }]);
       expect(rB.status).toBe(201);
 
       const res = await request(app)

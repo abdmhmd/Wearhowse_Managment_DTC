@@ -231,11 +231,11 @@ describe('Authorization (RBAC + Data Scope)', () => {
     }
 
     test('department_manager only sees requests of own department', async () => {
-      const rA = await createRequestAs(admin.token, deptA, whA);
+      const rA = await createRequestAs(whManager.token, deptA, whA);
       expect(rA.status).toBe(201);
       const requestIdA = rA.body.data.id;
 
-      await createRequestAs(admin.token, deptB, whB);
+      await createRequestAs(wm2.token, deptB, whB);
 
       const list = await request(app)
         .get('/api/requests')
@@ -255,7 +255,7 @@ describe('Authorization (RBAC + Data Scope)', () => {
     });
 
     test('department_manager cannot read a request of another department (404)', async () => {
-      const rB = await createRequestAs(admin.token, deptB, whB);
+      const rB = await createRequestAs(wm2.token, deptB, whB);
       const otherId = rB.body.data.id;
       const res = await request(app)
         .get(`/api/requests/${otherId}`)

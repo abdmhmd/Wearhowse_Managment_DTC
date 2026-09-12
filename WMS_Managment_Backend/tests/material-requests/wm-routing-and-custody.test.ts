@@ -137,11 +137,11 @@ describe('Part 1: Supervisor request routing — WM approve + issue', () => {
     expect(res.body.data.status).toBe('wm_approved');
   });
 
-  test('admin cannot issue wm_approved request (wrong status for admin flow)', async () => {
+  test('admin cannot issue wm_approved request (no requests:issue after phase 2)', async () => {
     const res = await request(app)
       .post(`/api/requests/${supervisorRequestId}/issue`)
       .set('Authorization', `Bearer ${admin.token}`);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
   });
 
   test('WM issues wm_approved request -> issued', async () => {
@@ -156,8 +156,8 @@ describe('Part 1: Supervisor request routing — WM approve + issue', () => {
     const dmA = await seedRoleUser('department_manager', { department_id: deptA });
     dmA.token = await login(dmA);
 
-    // Create request via admin, then reassign to DM to simulate a DM-owned request.
-    const createRes = await createRequest(admin.token, whA, [{ item_id: itemId, quantity: 2, unit_code: unitCode }]);
+    // Create request via supervisor, then reassign to DM to simulate a DM-owned request.
+    const createRes = await createRequest(supA.token, whA, [{ item_id: itemId, quantity: 2, unit_code: unitCode }]);
     expect(createRes.status).toBe(201);
     const reqId = createRes.body.data.id;
     await pool.query('UPDATE material_requests SET requested_by = $1 WHERE id = $2', [dmA.id, reqId]);
