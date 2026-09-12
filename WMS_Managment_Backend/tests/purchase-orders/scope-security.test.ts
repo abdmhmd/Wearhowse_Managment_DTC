@@ -76,9 +76,9 @@ const createdB = await apiCreatePo(app, world.users.admin.token, {
     expect((await request(app).post(`/api/purchase-orders/${poB}/cancel`).set('Authorization', `Bearer ${world.users.wmMain.token}`)).status).toBe(404);
   });
 
-  test('WM cannot receive or allocate against a foreign PO', async () => {
+  test('WM cannot receive or confirm-transfer against a foreign PO', async () => {
     const { poId, detailId } = await fullWorkflowPo(app, world);
-    // wmMain IS in scope for mainWhA â€” sanity check receive works for owner
+    // wmMain IS in scope for mainWhA — sanity check receive works for owner
     void poId; void detailId;
 
 const createdB = await apiCreatePo(app, world.users.admin.token, {
@@ -96,17 +96,17 @@ const createdB = await apiCreatePo(app, world.users.admin.token, {
       .send({ lines: [{ detail_id: detailB, quantity: 1 }] })).status).toBe(404);
 
     expect((await request(app)
-      .post(`/api/purchase-orders/${poB}/allocations`)
-      .set('Authorization', `Bearer ${world.users.wmMain.token}`)
-      .send({ detail_id: detailB, dest_warehouse_id: world.subWhB, quantity: 1 })).status).toBe(404);
+      .post(`/api/purchase-orders/${poB}/confirm-transfer`)
+      .set('Authorization', `Bearer ${world.users.wmMain.token}`)).status).toBe(404);
   });
 
-  test('forged allocation id returns 404; forged ids never leak other tenants', async () => {
+  test('confirm-transfer on an in-scope PO without a linked transfer is a clean 400 (no leak)', async () => {
+    const target = await fullWorkflowPo(app, world);
     const res = await request(app)
-      .post('/api/purchase-orders/allocations/99999999/transfer')
-      .set('Authorization', `Bearer ${world.users.admin.token}`)
-      .send({ quantity: 1 });
-    expect(res.status).toBe(404);
+      .post(`/api/purchase-orders/${target.poId}/confirm-transfer`)
+      .set('Authorization', `Bearer ${world.users.admin.token}`);
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toMatch(/no linked transfer/i);
   });
 
   test('forged detail_id on receive returns 404 without touching stock', async () => {
@@ -138,14 +138,8 @@ const created = await apiCreatePo(app, world.users.admin.token, {
     expect(stockAfter).toBe(stockBefore);
   });
 
-  test('WM cannot transfer an allocation sourced from another main warehouse (hidden)', async () => {
+  test('foreign warehouse manager cannot confirm-transfer an in-scope PO (hidden as 404)', async () => {
     const target = await fullWorkflowPo(app, world);
-    const alloc = await request(app)
-      .post(`/api/purchase-orders/${target.poId}/allocations`)
-      .set('Authorization', `Bearer ${world.users.admin.token}`)
-      .send({ detail_id: target.detailId, dest_warehouse_id: world.subWhA1, quantity: 5 });
-    expect(alloc.status).toBe(201);
-    const allocationId = alloc.body.data.id;
 
     // wmB scoped to mainWhB only
     const loginB = await request(app).post('/api/auth/login')
@@ -153,9 +147,8 @@ const created = await apiCreatePo(app, world.users.admin.token, {
     const tokenB = loginB.body.data.token;
 
     expect((await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
-      .set('Authorization', `Bearer ${tokenB}`)
-      .send({ quantity: 1 })).status).toBe(404);
+      .post(`/api/purchase-orders/${target.poId}/confirm-transfer`)
+      .set('Authorization', `Bearer ${tokenB}`)).status).toBe(404);
   });
 });
 

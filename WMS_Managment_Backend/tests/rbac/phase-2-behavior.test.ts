@@ -462,19 +462,49 @@ describe('Part 4 — D9: two-party confirmation on purchase orders', () => {
   });
 
   test('D9: the transfer executor can never confirm their own transfer', async () => {
-    const created = await apiCreatePo(app, subWM.token, {
-      supplier_name: poWorld.supplierName,
-      warehouse_id: poWorld.mainWhA,
-      lines: [{ item_id: poWorld.itemId, quantity_ordered: 50, unit_code: poWorld.unitCode, unit_price: 3 }],
+    // D8 flow: a department sub-warehouse manager raises a Purchase Request;
+    // dept + admin approvals auto-create the PO; receiving it drafts a
+    // Transfer to the creator's sub-warehouse; a DIFFERENT user must confirm.
+    const primWM = await seedRoleUser('sub_warehouse_manager', {
+      department_id: poWorld.deptA,
+      warehouse_ids: [poWorld.mainWhA, poWorld.subWhA1],
     });
-    expect(created.status).toBe(201);
-    const poId = created.body.data.id;
-    const detailId = created.body.data.details[0].id;
+    primWM.token = await login(primWM);
+    poWorld.users.deptMgr.token = await login(poWorld.users.deptMgr);
+
+    const pr = await request(app)
+      .post('/api/purchase-requests')
+      .set('Authorization', `Bearer ${primWM.token}`)
+      .send({
+        warehouse_id: poWorld.mainWhA,
+        items: [{ item_id: poWorld.itemId, quantity: 50, unit_code: poWorld.unitCode }],
+      });
+    expect(pr.status).toBe(201);
+    const requestId = pr.body.data.id;
+
+    const deptOk = await request(app)
+      .patch(`/api/purchase-requests/${requestId}/approve-dept`)
+      .set('Authorization', `Bearer ${poWorld.users.deptMgr.token}`);
+    expect(deptOk.status).toBe(200);
+
+    const adminOk = await request(app)
+      .patch(`/api/purchase-requests/${requestId}/approve-admin`)
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(adminOk.status).toBe(200);
+    const poId = adminOk.body.data.purchase_order_id;
+    expect(poId).toBeDefined();
+
+    const po = (await request(app).get(`/api/purchase-orders/${poId}`).set('Authorization', `Bearer ${admin.token}`)).body.data;
+    expect(po.purchase_request_id).toBe(requestId);
+    const detailId = po.details[0].id;
 
     const approved = await request(app)
       .post(`/api/purchase-orders/${poId}/approve`)
       .set('Authorization', `Bearer ${subWM.token}`);
     expect(approved.status).toBe(200);
+
+    const srcBefore = await getStock(poWorld.itemId, poWorld.mainWhA);
+    const dstBefore = await getStock(poWorld.itemId, poWorld.subWhA1);
 
     const received = await request(app)
       .post(`/api/purchase-orders/${poId}/receive`)
@@ -482,53 +512,24 @@ describe('Part 4 — D9: two-party confirmation on purchase orders', () => {
       .send({ lines: [{ detail_id: detailId, quantity: 50 }] });
     expect(received.status).toBe(200);
     expect(received.body.data.status).toBe('received');
+    expect(received.body.data.auto_transfer_created).toBe(true);
+    expect(received.body.data.linked_transfer_destination_warehouse_id).toBe(poWorld.subWhA1);
 
-    const allocated = await request(app)
-      .post(`/api/purchase-orders/${poId}/allocations`)
-      .set('Authorization', `Bearer ${subWM.token}`)
-      .send({ detail_id: detailId, dest_warehouse_id: poWorld.subWhA1, quantity: 20 });
-    expect(allocated.status).toBe(201);
-    const allocationId = allocated.body.data.id;
-
-    const srcBefore = await getStock(poWorld.itemId, poWorld.mainWhA);
-    const dstBefore = await getStock(poWorld.itemId, poWorld.subWhA1);
-
-    const t1 = await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
-      .set('Authorization', `Bearer ${subWM.token}`)
-      .send({ quantity: 10 });
-    expect(t1.status).toBe(200);
-    expect(t1.body.data.status).toBe('pending_confirmation');
-
-    // The executor cannot confirm their own movement.
+    // The executor who drafted the transfer cannot confirm their own movement.
     const selfConfirm = await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
+      .post(`/api/purchase-orders/${poId}/confirm-transfer`)
       .set('Authorization', `Bearer ${subWM.token}`);
     expect(selfConfirm.status).toBe(403);
 
+    // Confirming by a DIFFERENT user realises the movement main -> sub.
     const otherConfirm = await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
+      .post(`/api/purchase-orders/${poId}/confirm-transfer`)
       .set('Authorization', `Bearer ${admin.token}`);
     expect(otherConfirm.status).toBe(200);
-    expect(otherConfirm.body.data.status).toBe('partially_transferred');
+    expect(otherConfirm.body.data.status).toBe('approved');
+    expect(otherConfirm.body.data.transfer_count).toBe(1);
 
-    // Complete the allocation with a second transfer + confirmation.
-    const t2 = await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
-      .set('Authorization', `Bearer ${subWM.token}`)
-      .send({ quantity: 10 });
-    expect(t2.status).toBe(200);
-    expect(t2.body.data.status).toBe('pending_confirmation');
-
-    const finalConfirm = await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
-      .set('Authorization', `Bearer ${admin.token}`);
-    expect(finalConfirm.status).toBe(200);
-    expect(finalConfirm.body.data.status).toBe('transferred');
-
-    // Each transfer moves its quantity immediately (10 + 10 = 20 total) and is
-    // confirmed by a DIFFERENT user afterwards.
-    expect(await getStock(poWorld.itemId, poWorld.mainWhA)).toBe(srcBefore - 20);
-    expect(await getStock(poWorld.itemId, poWorld.subWhA1)).toBe(dstBefore + 20);
+    expect(await getStock(poWorld.itemId, poWorld.mainWhA)).toBe(srcBefore);
+    expect(await getStock(poWorld.itemId, poWorld.subWhA1)).toBe(dstBefore + 50);
   });
 });

@@ -4,12 +4,16 @@ import { cleanup, seedItem } from '../helpers';
 import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, getStock, poTeardown, type PoWorld } from './helpers';
 
 /**
- * End-to-end: Supplier -> PO -> Approval -> Partial receiving -> Allocation ->
- * Partial transfer -> Close. Verifies every aggregate and physical stock
- * figure along the way, plus MR-workflow non-interference.
+ * End-to-end: Supplier -> PO -> Approval -> Partial receiving -> Confirm receipt
+ * -> Close. Verifies every aggregate and physical stock figure along the way,
+ * plus MR-workflow non-interference.
+ *
+ * This standalone PO has no linked Purchase Request, so `receive()` drafts NO
+ * transfer (D8 auto-transfer is exercised in auto-transfer.test.ts) and its
+ * received stock simply stays in the main warehouse as general stock.
  */
 
-describe('Purchase orders â€” full lifecycle e2e', () => {
+describe('Purchase orders — full lifecycle e2e', () => {
   let app: any;
   let world: PoWorld;
 
@@ -23,10 +27,9 @@ describe('Purchase orders â€” full lifecycle e2e', () => {
 
   afterAll(async () => { await poTeardown(PO_TEST_PREFIX); });
 
-  test('create â†’ approve â†’ receive 60/40 â†’ allocate 50 â†’ transfer 20/30 â†’ close', async () => {
+  test('create → approve → receive 60/40 → confirm-receive → close', async () => {
     await seedStock(world.itemId, world.mainWhA, 200);
     const srcBefore = await getStock(world.itemId, world.mainWhA);
-    const dstBefore = await getStock(world.itemId, world.subWhA1);
 
     // 1. CREATE draft
     const created = await apiCreatePo(app, world.users.admin.token, {
@@ -42,13 +45,15 @@ describe('Purchase orders â€” full lifecycle e2e', () => {
     const approved = await request(app).post(`/api/purchase-orders/${poId}/approve`).set('Authorization', `Bearer ${world.users.admin.token}`);
     expect(approved.status).toBe(200);
 
-    // 3. RECEIVE partial (60) then complete (40)
+    // 3. RECEIVE partial (60) then complete (40).
     const r1 = await request(app)
       .post(`/api/purchase-orders/${poId}/receive`)
       .set('Authorization', `Bearer ${world.users.admin.token}`)
       .send({ lines: [{ detail_id: detailId, quantity: 60 }] });
     expect(r1.status).toBe(200);
     expect(r1.body.data.status).toBe('partially_received');
+    expect(r1.body.data.auto_transfer_created).toBe(false);
+    expect(r1.body.data.linked_transfer_id).toBeNull();
     const rvId = r1.body.data.transaction_id;
 
     const r2 = await request(app)
@@ -60,73 +65,40 @@ describe('Purchase orders â€” full lifecycle e2e', () => {
 
     expect(await getStock(world.itemId, world.mainWhA)).toBe(srcBefore + 100);
 
-    // 4. ALLOCATE 50 to the department warehouse (reservation only)
-    const alloc = await request(app)
-      .post(`/api/purchase-orders/${poId}/allocations`)
-      .set('Authorization', `Bearer ${world.users.wmMain.token}`)
-      .send({ detail_id: detailId, dest_warehouse_id: world.subWhA1, quantity: 50 });
-    expect(alloc.status).toBe(201);
-    const allocationId = alloc.body.data.id;
-    expect(await getStock(world.itemId, world.mainWhA)).toBe(srcBefore + 100); // untouched
-
-// 5. TRANSFER 20 -> confirm (admin) -> TRANSFER 30 -> confirm (admin)
-    const t1 = await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
-      .set('Authorization', `Bearer ${world.users.wmMain.token}`)
-      .send({ quantity: 20 });
-    expect(t1.status).toBe(200);
-    expect(t1.body.data.status).toBe('pending_confirmation');
-
-    const c1 = await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
+    // 4. CONFIRM RECEIPT — two-party: the PO creator (admin) may not confirm
+    //    their own receipt; the receiving warehouse manager must.
+    const selfConfirm = await request(app)
+      .post(`/api/purchase-orders/${poId}/confirm-receive`)
       .set('Authorization', `Bearer ${world.users.admin.token}`);
-    expect(c1.status).toBe(200);
-    expect(c1.body.data.status).toBe('partially_transferred');
+    expect(selfConfirm.status).toBe(403);
 
-    const t2 = await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/transfer`)
-      .set('Authorization', `Bearer ${world.users.wmMain.token}`)
-      .send({ quantity: 30 });
-    expect(t2.status).toBe(200);
-    expect(t2.body.data.status).toBe('pending_confirmation');
+    const confirm = await request(app)
+      .post(`/api/purchase-orders/${poId}/confirm-receive`)
+      .set('Authorization', `Bearer ${world.users.wmMain.token}`);
+    expect(confirm.status).toBe(200);
+    expect(confirm.body.data.receive_confirmed_by).toBe(world.users.wmMain.id);
 
-    const c2 = await request(app)
-      .post(`/api/purchase-orders/allocations/${allocationId}/confirm-transfer`)
-      .set('Authorization', `Bearer ${world.users.admin.token}`);
-    expect(c2.status).toBe(200);
-    expect(c2.body.data.status).toBe('transferred');
-
-    // Physical movement verified on both sides.
-    expect(await getStock(world.itemId, world.mainWhA)).toBe(srcBefore + 100 - 50);
-    expect(await getStock(world.itemId, world.subWhA1)).toBe(dstBefore + 50);
-
-    // Aggregates on the detail row.
+    // Detail aggregates: received up to ordered; no allocation columns exist.
     const detail = (await pool.query(
-      `SELECT quantity_ordered::float8 AS o, quantity_received::float8 AS r,
-              quantity_allocated::float8 AS a, quantity_transferred::float8 AS t
+      `SELECT quantity_ordered::float8 AS o, quantity_received::float8 AS r
        FROM purchase_order_details WHERE id = $1`, [detailId]
     )).rows[0];
-    expect(detail).toEqual({ o: 100, r: 100, a: 50, t: 50 });
-
-    // Invariants hold.
+    expect(detail).toEqual({ o: 100, r: 100 });
     expect(detail.r).toBeLessThanOrEqual(detail.o);
-    expect(detail.a).toBeLessThanOrEqual(detail.r);
-    expect(detail.t).toBeLessThanOrEqual(detail.a);
 
-    // 6. CLOSE â€” unallocated remainder (50) intentionally stays general stock.
+    // 5. CLOSE — no linked transfer exists so nothing blocks it.
     const closed = await request(app).post(`/api/purchase-orders/${poId}/close`).set('Authorization', `Bearer ${world.users.admin.token}`);
     expect(closed.status).toBe(200);
     expect(closed.body.data.status).toBe('closed');
 
     const finalPo = (await request(app).get(`/api/purchase-orders/${poId}`).set('Authorization', `Bearer ${world.users.admin.token}`)).body.data;
     expect(finalPo.status).toBe('closed');
-    expect(finalPo.allocations[0].status).toBe('transferred');
-    expect(finalPo.allocations[0].transfer_transaction_no).toMatch(/^TRF-/);
+    expect(Number(finalPo.details[0].quantity_received)).toBe(100);
     void rvId;
   });
 
   test('material request workflow still issues stock independently of POs', async () => {
-    // Supervisor creates an MR; WM approves + issues it â€” proving the demand-side
+    // Supervisor creates an MR; WM approves + issues it — proving the demand-side
     // workflow coexists with purchase orders unchanged.
     // NOTE: the supervisor line-item hardening requires the item's home
     // warehouse to be one of the department's non-main warehouses, so this MR
@@ -168,7 +140,7 @@ describe('Purchase orders â€” full lifecycle e2e', () => {
   });
 
   test('audit trail records the full PO lifecycle', async () => {
-const created = await apiCreatePo(app, world.users.admin.token, {
+    const created = await apiCreatePo(app, world.users.admin.token, {
       supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 4, unit_code: world.unitCode }],
@@ -185,4 +157,3 @@ const created = await apiCreatePo(app, world.users.admin.token, {
     expect(actions).toContain('PO_APPROVED');
   });
 });
-

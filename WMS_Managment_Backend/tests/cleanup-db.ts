@@ -48,19 +48,11 @@ export async function cleanupTestData(prefix: string): Promise<void> {
          OR warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)`,
     [pattern]
   );
-  // Purchase order tables must be cleaned BEFORE transactions (allocations
-  // reference them) and BEFORE warehouses/items/users.
-  await p.query(
-    `DELETE FROM purchase_order_allocations
-      WHERE po_id IN (SELECT id FROM purchase_orders WHERE po_number LIKE $1)
-         OR allocated_by IN (SELECT id FROM users WHERE username LIKE $1)
-         OR transferred_by IN (SELECT id FROM users WHERE username LIKE $1)
-         OR source_warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
-         OR dest_warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
-         OR transfer_transaction_id IN (SELECT id FROM transactions WHERE transaction_no LIKE $1)
-         OR receive_transaction_id IN (SELECT id FROM transactions WHERE transaction_no LIKE $1)`,
-    [pattern]
-  );
+  // Purchase order tables must be cleaned BEFORE transactions and BEFORE
+  // warehouses/items/users. transactions.purchase_order_id and
+  // purchase_requests.purchase_order_id are ON DELETE SET NULL, so deleting
+  // purchase_orders first is safe (the RV/TRF rows are then removed with the
+  // transactions cleanup below).
   await p.query(
     `DELETE FROM purchase_order_details
       WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)

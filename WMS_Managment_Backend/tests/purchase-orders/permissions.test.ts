@@ -16,8 +16,8 @@ const ENDPOINTS: Array<{ method: 'get' | 'post' | 'patch'; path: string; perm: s
   { method: 'post', path: '/api/purchase-orders/1/cancel', perm: 'purchase-orders:cancel' },
   { method: 'post', path: '/api/purchase-orders/1/close', perm: 'purchase-orders:update(close)' },
   { method: 'post', path: '/api/purchase-orders/1/receive', perm: 'purchase-orders:receive' },
-  { method: 'post', path: '/api/purchase-orders/1/allocations', perm: 'purchase-orders:allocate' },
-  { method: 'post', path: '/api/purchase-orders/allocations/1/transfer', perm: 'purchase-orders:transfer' },
+  { method: 'post', path: '/api/purchase-orders/1/confirm-receive', perm: 'purchase-orders:receive' },
+  { method: 'post', path: '/api/purchase-orders/1/confirm-transfer', perm: 'purchase-orders:receive' },
 ];
 
 describe('Purchase orders â€” permissions', () => {
@@ -65,13 +65,11 @@ describe('Purchase orders â€” permissions', () => {
        WHERE r.code = 'admin' AND p.code LIKE 'purchase-orders:%'
        ORDER BY p.code`
     );
-    expect(admin.rows.map(r => r.code)).toEqual([
-      'purchase-orders:allocate',
+expect(admin.rows.map(r => r.code)).toEqual([
       'purchase-orders:approve',
       'purchase-orders:cancel',
       'purchase-orders:create',
       'purchase-orders:receive',
-      'purchase-orders:transfer',
       'purchase-orders:update',
       'purchase-orders:view',
     ]);
