@@ -187,13 +187,14 @@ export default function SearchableSelect({
               ) : (
                 <>
                   <Command.Empty>{emptyMessage || t('components.searchableSelect.noResults')}</Command.Empty>
-                  {options.map((opt) => (
+{options.map((opt) => (
                     <Command.Item
                       key={String(opt.value)}
                       value={String(opt.value)}
+                      keywords={[opt.label, opt.sublabel ?? ''].filter(Boolean)}
                       disabled={opt.disabled}
                       onSelect={() => handleSelect(opt)}
-                      className="data-[selected=true]:bg-primary-50 data-[selected=true]:text-primary-800 dark:data-[selected=true]:bg-gray-700 dark:data-[selected=true]:text-primary-300"
+                      className="data-[selected=true]:bg-primary-50 data-[selected=true]:text-primary-800"
                     >
                       <div className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-start">
                         <div className="min-w-0 flex-1">

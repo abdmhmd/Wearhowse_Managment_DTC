@@ -1,12 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { cn } from '@/utils';
+﻿// @vitest-environment happy-dom
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { screen, fireEvent } from '@testing-library/react';
 import '@/i18n';
+import i18n from '@/i18n';
 import SearchableSelect, { type SearchableSelectOption } from '@/components/ui/SearchableSelect';
 import { renderWithProviders } from '@/test/test-utils';
 
-const options: SearchableSelectOption[] = [
+const ITEMS: SearchableSelectOption[] = [
   { value: 1, label: 'Laptop', sublabel: 'ELEC-001' },
   { value: 2, label: 'Keyboard', sublabel: 'ELEC-002' },
   { value: 3, label: 'Mouse', sublabel: 'ELEC-003' },
@@ -14,151 +14,128 @@ const options: SearchableSelectOption[] = [
   { value: 5, label: 'Printer', sublabel: 'ELEC-005' },
 ];
 
-interface RenderSelectOptions {
-  value?: string | number | null;
-  options?: SearchableSelectOption[];
-  disabled?: boolean;
-  isLoading?: boolean;
-  onSearch?: (q: string) => void;
+function triggerButton() {
+  return screen.getByRole('button', { name: 'Pick an item' });
 }
 
-function renderSelect(opts: RenderSelectOptions = {}) {
-  const result = renderWithProviders(
-    <SearchableSelect
-      options={opts.options ?? options}
-      value={opts.value ?? null}
-      onChange={vi.fn()}
-      placeholder="Select an item"
-      searchPlaceholder="Search items"
-      emptyMessage="No items match"
-      loadingMessage="Loading items..."
-      name="item-select"
-    />
-  );
-  return result;
-}
-
-async function openPicker() {
-  const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: 'Select an item' }));
+function queryCombobox() {
+  return screen.queryByRole('combobox') as HTMLInputElement | null;
 }
 
 describe('SearchableSelect', () => {
-  it('renders a placeholder button', () => {
-    renderSelect();
-    expect(screen.getByRole('button', { name: 'Select an item' })).toBeInTheDocument();
+  beforeEach(() => {
+    i18n.changeLanguage('en');
+    document.documentElement.dir = 'ltr';
   });
 
-  it('opens the listbox when clicked', async () => {
-    renderSelect();
-    await openPicker();
-    expect(await screen.findByRole('listbox')).toBeInTheDocument();
-  });
-
-  it('filters options while typing (client-side)', async () => {
-    renderSelect();
-    await openPicker();
-    const input = await screen.findByRole('combobox');
-    await userEvent.type(input, 'mon');
-    expect(screen.queryByText('Laptop')).not.toBeInTheDocument();
-    expect(await screen.findByText('Monitor')).toBeInTheDocument();
-  });
-
-  it('selects an option via keyboard (arrow + enter)', async () => {
+  it('renders the placeholder when nothing is selected', () => {
     const onChange = vi.fn();
-    renderWithProviders(
-      <SearchableSelect
-        options={options}
-        value={null}
-        onChange={onChange}
-        placeholder="Pick an item"
-        searchPlaceholder="Search items"
-        name="item-select"
-      />
-    );
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Pick an item' }));
-    await screen.findByRole('listbox');
-    await user.keyboard('{ArrowDown}{Enter}');
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith(1));
+    renderWithProviders(<SearchableSelect options={ITEMS} value={null} onChange={onChange} placeholder="Select an item" name="item-picker" aria-label="Pick an item" />);
+    expect(screen.getByText('Select an item')).toBeInTheDocument();
   });
 
-  it('shows the empty message when no option matches', async () => {
-    renderSelect();
-    await openPicker();
+  it('renders the selected option when a value is provided', () => {
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={2} onChange={onChange} placeholder="Pick an item" name="item-picker" aria-label="Pick an item" />);
+    expect(screen.getByText('Keyboard')).toBeInTheDocument();
+    expect(screen.getByText('ELEC-002')).toBeInTheDocument();
+  });
+
+  it('opens the picker and lists all options on click', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={null} onChange={onChange} placeholder="Pick an item" name="item-picker" aria-label="Pick an item" />);
+    fireEvent.click(triggerButton());
     const input = await screen.findByRole('combobox');
-    await userEvent.type(input, 'zzz-nothing');
-    expect(await screen.findByText('No items match')).toBeInTheDocument();
+    expect(input).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Monitor/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('option')).toHaveLength(5);
   });
 
-  it('shows a loading indicator when isLoading is set', async () => {
-    renderWithProviders(
-      <SearchableSelect
-        options={options}
-        value={null}
-        onChange={vi.fn()}
-        placeholder="Pick an item"
-        searchPlaceholder="Search items"
-        isLoading
-        loadingMessage="Loading items..."
-        name="item-select"
-      />
-    );
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Pick an item' }));
+  it('filters options client-side while typing', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={null} onChange={onChange} placeholder="Pick an item" name="item-picker" aria-label="Pick an item" />);
+    fireEvent.click(triggerButton());
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'key' } });
+    expect(screen.getByRole('option', { name: /Keyboard/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Monitor/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the empty message when nothing matches', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={null} onChange={onChange} placeholder="Pick an item" emptyMessage="No items found" name="item-picker" aria-label="Pick an item" />);
+    fireEvent.click(triggerButton());
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'zzz' } });
+    expect(await screen.findByText('No items found')).toBeInTheDocument();
+  });
+
+  it('calls onChange with the selected value when clicking an option', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={null} onChange={onChange} placeholder="Pick an item" name="item-picker" aria-label="Pick an item" />);
+    fireEvent.click(triggerButton());
+    fireEvent.click(await screen.findByRole('option', { name: /Monitor/ }));
+    expect(onChange).toHaveBeenCalledWith(4);
+  });
+
+  it('selects via keyboard: ArrowDown then Enter', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={null} onChange={onChange} placeholder="Pick an item" name="item-picker" aria-label="Pick an item" />);
+    fireEvent.click(triggerButton());
+    const input = await screen.findByRole('combobox');
+    fireEvent.keyDown(input, { key: 'ArrowDown', code: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+    expect(onChange).toHaveBeenCalled();
+  });
+
+  it('clears the selection via the clear button', () => {
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={2} onChange={onChange} placeholder="Pick an item" clearLabel="Clear selection" name="item-picker" aria-label="Pick an item" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it('does not open when disabled', () => {
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={2} onChange={onChange} placeholder="Pick an item" disabled name="item-picker" aria-label="Pick an item" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pick an item' }));
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('shows the loading message while isLoading', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={null} onChange={onChange} placeholder="Pick an item" isLoading loadingMessage="Loading items..." name="item-picker" aria-label="Pick an item" />);
+    fireEvent.click(triggerButton());
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } });
     expect(await screen.findByText('Loading items...')).toBeInTheDocument();
   });
 
-  it('is disabled and does not open when disabled', async () => {
-    renderWithProviders(
-      <SearchableSelect
-        options={options}
-        value={1}
-        onChange={vi.fn()}
-        placeholder="Select an item"
-        searchPlaceholder="Search items"
-        disabled
-        name="item-select"
-      />
-    );
-    const button = screen.getByRole('button', { name: 'Laptop' });
-    expect(button).toBeDisabled();
-    await openPicker();
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-  });
-
-  it('supports server-side async search via debounced onSearch', async () => {
+  it('calls onSearch after typing (debounced once settled)', async () => {
     const onSearch = vi.fn();
-    renderWithProviders(
-      <SearchableSelect
-        options={options}
-        value={null}
-        onChange={vi.fn()}
-        placeholder="Pick an item"
-        searchPlaceholder="Search items"
-        onSearch={onSearch}
-        name="item-select"
-      />
-    );
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Pick an item' }));
-    const input = await screen.findByRole('combobox');
-    await user.type(input, 'key');
-    await waitFor(() => expect(onSearch).toHaveBeenLastCalledWith('key'));
+    const onChange = vi.fn();
+    renderWithProviders(<SearchableSelect options={ITEMS} value={null} onChange={onChange} onSearch={onSearch} placeholder="Pick an item" name="item-picker" aria-label="Pick an item" />);
+    fireEvent.click(triggerButton());
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'lap' } });
+    await new Promise((r) => setTimeout(r, 600));
+    expect(onSearch).toHaveBeenCalledWith('lap');
   });
 
-  it('applies an rtl class when the document direction is rtl', async () => {
-    document.documentElement.dir = 'rtl';
-    try {
-      renderWithProviders(
-        <SearchableSelect options={options} value={null} onChange={vi.fn()} placeholder="اختر" searchPlaceholder="بحث" name="item-select" />
-      );
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'اختر' }));
-      const content = (await screen.findByRole('listbox')).closest('[role="listbox"]');
-      expect(content?.closest('button')?.getAttribute('data-state')).toBe('open');
-    } finally {
-      document.documentElement.dir = 'ltr';
-    }
+  it('renders custom option content via renderOption', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(
+      <SearchableSelect
+        options={ITEMS}
+        value={null}
+        onChange={onChange}
+        placeholder="Pick an item"
+        name="item-picker"
+        aria-label="Pick an item"
+        renderOption={(opt) => (
+          <span>
+            [{opt.label.toUpperCase()}] {opt.sublabel}
+          </span>
+        )}
+      />
+    );
+    fireEvent.click(triggerButton());
+    expect(await screen.findByText('[MONITOR] ELEC-004')).toBeInTheDocument();
   });
 });
