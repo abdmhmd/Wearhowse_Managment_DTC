@@ -18,11 +18,6 @@ export const PERMISSIONS = {
   UNITS_UPDATE: 'units:update',
   UNITS_DELETE: 'units:delete',
 
-  SUPPLIERS_VIEW: 'suppliers:view',
-  SUPPLIERS_CREATE: 'suppliers:create',
-  SUPPLIERS_UPDATE: 'suppliers:update',
-  SUPPLIERS_DELETE: 'suppliers:delete',
-
   DEPARTMENTS_VIEW: 'departments:view',
   DEPARTMENTS_CREATE: 'departments:create',
   DEPARTMENTS_UPDATE: 'departments:update',
