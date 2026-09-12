@@ -29,6 +29,7 @@ import projectsRoutes from './modules/projects/projects.routes';
 import custodiesRoutes from './modules/custodies/custodies.routes';
 import supervisorsRoutes from './modules/supervisors/supervisors.routes';
 import purchaseOrdersRoutes from './modules/purchase-orders/purchase-orders.routes';
+import purchaseRequestsRoutes from './modules/purchase-requests/purchase-requests.routes';
 
 const app: Application = express();
 
@@ -68,6 +69,7 @@ app.use('/api/projects', projectsRoutes);
 app.use('/api/custodies', custodiesRoutes);
 app.use('/api/supervisors', supervisorsRoutes);
 app.use('/api/purchase-orders', purchaseOrdersRoutes);
+app.use('/api/purchase-requests', purchaseRequestsRoutes);
 
 import { testConnection } from './config/database';
 

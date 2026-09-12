@@ -76,6 +76,20 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     [pattern]
   );
   await p.query(
+    `DELETE FROM purchase_request_items
+      WHERE purchase_request_id IN (SELECT id FROM purchase_requests WHERE request_no LIKE $1)`,
+    [pattern]
+  );
+  await p.query(
+    `DELETE FROM purchase_requests
+       WHERE request_no LIKE $1
+          OR created_by IN (SELECT id FROM users WHERE username LIKE $1)
+          OR warehouse_id IN (SELECT id FROM warehouses WHERE code LIKE $1)
+          OR department_id IN (SELECT id FROM departments WHERE code LIKE $1)
+          OR purchase_order_id IN (SELECT id FROM purchase_orders WHERE po_number LIKE $1)`,
+    [pattern]
+  );
+  await p.query(
     `DELETE FROM material_request_details
       WHERE item_id IN (SELECT id FROM items WHERE item_code LIKE $1)
          OR request_id IN (SELECT id FROM material_requests WHERE request_no LIKE $1)`,

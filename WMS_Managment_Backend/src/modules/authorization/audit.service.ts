@@ -51,6 +51,12 @@ export type AuditAction =
   | 'PO_ALLOCATION_CANCELLED'
   | 'PO_TRANSFERRED'
   | 'PO_TRANSFER_CONFIRMED'
+  | 'PR_CREATED'
+  | 'PR_CANCELLED'
+  | 'PR_DEPT_APPROVED'
+  | 'PR_DEPT_REJECTED'
+  | 'PR_ADMIN_APPROVED'
+  | 'PR_ADMIN_REJECTED'
   | 'GENERIC';
 
 export interface AuditEntry {

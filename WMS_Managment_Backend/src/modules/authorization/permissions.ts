@@ -90,6 +90,15 @@ export const PERMISSIONS = {
   CUSTODIES_VIEW: 'custodies:view',
   CUSTODIES_VIEW_OWN: 'custodies:view_own',
   CUSTODIES_RETURN: 'custodies:return',
+
+  PURCHASE_REQUESTS_VIEW: 'purchase-requests:view',
+  PURCHASE_REQUESTS_VIEW_OWN: 'purchase-requests:view_own',
+  PURCHASE_REQUESTS_CREATE: 'purchase-requests:create',
+  PURCHASE_REQUESTS_CANCEL: 'purchase-requests:cancel',
+  PURCHASE_REQUESTS_APPROVE_DEPT: 'purchase-requests:approve-dept',
+  PURCHASE_REQUESTS_REJECT_DEPT: 'purchase-requests:reject-dept',
+  PURCHASE_REQUESTS_APPROVE_ADMIN: 'purchase-requests:approve-admin',
+  PURCHASE_REQUESTS_REJECT_ADMIN: 'purchase-requests:reject-admin',
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
