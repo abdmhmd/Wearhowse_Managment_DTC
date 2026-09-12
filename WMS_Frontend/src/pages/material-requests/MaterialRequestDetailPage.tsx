@@ -95,10 +95,10 @@ export default function MaterialRequestDetailPage() {
           <div><dt className="text-sm text-gray-500">{t('pages.materialRequests.requestedAt')}</dt><dd className="text-sm font-medium">{formatDate(req.created_at)}</dd></div>
           <div><dt className="text-sm text-gray-500">{t('pages.materialRequests.neededBy')}</dt><dd className="text-sm font-medium">{req.needed_by ? formatDate(req.needed_by) : '-'}</dd></div>
           <div><dt className="text-sm text-gray-500">{t('table.notes')}</dt><dd className="text-sm font-medium">{req.notes || '-'}</dd></div>
-          {req.status === 'admin_rejected' && <div><dt className="text-sm text-gray-500">{t('pages.materialRequests.rejectReason')}</dt><dd className="text-sm font-medium text-red-600">{req.rejection_reason || '-'}</dd></div>}
+          {['admin_rejected', 'wm_rejected'].includes(req.status) && <div><dt className="text-sm text-gray-500">{t('pages.materialRequests.rejectReason')}</dt><dd className="text-sm font-medium text-red-600">{req.rejection_reason || '-'}</dd></div>}
         </dl>
 
-        {req.status !== 'cancelled' && req.status !== 'admin_rejected' && (
+        {!['cancelled', 'admin_rejected', 'wm_rejected'].includes(req.status) && (
           <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
             {canApprove && ['pending', 'forwarded'].includes(req.status) && (
               <>

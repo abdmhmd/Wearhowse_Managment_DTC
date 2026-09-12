@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCustodies, useReturnCustody, useReceiveReturn } from '@/hooks/useCustodies';
-import { PageHeader, Button, DataTable, Badge, ConfirmDialog } from '@/components/ui';
+import { useCustodies, useReceiveReturn } from '@/hooks/useCustodies';
+import { PageHeader, Button, DataTable, Badge, Modal, Select } from '@/components/ui';
 import ReturnCustodyModal from '@/components/custodies/ReturnCustodyModal';
 import { ArrowUturnLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useAuthStore } from '@/store/auth.store';
-import type { Custody } from '@/types';
+import type { Custody, CustodyCondition } from '@/types';
 
 const statusBadge = (status: string, t: any) => {
   if (status === 'active') return <Badge variant="success">{t('pages.custodies.active')}</Badge>;
@@ -19,22 +19,25 @@ const statusBadge = (status: string, t: any) => {
 
 export default function CustodiesPage() {
   const { t } = useTranslation();
-  const { can } = useAuthStore();
+  const { user, can } = useAuthStore();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [returningCustody, setReturningCustody] = useState<Custody | null>(null);
   const [receiving, setReceiving] = useState<Custody | null>(null);
+  const [receivingCondition, setReceivingCondition] = useState<CustodyCondition>('good');
 
   const { data } = useCustodies(page, 20, statusFilter ? { status: statusFilter as any } : undefined);
   const receiveMutation = useReceiveReturn();
 
   const handleReceive = async () => {
     if (!receiving) return;
-    await receiveMutation.mutateAsync(receiving.id);
+    await receiveMutation.mutateAsync({ id: receiving.id, condition: receivingCondition });
     setReceiving(null);
+    setReceivingCondition('good');
   };
 
-  const canReceive = can('custodies:return');
+  const canReturn = can('custodies:return');
+  const receiveAllowed = user?.role === 'sub_warehouse_manager';
 
   const columns = [
     { key: 'item', header: t('pages.custodies.item'), render: (item: any) => <span>{item.item_code} - {getLocalizedName({ name_ar: item.item_name_ar, name_en: item.item_name_en })}</span> },
@@ -52,7 +55,7 @@ export default function CustodiesPage() {
     {
       key: 'actions', header: t('table.actions'), className: 'text-end',
       render: (item: any) => {
-        if (item.status === 'active') {
+        if (item.status === 'active' && canReturn) {
           return (
             <div className="flex justify-end">
               <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setReturningCustody(item); }}>
@@ -61,10 +64,10 @@ export default function CustodiesPage() {
             </div>
           );
         }
-        if (item.status === 'return_pending' && canReceive) {
+        if (item.status === 'return_pending' && receiveAllowed) {
           return (
             <div className="flex justify-end">
-              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setReceiving(item); }}>
+              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setReceiving(item); setReceivingCondition('good'); }}>
                 <CheckCircleIcon className="h-4 w-4 text-blue-600" />
               </Button>
             </div>
@@ -98,15 +101,23 @@ export default function CustodiesPage() {
 
       <ReturnCustodyModal custody={returningCustody} onClose={() => setReturningCustody(null)} />
 
-      <ConfirmDialog
-        isOpen={!!receiving}
-        onClose={() => setReceiving(null)}
-        onConfirm={handleReceive}
-        title={t('pages.custodies.confirmReturn')}
-        message={t('pages.custodies.confirmReturnConfirm')}
-        confirmLabel={t('pages.custodies.confirmReturn')}
-        isLoading={receiveMutation.isPending}
-      />
+      <Modal isOpen={!!receiving} onClose={() => setReceiving(null)} title={t('pages.custodies.receiveConditionTitle')}>
+        <p className="text-sm text-gray-500 mb-4">{t('pages.custodies.receiveConditionHint')}</p>
+        <Select
+          value={receivingCondition}
+          onChange={(e) => setReceivingCondition(e.target.value as CustodyCondition)}
+          className="mb-4"
+          options={[
+            { value: 'good', label: t('pages.custodies.good') },
+            { value: 'damaged', label: t('pages.custodies.damaged') },
+            { value: 'lost', label: t('pages.custodies.lost') },
+          ]}
+        />
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" type="button" onClick={() => setReceiving(null)}>{t('common.cancel')}</Button>
+          <Button type="button" onClick={handleReceive} isLoading={receiveMutation.isPending}>{t('pages.custodies.confirmReturn')}</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -9,6 +9,8 @@ import {
   useReceivePurchaseOrder,
   useAllocateStock,
   useTransferAllocation,
+  useConfirmPurchaseOrderReceive,
+  useConfirmTransferAllocation,
 } from '@/hooks/usePurchaseOrders';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { PageHeader, Button, Badge, Modal, Input, Select, ConfirmDialog } from '@/components/ui';
@@ -47,6 +49,8 @@ export default function PurchaseOrderDetailPage() {
   const receiveMutation = useReceivePurchaseOrder();
   const allocateMutation = useAllocateStock();
   const transferMutation = useTransferAllocation();
+  const confirmReceiveMutation = useConfirmPurchaseOrderReceive();
+  const confirmTransferMutation = useConfirmTransferAllocation();
 
   const [confirmAction, setConfirmAction] = useState<'approve' | 'cancel' | 'close' | null>(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
@@ -159,6 +163,11 @@ export default function PurchaseOrderDetailPage() {
             {canReceiveNow && (
               <Button onClick={openReceive} disabled={receiveMutation.isPending}>
                 {t('pages.purchaseOrders.actions.receive')}
+              </Button>
+            )}
+            {can('purchase-orders:receive') && ['received', 'partially_received'].includes(status) && order.created_by !== user?.id && (
+              <Button variant="secondary" onClick={() => confirmReceiveMutation.mutate(order.id)} disabled={confirmReceiveMutation.isPending}>
+                {t('pages.purchaseOrders.actions.confirmReceive')}
               </Button>
             )}
             {canCancelNow && (
@@ -278,6 +287,10 @@ export default function PurchaseOrderDetailPage() {
               const canTransfer =
                 can('purchase-orders:transfer') && open && remaining > 0 &&
                 (!isManager || (user?.warehouse_ids ?? []).includes(Number((a as any).source_warehouse_id)));
+              const canConfirmTransfer =
+                can('purchase-orders:transfer') &&
+                a.status === 'pending_confirmation' &&
+                a.transferred_by !== user?.id;
               return (
                 <tr key={a.id}>
                   <td className="px-4 py-2">
@@ -294,6 +307,11 @@ export default function PurchaseOrderDetailPage() {
                     {canTransfer && (
                       <Button variant="secondary" onClick={() => openTransfer(a.id, remaining)}>
                         {t('pages.purchaseOrders.actions.transfer')}
+                      </Button>
+                    )}
+                    {canConfirmTransfer && (
+                      <Button variant="secondary" onClick={() => confirmTransferMutation.mutate(a.id)} disabled={confirmTransferMutation.isPending}>
+                        {t('pages.purchaseOrders.actions.confirmTransfer')}
                       </Button>
                     )}
                   </td>
