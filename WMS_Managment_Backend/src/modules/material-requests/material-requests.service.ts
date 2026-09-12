@@ -360,6 +360,7 @@ export class MaterialRequestsService {
               WHERE i.is_active = true
                 AND w.is_active = true
                 AND w.department_id = $1
+                AND i.current_balance > 0
               ORDER BY i.item_code`,
             [departmentId]
           ).then((r) => r.rows),
