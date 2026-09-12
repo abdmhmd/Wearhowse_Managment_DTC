@@ -71,6 +71,9 @@ const PO_SELECT = `
          po.created_by, po.approved_by, po.approved_at,
          po.cancelled_by, po.cancelled_at, po.received_at, po.is_active,
          po.created_at, po.updated_at,
+         -- Auto-PO linkage: which purchase request generated this PO (1-to-1).
+         preq.id AS purchase_request_id,
+         preq.request_no AS purchase_request_no,
          w.code AS warehouse_code, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
          w.is_main AS warehouse_is_main,
          d.code AS department_code, d.name_ar AS department_name_ar, d.name_en AS department_name_en,
@@ -88,6 +91,7 @@ const PO_SELECT = `
   LEFT JOIN users cu ON cu.id = po.created_by
   LEFT JOIN users au ON au.id = po.approved_by
   LEFT JOIN users xu ON xu.id = po.cancelled_by
+  LEFT JOIN purchase_requests preq ON preq.purchase_order_id = po.id
   LEFT JOIN (
     SELECT po_id,
            COUNT(*)::int                AS lines_count,

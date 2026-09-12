@@ -6,7 +6,7 @@ export function useLanguage() {
   return ii.language === 'ar' ? 'ar' : 'en';
 }
 
-export function getLocalizedName(item: { name_ar?: string; name_en?: string } | null | undefined, lang?: string): string {
+export function getLocalizedName(item: { name_ar?: string | null; name_en?: string | null } | null | undefined, lang?: string): string {
   const language = lang || (i18n.language === 'ar' ? 'ar' : 'en');
   if (!item) return '-';
   if (language === 'ar') return item.name_ar || item.name_en || '-';

@@ -216,6 +216,18 @@ export default function PurchaseOrderDetailPage() {
         )}
       </div>
 
+      {/* Linked purchase request */}
+      {order.purchase_request_id && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <p className="text-gray-500">{t('pages.purchaseOrders.createdFromRequest', { requestNo: order.purchase_request_no || '#' })}</p>
+          </div>
+          <Button variant="secondary" onClick={() => navigate(`/purchase-requests/${order.purchase_request_id}`)}>
+            {t('pages.purchaseOrders.viewRequest')}
+          </Button>
+        </div>
+      )}
+
       {/* Lines */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200 text-sm">

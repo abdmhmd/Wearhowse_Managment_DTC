@@ -19,6 +19,7 @@ import {
   ShieldCheckIcon,
   ClipboardDocumentCheckIcon,
   ShoppingCartIcon,
+  DocumentPlusIcon,
 } from '@heroicons/react/24/outline';
 import type { Permission } from '@/types';
 import { cn } from '@/utils';
@@ -42,6 +43,7 @@ const navItems: NavItem[] = [
   { labelKey: 'nav.stockMovements', path: '/stock-movements', icon: ClipboardDocumentListIcon, permissions: ['stock-movements:view-all'] },
   { labelKey: 'nav.materialRequests', path: '/requests', icon: ClipboardDocumentCheckIcon, permissions: ['requests:view', 'requests:view_own'] },
   { labelKey: 'nav.purchaseOrders', path: '/purchase-orders', icon: ShoppingCartIcon, permissions: ['purchase-orders:view'] },
+  { labelKey: 'nav.purchaseRequests', path: '/purchase-requests', icon: DocumentPlusIcon, permissions: ['purchase-requests:view', 'purchase-requests:view_own'] },
   { labelKey: 'nav.projects', path: '/projects', icon: FolderIcon, permissions: ['projects:view'] },
   { labelKey: 'nav.custodies', path: '/custodies', icon: ShieldCheckIcon, permissions: ['custodies:view'] },
   { labelKey: 'nav.myCustody', path: '/my-custody', icon: ShieldCheckIcon, permissions: ['custodies:view_own'] },

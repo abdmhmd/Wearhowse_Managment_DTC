@@ -34,6 +34,9 @@ const MaterialRequestDetailPage = lazy(() => import('@/pages/material-requests/M
 const PurchaseOrdersListPage = lazy(() => import('@/pages/purchase-orders/PurchaseOrdersListPage'));
 const CreatePurchaseOrderPage = lazy(() => import('@/pages/purchase-orders/CreatePurchaseOrderPage'));
 const PurchaseOrderDetailPage = lazy(() => import('@/pages/purchase-orders/PurchaseOrderDetailPage'));
+const PurchaseRequestsListPage = lazy(() => import('@/pages/purchase-requests/PurchaseRequestsListPage'));
+const CreatePurchaseRequestPage = lazy(() => import('@/pages/purchase-requests/CreatePurchaseRequestPage'));
+const PurchaseRequestDetailPage = lazy(() => import('@/pages/purchase-requests/PurchaseRequestDetailPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -148,6 +151,18 @@ export default function App() {
 
                 <Route element={<ProtectedRoute allowedPermissions={['purchase-orders:view']} />}>
                   <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedPermissions={['purchase-requests:view', 'purchase-requests:view_own']} />}>
+                  <Route path="/purchase-requests" element={<PurchaseRequestsListPage />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedPermissions={['purchase-requests:create']} />}>
+                  <Route path="/purchase-requests/new" element={<CreatePurchaseRequestPage />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedPermissions={['purchase-requests:view', 'purchase-requests:view_own']} />}>
+                  <Route path="/purchase-requests/:id" element={<PurchaseRequestDetailPage />} />
                 </Route>
 
                 <Route element={<ProtectedRoute allowedPermissions={['reports:view']} />}>
