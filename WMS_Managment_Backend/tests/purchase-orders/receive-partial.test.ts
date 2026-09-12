@@ -22,7 +22,7 @@ describe('Purchase orders â€” partial receiving', () => {
 
   test('60 then 40 reaches received=100 with status transitions; over-receive rejected', async () => {
     const created = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 100, unit_code: world.unitCode, unit_price: 2 }],
     });
@@ -82,7 +82,7 @@ describe('Purchase orders â€” partial receiving', () => {
 
   test('multi-line PO: partial per-line receiving works independently', async () => {
 const created = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [
         { item_id: world.itemId, quantity_ordered: 10, unit_code: world.unitCode },
@@ -121,7 +121,7 @@ const created = await apiCreatePo(app, world.users.admin.token, {
 
   test('RV voucher is linked to the purchase order and stock_movements recorded', async () => {
 const created = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 7, unit_code: world.unitCode }],
     });

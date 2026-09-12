@@ -53,13 +53,8 @@ export async function login(app: any, user: SeedUser): Promise<string> {
   return res.body.data.token as string;
 }
 
-export async function seedSupplier(): Promise<number> {
-  const name = `${PO_TEST_PREFIX}supplier_${shortId()}`;
-  const res = await pool.query(
-    `INSERT INTO suppliers (name_ar, name_en, is_active) VALUES ($1, $1, true) RETURNING id`,
-    [name]
-  );
-  return res.rows[0].id;
+export async function seedSupplierName(): Promise<string> {
+  return `${PO_TEST_PREFIX}supplier_${shortId()}`;
 }
 
 export async function seedStock(itemId: number, warehouseId: number, balance: number): Promise<void> {
@@ -96,7 +91,7 @@ export async function seedPoWorld() {
   const mainWhB = await seedWarehouse({ department_id: deptB, is_main: true });
   const subWhB = await seedWarehouse({ department_id: deptB });
 
-  const supplierId = await seedSupplier();
+  const supplierName = await seedSupplierName();
   const itemId = await seedItem(catCode, unitCode, mainWhA, 0);
   const itemId2 = await seedItem(catCode, unitCode, mainWhA, 0);
 
@@ -110,7 +105,7 @@ export async function seedPoWorld() {
   return {
     catCode, unitCode,
     deptA, mainWhA, subWhA1, subWhA2, deptB, mainWhB, subWhB,
-    supplierId, itemId, itemId2,
+    supplierName, itemId, itemId2,
     users: { admin, wmMain, wmB, supervisor, deptMgr },
   };
 }

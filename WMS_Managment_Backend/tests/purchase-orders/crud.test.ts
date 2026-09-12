@@ -1,6 +1,5 @@
 ﻿import request from 'supertest';
-import { pool } from '../../src/config/database';
-import { PO_TEST_PREFIX, seedPoWorld, seedSupplier, login, apiCreatePo, poTeardown, type PoWorld } from './helpers';
+import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, poTeardown, type PoWorld } from './helpers';
 
 /**
  * Purchase order CRUD: create validation, draft editing, scope-filtered reads.
@@ -22,7 +21,7 @@ describe('Purchase orders â€” CRUD', () => {
   describe('create', () => {
     test('admin creates a valid draft PO into the main warehouse (department derived)', async () => {
       const res = await apiCreatePo(app, world.users.admin.token, {
-        supplier_id: world.supplierId,
+        supplier_name: world.supplierName,
         warehouse_id: world.mainWhA,
         expected_date: '2030-01-01',
         notes: 'crud test',
@@ -126,11 +125,9 @@ describe('Purchase orders â€” CRUD', () => {
       }
     });
 
-    test('inactive supplier rejected', async () => {
-      const deadSupplier = await seedSupplier();
-      await pool.query('UPDATE suppliers SET is_active = false WHERE id = $1', [deadSupplier]);
+    test('admin must name the supplier (blank supplier_name rejected)', async () => {
       const res = await apiCreatePo(app, world.users.admin.token, {
-        supplier_id: deadSupplier,
+        supplier_name: '   ',
         warehouse_id: world.mainWhA,
         lines: [{ item_id: world.itemId, quantity_ordered: 1, unit_code: world.unitCode }],
       });
@@ -143,7 +140,7 @@ describe('Purchase orders â€” CRUD', () => {
 
     beforeAll(async () => {
 const res = await apiCreatePo(app, world.users.admin.token, {
-        supplier_id: world.supplierId,
+        supplier_name: world.supplierName,
         warehouse_id: world.mainWhA,
         notes: 'before',
         lines: [{ item_id: world.itemId, quantity_ordered: 50, unit_code: world.unitCode }],
@@ -185,7 +182,7 @@ const res = await apiCreatePo(app, world.users.admin.token, {
     let poA: number;
     beforeAll(async () => {
 const res = await apiCreatePo(app, world.users.admin.token, {
-        supplier_id: world.supplierId,
+        supplier_name: world.supplierName,
         warehouse_id: world.mainWhB,
         lines: [{ item_id: world.itemId, quantity_ordered: 3, unit_code: world.unitCode }],
       });

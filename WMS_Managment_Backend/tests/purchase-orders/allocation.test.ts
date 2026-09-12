@@ -10,7 +10,7 @@ import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, getStock, p
 
 async function approvedPoWithReceived(app: any, world: PoWorld, qty: number) {
 const created = await apiCreatePo(app, world.users.admin.token, {
-    supplier_id: world.supplierId,
+    supplier_name: world.supplierName,
     warehouse_id: world.mainWhA,
     lines: [{ item_id: world.itemId, quantity_ordered: qty, unit_code: world.unitCode }],
   });
@@ -83,7 +83,7 @@ describe('Purchase orders â€” allocation', () => {
 
   test('cannot allocate before anything is received', async () => {
 const created = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 10, unit_code: world.unitCode }],
     });

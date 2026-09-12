@@ -175,10 +175,6 @@ export async function cleanupTestData(prefix: string): Promise<void> {
   );
   await p.query(`DELETE FROM categories WHERE code LIKE $1`, [pattern]);
   await p.query(`DELETE FROM units WHERE code LIKE $1`, [pattern]);
-  await p.query(
-    `DELETE FROM suppliers WHERE name_ar LIKE $1 OR name_en LIKE $1`,
-    [pattern]
-  );
   await p.query(`DELETE FROM departments WHERE code LIKE $1`, [pattern]);
   await p.query(`DELETE FROM users WHERE username LIKE $1`, [pattern]);
 }

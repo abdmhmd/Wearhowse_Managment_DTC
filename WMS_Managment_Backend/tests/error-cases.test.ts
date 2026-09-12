@@ -2,7 +2,6 @@ import { pool } from '../src/config/database';
 import { categoriesService } from '../src/modules/categories/categories.service';
 import { departmentsService } from '../src/modules/departments/departments.service';
 import { itemsService } from '../src/modules/items/items.service';
-import { suppliersService } from '../src/modules/suppliers/suppliers.service';
 import { unitsService } from '../src/modules/units/units.service';
 import { usersService } from '../src/modules/users/users.service';
 import { warehousesService } from '../src/modules/warehouses/warehouses.service';
@@ -73,12 +72,6 @@ describe('400 Validation Errors', () => {
     });
   });
 
-  describe('Suppliers', () => {
-    test('create rejects missing required fields', async () => {
-      await expect(suppliersService.create({} as any)).rejects.toThrow();
-    });
-  });
-
   describe('Units', () => {
     test('create rejects missing required fields', async () => {
       await expect(unitsService.create({} as any)).rejects.toThrow();
@@ -129,11 +122,6 @@ describe('404 Not Found Errors', () => {
 
   test('getItemCard throws for non-existent', async () => {
     await expect(itemsService.getItemCard(999999999)).rejects.toThrow();
-  });
-
-  test('getSupplierById returns null for non-existent', async () => {
-    const result = await suppliersService.getById(999999999);
-    expect(result).toBeNull();
   });
 
   test('getUnitByCode returns null for non-existent', async () => {

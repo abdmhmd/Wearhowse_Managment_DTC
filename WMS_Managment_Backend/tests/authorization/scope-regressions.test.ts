@@ -121,7 +121,7 @@ describe('Scope regressions (audit remediation)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whA, supplier_id: null, department_id: deptA, notes: 'scoped RV A' },
+          header: { type: 'RV', warehouse_id: whA, department_id: deptA, notes: 'scoped RV A' },
           details: [{ item_id: itemA, quantity: 1, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(txnA.status).toBe(201);
@@ -130,7 +130,7 @@ describe('Scope regressions (audit remediation)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whB, supplier_id: null, department_id: deptB, notes: 'scoped RV B' },
+          header: { type: 'RV', warehouse_id: whB, department_id: deptB, notes: 'scoped RV B' },
           details: [{ item_id: itemB, quantity: 1, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(txnB.status).toBe(201);
@@ -171,7 +171,7 @@ describe('Scope regressions (audit remediation)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whA, supplier_id: null, department_id: deptA, notes: 'dm scoped RV A' },
+          header: { type: 'RV', warehouse_id: whA, department_id: deptA, notes: 'dm scoped RV A' },
           details: [{ item_id: itemA, quantity: 1, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(rvA.status).toBe(201);
@@ -181,7 +181,7 @@ describe('Scope regressions (audit remediation)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whB, supplier_id: null, department_id: deptB, notes: 'dm scoped RV B' },
+          header: { type: 'RV', warehouse_id: whB, department_id: deptB, notes: 'dm scoped RV B' },
           details: [{ item_id: itemB, quantity: 1, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(rvB.status).toBe(201);
@@ -259,7 +259,7 @@ describe('Scope regressions (audit remediation)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whA, supplier_id: null, department_id: deptA, notes: 'card RV A' },
+          header: { type: 'RV', warehouse_id: whA, department_id: deptA, notes: 'card RV A' },
           details: [{ item_id: itemA, quantity: 3, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(rvA.status).toBe(201);
@@ -274,7 +274,7 @@ describe('Scope regressions (audit remediation)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whB, supplier_id: null, department_id: deptB, notes: 'card RV B' },
+          header: { type: 'RV', warehouse_id: whB, department_id: deptB, notes: 'card RV B' },
           details: [{ item_id: itemA, quantity: 8, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(rvB.status).toBe(201);

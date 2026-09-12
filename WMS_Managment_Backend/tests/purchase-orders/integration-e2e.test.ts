@@ -30,7 +30,7 @@ describe('Purchase orders â€” full lifecycle e2e', () => {
 
     // 1. CREATE draft
     const created = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 100, unit_code: world.unitCode, unit_price: 3 }],
     });
@@ -169,7 +169,7 @@ describe('Purchase orders â€” full lifecycle e2e', () => {
 
   test('audit trail records the full PO lifecycle', async () => {
 const created = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 4, unit_code: world.unitCode }],
     });

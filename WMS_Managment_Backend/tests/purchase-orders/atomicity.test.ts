@@ -10,7 +10,7 @@ import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, getStock, p
 
 async function approvedPo(app: any, world: PoWorld, qty: number) {
 const created = await apiCreatePo(app, world.users.admin.token, {
-    supplier_id: world.supplierId,
+    supplier_name: world.supplierName,
     warehouse_id: world.mainWhA,
     lines: [{ item_id: world.itemId, quantity_ordered: qty, unit_code: world.unitCode }],
   });
@@ -85,7 +85,7 @@ describe('Purchase orders â€” atomicity / rollback', () => {
   test('transfer failure rolls back allocation bookkeeping AND destination credit', async () => {
     await seedStock(world.itemId2, world.mainWhA, 100);
 const created = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId2, quantity_ordered: 40, unit_code: world.unitCode }],
     });

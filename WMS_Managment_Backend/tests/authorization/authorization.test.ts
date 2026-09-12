@@ -271,7 +271,7 @@ describe('Authorization (RBAC + Data Scope)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whB, supplier_id: null, department_id: null, notes: 'whB txn' },
+          header: { type: 'RV', warehouse_id: whB, department_id: null, notes: 'whB txn' },
           details: [{ item_id: itemId, quantity: 1, unit_code: unitCode, unit_price: 5, batch_number: null }],
         });
 

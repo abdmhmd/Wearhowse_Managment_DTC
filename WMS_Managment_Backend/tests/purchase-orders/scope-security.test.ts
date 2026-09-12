@@ -10,7 +10,7 @@ import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, poTeardown,
 
 async function fullWorkflowPo(app: any, world: PoWorld, qty = 20) {
 const created = await apiCreatePo(app, world.users.admin.token, {
-    supplier_id: world.supplierId,
+    supplier_name: world.supplierName,
     warehouse_id: world.mainWhA,
     lines: [{ item_id: world.itemId, quantity_ordered: qty, unit_code: world.unitCode }],
   });
@@ -65,7 +65,7 @@ describe('Purchase orders â€” scope & security (direct API)', () => {
 
   test('WM cannot view / approve another warehouse PO (hidden as 404)', async () => {
 const createdB = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhB,
       lines: [{ item_id: world.itemId, quantity_ordered: 5, unit_code: world.unitCode }],
     });
@@ -82,7 +82,7 @@ const createdB = await apiCreatePo(app, world.users.admin.token, {
     void poId; void detailId;
 
 const createdB = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhB,
       lines: [{ item_id: world.itemId2, quantity_ordered: 5, unit_code: world.unitCode }],
     });
@@ -113,7 +113,7 @@ const createdB = await apiCreatePo(app, world.users.admin.token, {
     // Approved but NOT received: the status gate must pass so the request
     // actually reaches the (forged) detail lookup.
 const created = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId, quantity_ordered: 5, unit_code: world.unitCode }],
     });

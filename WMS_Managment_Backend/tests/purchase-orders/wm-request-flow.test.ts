@@ -13,7 +13,7 @@ import {
  * unit + notes). The receiving MAIN warehouse is DERIVED SERVER-SIDE from the
  * authenticated account (department main warehouse first, then a uniquely
  * assigned active main via user_warehouses). Client-supplied warehouse_id /
- * department_id / supplier_id / unit_price are ignored or rejected.
+ * department_id / supplier_name / unit_price are ignored or rejected.
  *
  * Test mapping (task spec):
  *   T1  create request with item+quantity          -> 201 draft
@@ -72,7 +72,7 @@ describe('Purchase orders — WM purchase-request workflow', () => {
     expect(res.body.data.status).toBe('draft');
     expect(res.body.data.warehouse_id).toBe(world.mainWhA);       // derived, not chosen
     expect(res.body.data.department_id).toBe(world.deptA);        // derived from warehouse
-    expect(res.body.data.supplier_id).toBeNull();                 // T7: supplier not required
+    expect(res.body.data.supplier_name).toBeNull();                 // T7: supplier not required
     expect(Number(res.body.data.details[0].unit_price)).toBe(0);  // T8: price not required
     expect(res.body.data.created_by).toBe(world.users.wmMain.id);
   });
@@ -127,11 +127,11 @@ describe('Purchase orders — WM purchase-request workflow', () => {
   // ── T9: forged supplier stripped ───────────────────────────────────────────
   test('T9: raw-payload supplier manipulation is neutralized (stored NULL)', async () => {
     const res = await apiCreatePo(app, world.users.wmMain.token, {
-      supplier_id: 999,
+      supplier_name: 'Forged Corp',
       lines: [itemLine()],
     });
     expect(res.status).toBe(201);
-    expect(res.body.data.supplier_id).toBeNull();
+    expect(res.body.data.supplier_name).toBeNull();
   });
 
   // ── T10: forged price zeroed ───────────────────────────────────────────────
@@ -185,7 +185,7 @@ describe('Purchase orders — WM purchase-request workflow', () => {
       });
     expect(res.status).toBe(201);
     expect(res.body.data.warehouse_id).toBe(world.mainWhA);
-    expect(res.body.data.supplier_id).toBeNull();
+    expect(res.body.data.supplier_name).toBeNull();
   });
 
   // ── validation guards ──────────────────────────────────────────────────────
@@ -211,13 +211,13 @@ describe('Purchase orders — WM purchase-request workflow', () => {
   test('T11: admin still controls warehouse + supplier + unit_price', async () => {
     const res = await apiCreatePo(app, world.users.admin.token, {
       warehouse_id: world.mainWhA,
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       notes: 'procurement order',
       lines: [{ item_id: world.itemId, quantity_ordered: 25, unit_code: world.unitCode, unit_price: 12.5 }],
     });
     expect(res.status).toBe(201);
     expect(res.body.data.warehouse_id).toBe(world.mainWhA);
-    expect(res.body.data.supplier_id).toBe(world.supplierId);
+    expect(res.body.data.supplier_name).toBe(world.supplierName);
     expect(Number(res.body.data.details[0].unit_price)).toBe(12.5);
   });
 

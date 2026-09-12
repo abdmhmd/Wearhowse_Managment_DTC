@@ -10,7 +10,7 @@ import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, getStock, p
 
 async function setupReceived(app: any, world: PoWorld, qty: number) {
 const created = await apiCreatePo(app, world.users.admin.token, {
-    supplier_id: world.supplierId,
+    supplier_name: world.supplierName,
     warehouse_id: world.mainWhA,
     lines: [{ item_id: world.itemId, quantity_ordered: qty, unit_code: world.unitCode }],
   });
@@ -65,7 +65,7 @@ beforeAll(async () => {
   test('racing transfers draining one allocation: sum transferred == allocated, none negative-stock', async () => {
     await seedStock(world.itemId2, world.mainWhA, 200);
 const created = await apiCreatePo(app, world.users.admin.token, {
-      supplier_id: world.supplierId,
+      supplier_name: world.supplierName,
       warehouse_id: world.mainWhA,
       lines: [{ item_id: world.itemId2, quantity_ordered: 30, unit_code: world.unitCode }],
     });

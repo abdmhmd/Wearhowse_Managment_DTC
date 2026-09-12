@@ -171,7 +171,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${whManager.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whMainA, supplier_id: null, department_id: deptA, notes: 'authz RV' },
+          header: { type: 'RV', warehouse_id: whMainA, department_id: deptA, notes: 'authz RV' },
           details: [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(res.status).toBe(403);
@@ -183,7 +183,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${dm2.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whMainA, supplier_id: null, department_id: deptA, notes: 'authz RV' },
+          header: { type: 'RV', warehouse_id: whMainA, department_id: deptA, notes: 'authz RV' },
           details: [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(res.status).toBe(403);
@@ -194,7 +194,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whMainA, supplier_id: null, department_id: deptA, notes: 'admin RV' },
+          header: { type: 'RV', warehouse_id: whMainA, department_id: deptA, notes: 'admin RV' },
           details: [{ item_id: itemWorkflow, quantity: 1, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(txn.status).toBe(201);
@@ -211,7 +211,7 @@ describe('Inventory authorization workflow (migrations 018 + 019)', () => {
         .post('/api/transactions')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({
-          header: { type: 'RV', warehouse_id: whMainA, supplier_id: null, department_id: deptA, notes: 'admin RV' },
+          header: { type: 'RV', warehouse_id: whMainA, department_id: deptA, notes: 'admin RV' },
           details: [{ item_id: itemWorkflow, quantity: 2, unit_code: unitCode, unit_price: 10, batch_number: null }],
         });
       expect(txn.status).toBe(201);

@@ -184,7 +184,7 @@ beforeAll(async () => {
     .post('/api/transactions')
     .set('Authorization', `Bearer ${admin.token}`)
     .send({
-      header: { type: 'RV', warehouse_id: mainWhA, supplier_id: null, department_id: deptA, notes: `${prefix}d11 main` },
+      header: { type: 'RV', warehouse_id: mainWhA, department_id: deptA, notes: `${prefix}d11 main` },
       details: [{ item_id: itemId, quantity: 1, unit_code: unitCode, unit_price: 10, batch_number: null }],
     });
   expect(txnMainRes.status).toBe(201);
@@ -194,7 +194,7 @@ beforeAll(async () => {
     .post('/api/transactions')
     .set('Authorization', `Bearer ${admin.token}`)
     .send({
-      header: { type: 'RV', warehouse_id: subWhA, supplier_id: null, department_id: deptA, notes: `${prefix}d11 sub` },
+      header: { type: 'RV', warehouse_id: subWhA, department_id: deptA, notes: `${prefix}d11 sub` },
       details: [{ item_id: itemId, quantity: 1, unit_code: unitCode, unit_price: 10, batch_number: null }],
     });
   expect(txnSubRes.status).toBe(201);
@@ -427,7 +427,7 @@ describe('Part 3 — D3/D15: custody return is bilateral and the Sub-WM sets the
 describe('Part 4 — D9: two-party confirmation on purchase orders', () => {
   test('D9: the PO creator can never confirm their own receive (another user must)', async () => {
     const created = await apiCreatePo(app, admin.token, {
-      supplier_id: poWorld.supplierId,
+      supplier_name: poWorld.supplierName,
       warehouse_id: poWorld.mainWhA,
       lines: [{ item_id: poWorld.itemId, quantity_ordered: 4, unit_code: poWorld.unitCode, unit_price: 3 }],
     });
@@ -463,7 +463,7 @@ describe('Part 4 — D9: two-party confirmation on purchase orders', () => {
 
   test('D9: the transfer executor can never confirm their own transfer', async () => {
     const created = await apiCreatePo(app, subWM.token, {
-      supplier_id: poWorld.supplierId,
+      supplier_name: poWorld.supplierName,
       warehouse_id: poWorld.mainWhA,
       lines: [{ item_id: poWorld.itemId, quantity_ordered: 50, unit_code: poWorld.unitCode, unit_price: 3 }],
     });

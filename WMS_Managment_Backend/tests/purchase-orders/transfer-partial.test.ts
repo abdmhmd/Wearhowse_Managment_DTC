@@ -11,7 +11,7 @@ import { PO_TEST_PREFIX, seedPoWorld, login, apiCreatePo, seedStock, getStock, p
 
 async function setupAllocation(app: any, world: PoWorld, ordered: number, allocatedQty: number, dest = 0) {
 const created = await apiCreatePo(app, world.users.admin.token, {
-    supplier_id: world.supplierId,
+    supplier_name: world.supplierName,
     warehouse_id: world.mainWhA,
     lines: [{ item_id: world.itemId, quantity_ordered: ordered, unit_code: world.unitCode }],
   });
