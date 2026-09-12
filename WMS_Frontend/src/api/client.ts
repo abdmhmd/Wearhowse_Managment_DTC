@@ -89,7 +89,11 @@ api.interceptors.response.use(
       // eslint-disable-next-line no-console
       console.error('[API]', error?.response?.status, error?.response?.data ?? error);
     }
-    showError(getApiErrorMessage(error));
+    // Callers may opt out of the interceptor toast (e.g. the login form, which
+    // renders field-tied error messaging and reset-hint feedback inline).
+    if (!originalRequest?.skipApiErrorToast) {
+      showError(getApiErrorMessage(error));
+    }
     return Promise.reject(error);
   }
 );

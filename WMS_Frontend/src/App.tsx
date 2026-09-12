@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui';
 
 // ── Lazy-loaded Route Components for Code Splitting ─────────────────────────
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
+const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'));
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
 const CategoriesPage = lazy(() => import('@/pages/categories/CategoriesPage'));
 const UnitsPage = lazy(() => import('@/pages/units/UnitsPage'));
@@ -89,6 +90,7 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>

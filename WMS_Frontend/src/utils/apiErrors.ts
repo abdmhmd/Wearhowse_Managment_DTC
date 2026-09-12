@@ -108,6 +108,16 @@ export function mapApiError(error: any): MappedApiError {
       return { key: 'pages.purchaseRequests.errors.invalidUnit' };
     case 'NO_DEPARTMENT':
       return { key: 'pages.purchaseRequests.errors.noDepartment' };
+
+    // ── auth ──────────────────────────────────────────────────────────────
+    case 'AUTH_INVALID_CREDENTIALS':
+      return { key: 'auth.login.errors.AUTH_INVALID_CREDENTIALS' };
+    case 'AUTH_ACCOUNT_DISABLED':
+      return { key: 'auth.login.errors.AUTH_ACCOUNT_DISABLED' };
+    case 'AUTH_ROLE_DISABLED':
+      return { key: 'auth.login.errors.AUTH_ROLE_DISABLED' };
+    case 'AUTH_RATE_LIMITED':
+      return { key: 'auth.login.errors.AUTH_RATE_LIMITED' };
   }
 
   // HTTP-status fallbacks for codes without a specific business mapping.
