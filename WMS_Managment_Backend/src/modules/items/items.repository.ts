@@ -2,7 +2,6 @@ import { PoolClient } from 'pg';
 import { pool } from '../../config/database';
 import { warehouseAccessClause, isWarehouseFallbackUser } from '../authorization/scope';
 import type { AuthUserContext } from '../authorization/authorization.service';
-import { OPEN_ALLOCATIONS_CTE } from '../purchase-orders/stock-availability';
 
 export interface ItemsFilter {
   category_code?: string;
@@ -197,13 +196,11 @@ export class ItemsRepository {
 
   /** Get stock balances across the warehouses the current user may access. */
   async getStockByWarehouse(itemId: number, user?: AuthUserContext) {
-    let query = `WITH ${OPEN_ALLOCATIONS_CTE}
-      SELECT iws.*, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
+    let query = `SELECT iws.*, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
              iws.current_balance AS physical_stock,
-             COALESCE(oa.allocated_qty, 0) AS allocated_stock,
-             GREATEST(COALESCE(iws.current_balance, 0) - COALESCE(oa.allocated_qty, 0), 0) AS available_stock
+             0 AS allocated_stock,
+             iws.current_balance AS available_stock
        FROM item_warehouse_stock iws
-       LEFT JOIN open_allocations oa ON oa.item_id = iws.item_id AND oa.source_warehouse_id = iws.warehouse_id
        JOIN warehouses w ON w.id = iws.warehouse_id
        WHERE iws.item_id = $1`;
     const params: any[] = [itemId];
