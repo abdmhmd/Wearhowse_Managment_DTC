@@ -33,7 +33,7 @@ export type Permission =
   | 'purchase-orders:view' | 'purchase-orders:create' | 'purchase-orders:update' | 'purchase-orders:approve' | 'purchase-orders:cancel' | 'purchase-orders:receive' | 'purchase-orders:allocate' | 'purchase-orders:transfer';
 
 export type PurchaseOrderStatus = 'draft' | 'approved' | 'partially_received' | 'received' | 'closed' | 'cancelled';
-export type AllocationStatus = 'allocated' | 'partially_transferred' | 'transferred' | 'cancelled';
+export type AllocationStatus = 'allocated' | 'partially_transferred' | 'transferred' | 'cancelled' | 'pending_confirmation';
 
 export interface PurchaseOrderLine {
   id: number;
@@ -70,7 +70,9 @@ export interface PurchaseOrderAllocation {
   quantity_transferred: number | string;
   status: AllocationStatus;
   allocated_by_name?: string | null;
+  transferred_by?: number | null;
   transferred_by_name?: string | null;
+  transfer_confirmed_by?: number | null;
   transfer_transaction_no?: string | null;
   created_at?: string;
 }
@@ -114,7 +116,7 @@ export type MovementType = 'IN' | 'OUT';
 
 export type RequestType = 'experiment' | 'semester' | 'project';
 export type RequestPriority = 'low' | 'normal' | 'high' | 'urgent';
-export type RequestStatus = 'pending' | 'dept_approved' | 'wm_approved' | 'forwarded' | 'admin_approved' | 'admin_rejected' | 'issued' | 'cancelled';
+export type RequestStatus = 'pending' | 'dept_approved' | 'wm_approved' | 'forwarded' | 'admin_approved' | 'admin_rejected' | 'wm_rejected' | 'issued' | 'cancelled';
 export type ProjectStatus = 'open' | 'closed' | 'cancelled' | 'pending_closure';
 export type CustodyStatus = 'active' | 'returned' | 'damaged' | 'lost' | 'return_pending';
 export type CustodyCondition = 'good' | 'damaged' | 'lost';
@@ -588,6 +590,7 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   forwarded: 'Forwarded',
   admin_approved: 'Admin Approved',
   admin_rejected: 'Admin Rejected',
+  wm_rejected: 'WM Rejected',
   issued: 'Issued',
   cancelled: 'Cancelled',
 };

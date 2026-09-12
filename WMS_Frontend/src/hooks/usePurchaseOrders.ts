@@ -114,3 +114,27 @@ export function useTransferAllocation() {
     onError: (error: Error) => showError(getErrorMessage(error, 'Failed to transfer stock')),
   });
 }
+
+export function useConfirmPurchaseOrderReceive() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => purchaseOrdersApi.confirmReceive(id),
+    onSuccess: (data) => {
+      invalidatePos(queryClient);
+      showSuccess(data.data?.message || 'Receipt confirmed');
+    },
+    onError: (error: Error) => showError(getErrorMessage(error, 'Failed to confirm receipt')),
+  });
+}
+
+export function useConfirmTransferAllocation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (allocationId: number) => purchaseOrdersApi.confirmTransfer(allocationId),
+    onSuccess: (data) => {
+      invalidatePos(queryClient);
+      showSuccess(data.data?.message || 'Transfer confirmed');
+    },
+    onError: (error: Error) => showError(getErrorMessage(error, 'Failed to confirm transfer')),
+  });
+}

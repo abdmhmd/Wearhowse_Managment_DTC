@@ -467,7 +467,10 @@
       "confirmReturn": "تأكيد الاستلام",
       "confirmReturnConfirm": "تأكيد استلام الغرض بحالة سليمة؟ سيتم إعادة الصنف إلى المخزون.",
       "requestReturn": "طلب إرجاع",
-      "requestReturnConfirm": "تقديم طلب إرجاع؟ يحتاج مدير المستودع لتأكيد الاستلام قبل إعادة إلى المخزون."
+      "requestReturnConfirm": "تقديم طلب إرجاع؟ يحتاج مدير المستودع لتأكيد الاستلام قبل إعادة إلى المخزون.",
+      "receiveConditionTitle": "تأكيد استلام الإرجاع",
+      "receiveCondition": "حالة الاستلام",
+      "receiveConditionHint": "الحالة السليمة تعيد الصنف إلى المخزون. الأغراض التالفة أو المفقودة تُحفظ نهائيًا بهذه الحالة ولا تُعاد إلى المخزون."
     },
     "materialRequests": {
       "title": "طلبات الصرف",
@@ -488,6 +491,7 @@
         "forwarded": "محول للمستودع",
         "admin_approved": "معتمد من الإدارة",
         "admin_rejected": "مرفوض من الإدارة",
+        "wm_rejected": "مرفوض من المستودع",
         "issued": "تم الصرف",
         "cancelled": "ملغى"
       },
@@ -577,7 +581,8 @@
         "allocated": "مخصص",
         "partially_transferred": "نقل جزئي",
         "transferred": "منقول بالكامل",
-        "cancelled": "ملغي"
+        "cancelled": "ملغي",
+        "pending_confirmation": "بانتظار التأكيد"
       },
       "actions": {
         "approve": "اعتماد",
@@ -586,7 +591,9 @@
         "allocate": "تخصيص",
         "transfer": "نقل",
         "close": "إغلاق",
-        "editDraft": "تعديل"
+        "editDraft": "تعديل",
+        "confirmTransfer": "تأكيد النقل",
+        "confirmReceive": "تأكيد الاستلام"
       },
       "receiveTitle": "استلام المخزون (سند استلام)",
       "receiveQuantity": "كمية الاستلام",

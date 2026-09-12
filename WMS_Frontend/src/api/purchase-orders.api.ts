@@ -67,4 +67,12 @@ export const purchaseOrdersApi = {
       `/purchase-orders/allocations/${allocationId}/transfer`,
       { quantity }
     ),
+
+  confirmReceive: (id: number) =>
+    api.post<ApiResponse<PurchaseOrder>>(`/purchase-orders/${id}/confirm-receive`),
+
+  confirmTransfer: (allocationId: number) =>
+    api.post<ApiResponse<{ message: string; status: string; transfer_confirmed_by: number }>>(
+      `/purchase-orders/allocations/${allocationId}/confirm-transfer`
+    ),
 };

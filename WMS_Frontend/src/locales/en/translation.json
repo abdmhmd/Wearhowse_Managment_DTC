@@ -461,7 +461,10 @@
       "confirmReturn": "Confirm Receipt",
       "confirmReturnConfirm": "Confirm that the item has been received back in good condition? This will restore stock.",
       "requestReturn": "Request Return",
-      "requestReturnConfirm": "Submit a return request? The warehouse manager will need to confirm receipt before stock is restored."
+      "requestReturnConfirm": "Submit a return request? The warehouse manager will need to confirm receipt before stock is restored.",
+      "receiveConditionTitle": "Confirm Return Receipt",
+      "receiveCondition": "Received condition",
+      "receiveConditionHint": "Good restores the item to stock. Damaged or lost items are permanently marked and are NOT restored to inventory."
     },
     "purchaseOrders": {
       "title": "Purchase Orders",
@@ -500,7 +503,8 @@
         "allocated": "Allocated",
         "partially_transferred": "Partially Transferred",
         "transferred": "Transferred",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "pending_confirmation": "Pending Confirmation"
       },
       "actions": {
         "approve": "Approve",
@@ -509,7 +513,9 @@
         "allocate": "Allocate",
         "transfer": "Transfer",
         "close": "Close",
-        "editDraft": "Edit"
+        "editDraft": "Edit",
+        "confirmTransfer": "Confirm Transfer",
+        "confirmReceive": "Confirm Receipt"
       },
       "receiveTitle": "Receive Stock (RV)",
       "receiveQuantity": "Receive Quantity",
@@ -593,6 +599,7 @@
         "forwarded": "Forwarded",
         "admin_approved": "Admin Approved",
         "admin_rejected": "Admin Rejected",
+        "wm_rejected": "WM Rejected",
         "issued": "Issued",
         "cancelled": "Cancelled"
       },

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { custodiesApi, type CustodiesFilter, type ReturnItemPayload } from '@/api/custodies.api';
+import type { CustodyCondition } from '@/types';
 import { showSuccess, showError } from '@/utils/toast';
 import { getErrorMessage } from '@/utils/error';
 
@@ -33,11 +34,18 @@ export function useReturnCustody() {
 export function useReceiveReturn() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => custodiesApi.receiveReturn(id),
+    mutationFn: ({ id, condition }: { id: number; condition?: CustodyCondition }) =>
+      custodiesApi.receiveReturn(id, { condition }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['custodies'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       const txnNo = data.data?.data?.transaction_no;
-      showSuccess(txnNo ? `Return confirmed - RTI #${txnNo}` : 'Return confirmed');
+      const status = data.data?.data?.status;
+      if (status && status !== 'returned') {
+        showSuccess(status === 'damaged' || status === 'lost' ? `Received as ${status}` : 'Return confirmed');
+      } else {
+        showSuccess(txnNo ? `Return confirmed - RTI #${txnNo}` : 'Return confirmed');
+      }
     },
     onError: (error: Error) => {
       showError(getErrorMessage(error, 'Failed to confirm return'));
