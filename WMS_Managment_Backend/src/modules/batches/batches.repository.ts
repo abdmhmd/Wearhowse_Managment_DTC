@@ -12,7 +12,6 @@ export interface BatchRow {
   expiry_date?: Date | null;
   quantity: number;
   unit_code: string;
-  supplier_id?: number | null;
   transaction_id?: number | null;
   notes?: string | null;
   is_active: boolean;
@@ -24,15 +23,15 @@ export class BatchesRepository {
   
   async create(client: PoolClient, batch: Omit<BatchRow, 'id' | 'created_at' | 'updated_at' | 'is_active'>) {
     const res = await client.query(
-      `INSERT INTO batches (item_id, warehouse_id, batch_number, production_date, expiry_date, quantity, unit_code, supplier_id, transaction_id, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO batches (item_id, warehouse_id, batch_number, production_date, expiry_date, quantity, unit_code, transaction_id, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (item_id, warehouse_id, batch_number) DO UPDATE
        SET quantity = batches.quantity + EXCLUDED.quantity, updated_at = NOW()
        RETURNING *`,
       [
         batch.item_id, batch.warehouse_id, batch.batch_number,
         batch.production_date ?? null, batch.expiry_date ?? null,
-        batch.quantity, batch.unit_code, batch.supplier_id ?? null,
+        batch.quantity, batch.unit_code,
         batch.transaction_id ?? null, batch.notes ?? null
       ]
     );
@@ -89,13 +88,11 @@ export class BatchesRepository {
         `SELECT b.*,
                 i.item_code, i.name_ar AS item_name_ar,
                 w.name_ar AS warehouse_name_ar,
-                u.name_ar AS unit_name_ar,
-                s.name_ar AS supplier_name_ar
+                u.name_ar AS unit_name_ar
          FROM batches b
          JOIN items i ON i.id = b.item_id
          JOIN warehouses w ON w.id = b.warehouse_id
          JOIN units u ON u.code = b.unit_code
-         LEFT JOIN suppliers s ON s.id = b.supplier_id
          ${where}
          ORDER BY b.expiry_date ASC NULLS LAST, b.created_at ASC
          LIMIT $${i++} OFFSET $${i++}`,

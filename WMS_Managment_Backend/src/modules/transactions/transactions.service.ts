@@ -106,7 +106,7 @@ export class TransactionsService {
 
     const [itemsRes, countRes] = await Promise.all([
       pool.query(
-        `SELECT id, transaction_no, type, status, transaction_date, supplier_id, department_id, warehouse_id, to_warehouse_id, created_by, approved_by, notes, created_at, updated_at
+        `SELECT id, transaction_no, type, status, transaction_date, department_id, warehouse_id, to_warehouse_id, created_by, approved_by, notes, created_at, updated_at
          FROM transactions${where} ORDER BY transaction_date DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
         [...params, limit, offset]
       ),
@@ -116,7 +116,7 @@ export class TransactionsService {
   }
 
   async createDraft(
-    header: { transaction_no?: string; type: string; supplier_id?: number | null; department_id?: number | null; warehouse_id: number; to_warehouse_id?: number | null; purchase_order_id?: number | null; notes?: string | null; created_by: number },
+    header: { transaction_no?: string; type: string; department_id?: number | null; warehouse_id: number; to_warehouse_id?: number | null; purchase_order_id?: number | null; notes?: string | null; created_by: number },
     details: Omit<TransactionDetail, 'id' | 'transaction_id' | 'total_price'>[],
     client?: PoolClient
   ) {
@@ -353,7 +353,6 @@ export class TransactionsService {
                 unit_code: detail.unit_code,
                 production_date: detail.production_date ?? null,
                 expiry_date: detail.expiry_date ?? null,
-                supplier_id: header.supplier_id,
                 transaction_id: header.id,
               });
             }

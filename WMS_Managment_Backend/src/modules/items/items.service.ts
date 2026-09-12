@@ -226,8 +226,8 @@ export class ItemsService {
         [item_id, ...sum.params]
       ),
       pool.query(
-        `SELECT t.id, t.transaction_no, t.transaction_date, t.notes, td.quantity, td.unit_price, s.name_ar AS supplier_name_ar, s.name_en AS supplier_name_en
-         FROM transactions t JOIN transaction_details td ON td.transaction_id = t.id LEFT JOIN suppliers s ON s.id = t.supplier_id
+        `SELECT t.id, t.transaction_no, t.transaction_date, t.notes, td.quantity, td.unit_price
+         FROM transactions t JOIN transaction_details td ON td.transaction_id = t.id
          WHERE td.item_id = $1 AND t.type = 'RV'${rv.clause} ORDER BY t.transaction_date DESC LIMIT 1`,
         [item_id, ...rv.params]
       ),
