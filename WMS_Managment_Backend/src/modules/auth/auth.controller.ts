@@ -27,6 +27,12 @@ const DUMMY_TIMING_HASH = '$2b$10$TS011iN3//m7y0sinqGYzOFelH6p.cr5d148EW3feH66BN
 const loginFailureKey = (username: string, ip?: string): string =>
   `${(username ?? '').trim().toLowerCase()}|${ip ?? 'unknown'}`;
 
+/** Failure feedback for the generic credentials error (anti-enumeration). */
+const attemptDetails = (count: number) => ({
+  attempt_count: count,
+  show_reset_hint: count >= 3,
+});
+
 export class AuthController {
   async login(req: Request, _res: Response, next: NextFunction) {
     try {
@@ -44,10 +50,22 @@ export class AuthController {
       // username+IP, waits the (progressive) response delay, then throws.
       // Success resets the streak. The helper returns `never` so TypeScript
       // keeps control-flow narrowing after each guarded branch.
-      const fail = async (message: string, code: string): Promise<never> => {
+      // `withAttemptInfo` gates the attempt_count / reset-hint metadata: it is
+      // sent ONLY by the generic-credentials failure (same response for a bad
+      // username or a bad password), never by the account/role errors, whose
+      // distinct codes already identify the problem.
+      const fail = async (
+        message: string,
+        code: string,
+        withAttemptInfo = false
+      ): Promise<never> => {
         const attempt = loginAttempts.register(loginKey);
         await sleep(loginAttempts.delayFor(attempt.count));
-        throw new AuthError(message, code);
+        throw new AuthError(
+          message,
+          code,
+          withAttemptInfo ? attemptDetails(attempt.count) : undefined
+        );
       };
 
       const user = await usersRepository.findByUsername(username);
@@ -59,7 +77,7 @@ export class AuthController {
         logger.debug(`Login rejected: no user found for username "${username}"`, 'Auth');
         const attempt = loginAttempts.register(loginKey);
         await sleep(loginAttempts.delayFor(attempt.count));
-        throw new AuthError('Invalid credentials', 'AUTH_INVALID_CREDENTIALS');
+        throw new AuthError('Invalid credentials', 'AUTH_INVALID_CREDENTIALS', attemptDetails(attempt.count));
       }
       if (!user.is_active) {
         logger.debug(`Login rejected: account "${username}" is inactive`, 'Auth');
@@ -84,7 +102,7 @@ export class AuthController {
           ip_address: req.ip,
           user_agent: req.headers?.['user-agent'] ?? null,
         });
-        await fail('Invalid credentials', 'AUTH_INVALID_CREDENTIALS');
+        await fail('Invalid credentials', 'AUTH_INVALID_CREDENTIALS', true);
       }
 
       // ── Success: clear the failure streak for this username+IP ───────────
