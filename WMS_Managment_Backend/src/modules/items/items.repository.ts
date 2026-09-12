@@ -7,6 +7,9 @@ export interface ItemsFilter {
   category_code?: string;
   subcategory_id?: number;
   warehouse_id?: number;
+  /** Restricts items to those owned by the given department (via their primary
+   *  warehouse). Used by the item picker's cascading "department" filtering. */
+  department_id?: number;
   search?: string;
   is_active?: boolean;
   /** Current authenticated user — used to restrict visible items to their
@@ -47,6 +50,10 @@ export class ItemsRepository {
       query += ` AND i.warehouse_id = $${paramIndex++}`;
       params.push(filter.warehouse_id);
     }
+    if (filter?.department_id) {
+      query += ` AND w.department_id = $${paramIndex++}`;
+      params.push(filter.department_id);
+    }
     if (filter?.is_active !== undefined) {
       query += ` AND i.is_active = $${paramIndex++}`;
       params.push(filter.is_active);
@@ -82,36 +89,40 @@ export class ItemsRepository {
   }
 
   async countAll(filter?: ItemsFilter) {
-    let query = 'SELECT COUNT(*)::int AS total FROM items WHERE 1=1';
+    let query = 'SELECT COUNT(*)::int AS total FROM items i LEFT JOIN warehouses w ON w.id = i.warehouse_id WHERE 1=1';
     const params: any[] = [];
     let paramIndex = 1;
 
     if (filter?.category_code) {
-      query += ` AND category_code = $${paramIndex++}`;
+      query += ` AND i.category_code = $${paramIndex++}`;
       params.push(filter.category_code);
     }
     if (filter?.subcategory_id) {
-      query += ` AND subcategory_id = $${paramIndex++}`;
+      query += ` AND i.subcategory_id = $${paramIndex++}`;
       params.push(filter.subcategory_id);
     }
     if (filter?.warehouse_id) {
-      query += ` AND warehouse_id = $${paramIndex++}`;
+      query += ` AND i.warehouse_id = $${paramIndex++}`;
       params.push(filter.warehouse_id);
     }
+    if (filter?.department_id) {
+      query += ` AND w.department_id = $${paramIndex++}`;
+      params.push(filter.department_id);
+    }
     if (filter?.is_active !== undefined) {
-      query += ` AND is_active = $${paramIndex++}`;
+      query += ` AND i.is_active = $${paramIndex++}`;
       params.push(filter.is_active);
     } else {
-      query += ' AND is_active = true';
+      query += ' AND i.is_active = true';
     }
     if (filter?.search) {
-      query += ` AND (item_code ILIKE $${paramIndex} OR name_ar ILIKE $${paramIndex})`;
+      query += ` AND (i.item_code ILIKE $${paramIndex} OR i.name_ar ILIKE $${paramIndex} OR i.name_en ILIKE $${paramIndex})`;
       params.push(`%${filter.search}%`);
       paramIndex++;
     }
     if (filter?.user) {
       if (!isWarehouseFallbackUser(filter.user)) {
-        const scope = warehouseAccessClause(filter.user, 'warehouse_id', paramIndex);
+        const scope = warehouseAccessClause(filter.user, 'i.warehouse_id', paramIndex);
         if (scope.clause !== 'TRUE') {
           query += ` AND ${scope.clause}`;
           params.push(...scope.params);

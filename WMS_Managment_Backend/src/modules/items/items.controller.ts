@@ -13,6 +13,7 @@ export class ItemsController {
       const filter = {
         category_code: req.query.category_code as string | undefined,
         warehouse_id: req.query.warehouse_id ? Number(req.query.warehouse_id) : undefined,
+        department_id: req.query.department_id ? Number(req.query.department_id) : undefined,
         search: req.query.search as string | undefined,
         is_active: req.query.is_active !== undefined ? req.query.is_active === 'true' : undefined,
       };

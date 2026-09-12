@@ -7,3 +7,4 @@ export { default as DataTable } from './DataTable';
 export { default as Badge } from './Badge';
 export { default as LoadingSpinner } from './LoadingSpinner';
 export { default as PageHeader } from './PageHeader';
+export { default as SearchableSelect } from './SearchableSelect';
