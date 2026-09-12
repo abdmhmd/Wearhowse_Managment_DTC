@@ -112,12 +112,6 @@ export default function TransactionDetailPage() {
             <p className="text-sm text-gray-500">{t('table.warehouse')}</p>
             <p className="mt-1 text-sm font-medium">{warehouseLabel}</p>
           </div>
-          {txn.supplier_id && (
-            <div>
-              <p className="text-sm text-gray-500">{t('transaction.supplier')}</p>
-              <p className="mt-1 text-sm font-medium">{displayName(txn.supplier_name_ar, txn.supplier_name_en, `#${txn.supplier_id}`)}</p>
-            </div>
-          )}
           {txn.department_id && (
             <div>
               <p className="text-sm text-gray-500">{t('transaction.department')}</p>

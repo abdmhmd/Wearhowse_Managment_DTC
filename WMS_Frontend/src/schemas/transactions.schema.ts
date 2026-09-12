@@ -4,7 +4,6 @@ export const transactionTypeEnum = z.enum(['RV', 'LN']);
 
 export const transactionHeaderSchema = z.object({
   type: transactionTypeEnum,
-  supplier_id: z.coerce.number().int().positive().optional().nullable(),
   department_id: z.coerce.number().int().positive().optional().nullable(),
   warehouse_id: z.coerce.number().int().positive('Warehouse is required'),
   notes: z.string().optional().nullable(),

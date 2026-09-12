@@ -37,9 +37,9 @@ export default function PurchaseOrdersListPage() {
       render: (po: any) => <span className="font-medium text-gray-900">{po.po_number}</span>,
     },
     {
-      key: 'supplier',
+      key: 'supplier_name',
       header: t('pages.purchaseOrders.supplier'),
-      render: (po: any) => getLocalizedName({ name_ar: po.supplier_name_ar, name_en: po.supplier_name_en }),
+      render: (po: any) => po.supplier_name || '—',
     },
     {
       key: 'warehouse',

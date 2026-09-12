@@ -3,7 +3,6 @@ import type { ApiResponse, PaginatedResponse, Transaction, TransactionDetail } f
 
 export interface TransactionHeaderInput {
   type: string;
-  supplier_id?: number | null;
   department_id?: number | null;
   warehouse_id: number;
   notes?: string | null;

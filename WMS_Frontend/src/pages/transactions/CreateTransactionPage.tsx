@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAllSuppliers } from '@/hooks/useSuppliers';
 import { useAllDepartments } from '@/hooks/useDepartments';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useItems } from '@/hooks/useItems';
@@ -38,7 +37,6 @@ export default function CreateTransactionPage() {
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [currentLine, setCurrentLine] = useState<Partial<LineItem>>({});
 
-  const { data: suppliersData } = useAllSuppliers();
   const { data: departmentsData } = useAllDepartments();
   const { data: warehousesData } = useAllWarehouses();
   const { data: itemsData } = useItems(1, 200);
@@ -46,7 +44,6 @@ export default function CreateTransactionPage() {
   const createMutation = useCreateDraftTransaction();
   const { data: conversionsData } = useUnitConversionsByItem(currentLine.item_id || 0);
 
-  const suppliers = suppliersData?.items || [];
   const departments = departmentsData?.items || [];
   const warehouses = warehousesData?.items || [];
   const items = itemsData?.items || [];
@@ -164,12 +161,6 @@ export default function CreateTransactionPage() {
               error={errors.header?.warehouse_id?.message}
               placeholder={t('form.selectWarehouse')}
               options={warehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
-            />
-            <Select
-              label={t('form.supplier')}
-              {...register('header.supplier_id')}
-              placeholder={t('form.selectSupplier')}
-              options={suppliers.map((s: any) => ({ value: s.id, label: getLocalizedName(s) }))}
             />
             {transactionType === 'LN' && (
               <Select

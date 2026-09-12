@@ -11,7 +11,6 @@ const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
 const CategoriesPage = lazy(() => import('@/pages/categories/CategoriesPage'));
 const UnitsPage = lazy(() => import('@/pages/units/UnitsPage'));
-const SuppliersPage = lazy(() => import('@/pages/suppliers/SuppliersPage'));
 const DepartmentsPage = lazy(() => import('@/pages/departments/DepartmentsPage'));
 const WarehousesPage = lazy(() => import('@/pages/warehouses/WarehousesPage'));
 const ItemsPage = lazy(() => import('@/pages/items/ItemsPage'));
@@ -92,10 +91,9 @@ export default function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<DashboardPage />} />
 
-                <Route element={<ProtectedRoute allowedPermissions={['categories:view', 'units:view', 'suppliers:view', 'departments:view', 'warehouses:view', 'unit-conversions:view']} />}>
+                <Route element={<ProtectedRoute allowedPermissions={['categories:view', 'units:view', 'departments:view', 'warehouses:view', 'unit-conversions:view']} />}>
                   <Route path="/categories" element={<CategoriesPage />} />
                   <Route path="/units" element={<UnitsPage />} />
-                  <Route path="/suppliers" element={<SuppliersPage />} />
                   <Route path="/departments" element={<DepartmentsPage />} />
                   <Route path="/warehouses" element={<WarehousesPage />} />
                   <Route path="/unit-conversions" element={<UnitConversionsPage />} />

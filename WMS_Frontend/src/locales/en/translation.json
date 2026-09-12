@@ -7,7 +7,6 @@
     "dashboard": "Dashboard",
     "categories": "Categories",
     "units": "Units",
-    "suppliers": "Suppliers",
     "departments": "Departments",
     "warehouses": "Warehouses",
     "items": "Items",
@@ -290,12 +289,6 @@
       "create": "Create Unit",
       "edit": "Edit Unit"
     },
-    "suppliers": {
-      "title": "Suppliers",
-      "subtitle": "Manage supplier contacts",
-      "create": "Create Supplier",
-      "edit": "Edit Supplier"
-    },
     "departments": {
       "title": "Departments",
       "subtitle": "Manage organizational departments",
@@ -474,6 +467,7 @@
       "empty": "No purchase orders found",
       "poNumber": "PO Number",
       "supplier": "Supplier",
+      "supplierPlaceholder": "Supplier name",
       "receivingWarehouse": "Receiving Warehouse",
       "orderDate": "Order Date",
       "expectedDate": "Expected Date",
@@ -665,9 +659,9 @@
     "AUTH_TOKEN_INVALID": "Invalid or expired token",
     "AUTH_FORBIDDEN": "You do not have permission to perform this action",
     "VALIDATION_ERROR": "Validation error: {{message}}",
+    "SUPPLIER_REQUIRED_FOR_ADMIN_PO": "Supplier name is required for procurement purchase orders",
     "CATEGORY_NOT_FOUND": "Category not found",
     "UNIT_NOT_FOUND": "Unit not found",
-    "SUPPLIER_NOT_FOUND": "Supplier not found",
     "DEPARTMENT_NOT_FOUND": "Department not found",
     "WAREHOUSE_NOT_FOUND": "Warehouse not found",
     "USER_NOT_FOUND": "User not found",

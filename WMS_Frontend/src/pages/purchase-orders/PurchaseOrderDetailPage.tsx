@@ -147,7 +147,7 @@ export default function PurchaseOrderDetailPage() {
     <div className="space-y-4">
       <PageHeader
         title={order.po_number}
-        subtitle={`${getLocalizedName({ name_ar: order.supplier_name_ar ?? undefined, name_en: order.supplier_name_en ?? undefined }) || '-'} → ${getLocalizedName({ name_ar: order.warehouse_name_ar, name_en: order.warehouse_name_en })}`}
+        subtitle={`${order.supplier_name || '-'} → ${getLocalizedName({ name_ar: order.warehouse_name_ar, name_en: order.warehouse_name_en })}`}
         actions={
           <div className="flex gap-2 flex-wrap">
             {canEditNow && (

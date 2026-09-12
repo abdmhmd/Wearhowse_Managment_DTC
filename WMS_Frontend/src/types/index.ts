@@ -13,7 +13,6 @@ export type Permission =
   | 'dashboard:view'
   | 'categories:view' | 'categories:create' | 'categories:update' | 'categories:delete'
   | 'units:view' | 'units:create' | 'units:update' | 'units:delete'
-  | 'suppliers:view' | 'suppliers:create' | 'suppliers:update' | 'suppliers:delete'
   | 'departments:view' | 'departments:create' | 'departments:update' | 'departments:delete'
   | 'warehouses:view' | 'warehouses:create' | 'warehouses:update' | 'warehouses:delete'
   | 'users:view' | 'users:create' | 'users:update' | 'users:delete'
@@ -80,9 +79,7 @@ export interface PurchaseOrderAllocation {
 export interface PurchaseOrder {
   id: number;
   po_number: string;
-  supplier_id?: number | null;
-  supplier_name_ar?: string | null;
-  supplier_name_en?: string | null;
+  supplier_name?: string | null;
   warehouse_id: number;
   warehouse_code?: string;
   warehouse_name_ar?: string;
@@ -181,17 +178,6 @@ export interface Unit {
   updated_at: string;
 }
 
-export interface Supplier {
-  id: number;
-  name_ar: string;
-  name_en?: string;
-  phone: string | null;
-  email: string | null;
-  address: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface Department {
   id?: number;
   code: string;
@@ -260,7 +246,6 @@ export interface TransactionHeader {
   type: TransactionType;
   status: TransactionStatus;
   transaction_date: string;
-  supplier_id: number | null;
   department_id: number | null;
   warehouse_id: number;
   to_warehouse_id: number | null;
@@ -277,8 +262,6 @@ export interface TransactionHeader {
   to_warehouse_name_en?: string;
   department_name_ar?: string;
   department_name_en?: string;
-  supplier_name_ar?: string;
-  supplier_name_en?: string;
   created_by_username?: string;
   created_by_name?: string;
   approved_by_username?: string;

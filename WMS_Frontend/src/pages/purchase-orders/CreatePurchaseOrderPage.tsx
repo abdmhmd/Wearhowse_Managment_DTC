@@ -33,7 +33,7 @@ export default function CreatePurchaseOrderPage() {
   // admin keeps full procurement control (supplier, price, warehouse).
   const isManager = user?.role === 'sub_warehouse_manager';
 
-  const [supplierId, setSupplierId] = useState('');
+  const [supplierName, setSupplierName] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -50,16 +50,6 @@ export default function CreatePurchaseOrderPage() {
 
   const { data: itemsData } = useItems(1, 500);
   const items = itemsData?.items || [];
-
-  const { data: suppliersData } = useQuery({
-    queryKey: ['suppliers', 'po-picker'],
-    queryFn: async () => {
-      const res = await api.get('/suppliers', { params: { limit: 200 } });
-      return res.data.data;
-    },
-    enabled: !isManager,
-  });
-  const suppliers = suppliersData?.items || [];
 
   const { data: unitsData } = useQuery({
     queryKey: ['units', 'po-picker'],
@@ -97,10 +87,6 @@ export default function CreatePurchaseOrderPage() {
       value: String(w.id),
       label: getLocalizedName(w) || w.code || String(w.id),
     })),
-  ];
-  const supplierOptions = [
-    { value: '', label: '-' },
-    ...suppliers.map((s: any) => ({ value: String(s.id), label: getLocalizedName(s) })),
   ];
   const itemOptions = [
     { value: '', label: t('common.select') },
@@ -157,7 +143,7 @@ export default function CreatePurchaseOrderPage() {
         ...(isManager
           ? { expected_date: expectedDate || null }
           : {
-            supplier_id: supplierId ? Number(supplierId) : null,
+            supplier_name: supplierName.trim() || null,
             warehouse_id: Number(warehouseId),
             expected_date: expectedDate || null,
           }),
@@ -209,8 +195,8 @@ export default function CreatePurchaseOrderPage() {
             <>
               <Select label={t('pages.purchaseOrders.receivingWarehouse')} value={warehouseId}
                 onChange={(e) => setWarehouseId(e.target.value)} options={warehouseOptions} />
-              <Select label={t('pages.purchaseOrders.supplier')} value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)} options={supplierOptions} />
+              <Input label={t('pages.purchaseOrders.supplier')} value={supplierName}
+                onChange={(e) => setSupplierName(e.target.value)} placeholder={t('pages.purchaseOrders.supplierPlaceholder')} />
               <Input type="date" label={t('pages.purchaseOrders.expectedDate')} value={expectedDate}
                 onChange={(e) => setExpectedDate(e.target.value)} />
               <Input type="date" label={t('pages.purchaseOrders.expectedDate')} value={expectedDate}

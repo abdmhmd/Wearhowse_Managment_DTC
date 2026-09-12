@@ -3,13 +3,13 @@ import type { ApiResponse, PaginatedResponse, PurchaseOrder, PurchaseOrderStatus
 
 export interface PurchaseOrdersFilter {
   status?: PurchaseOrderStatus;
-  supplier_id?: number;
+  supplier_name?: string;
   warehouse_id?: number;
   search?: string;
 }
 
 export interface CreatePurchaseOrderPayload {
-  supplier_id?: number | null;
+  supplier_name?: string | null;
   /** Optional: sub_warehouse_manager omit it — the backend derives their
    *  department main warehouse server-side. admin sends it. */
   warehouse_id?: number;

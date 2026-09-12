@@ -7,7 +7,6 @@
     "dashboard": "لوحة التحكم",
     "categories": "الأصناف",
     "units": "الوحدات",
-    "suppliers": "الموردون",
     "departments": "الأقسام",
     "warehouses": "المستودعات",
     "items": "الأغراض",
@@ -294,12 +293,6 @@
       "create": "إنشاء وحدة",
       "edit": "تعديل الوحدة"
     },
-    "suppliers": {
-      "title": "الموردون",
-      "subtitle": "إدارة جهات اتصال الموردين",
-      "create": "إنشاء مورد",
-      "edit": "تعديل المورد"
-    },
     "departments": {
       "title": "الأقسام",
       "subtitle": "إدارة الأقسام التنظيمية",
@@ -552,6 +545,7 @@
       "empty": "لا توجد أوامر شراء",
       "poNumber": "رقم أمر الشراء",
       "supplier": "المورد",
+      "supplierPlaceholder": "اسم المورد",
       "receivingWarehouse": "مستودع الاستلام",
       "orderDate": "تاريخ الطلب",
       "expectedDate": "التاريخ المتوقع",
@@ -671,9 +665,9 @@
     "AUTH_TOKEN_INVALID": "رمز الوصول غير صالح أو منتهي الصلاحية",
     "AUTH_FORBIDDEN": "ليس لديك صلاحية لتنفيذ هذا الإجراء",
     "VALIDATION_ERROR": "خطأ في التحقق: {{message}}",
+    "SUPPLIER_REQUIRED_FOR_ADMIN_PO": "اسم المورد مطلوب لأوامر الشراء",
     "CATEGORY_NOT_FOUND": "الفئة غير موجودة",
     "UNIT_NOT_FOUND": "الوحدة غير موجودة",
-    "SUPPLIER_NOT_FOUND": "المورد غير موجود",
     "DEPARTMENT_NOT_FOUND": "القسم غير موجود",
     "WAREHOUSE_NOT_FOUND": "المستودع غير موجود",
     "USER_NOT_FOUND": "المستخدم غير موجود",
