@@ -253,6 +253,8 @@ export interface Warehouse {
   location: string | null;
   is_main?: boolean;
   department_id?: number | null;
+  department_name_ar?: string | null;
+  department_name_en?: string | null;
   created_at: string;
   updated_at: string;
 }

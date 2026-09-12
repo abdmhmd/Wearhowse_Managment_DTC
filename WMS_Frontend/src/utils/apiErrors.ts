@@ -109,6 +109,12 @@ export function mapApiError(error: any): MappedApiError {
     case 'NO_DEPARTMENT':
       return { key: 'pages.purchaseRequests.errors.noDepartment' };
 
+    // ── warehouses ───────────────────────────────────────────────────────────
+    case 'MAIN_WAREHOUSE_EXISTS':
+      return { key: 'pages.warehouses.errors.MAIN_WAREHOUSE_EXISTS' };
+    case 'DEPARTMENT_NOT_FOUND':
+      return { key: 'pages.warehouses.errors.DEPARTMENT_NOT_FOUND' };
+
     // ── auth ──────────────────────────────────────────────────────────────
     case 'AUTH_INVALID_CREDENTIALS':
       return { key: 'auth.login.errors.AUTH_INVALID_CREDENTIALS' };

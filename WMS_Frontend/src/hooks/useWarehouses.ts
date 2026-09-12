@@ -1,14 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { warehousesApi } from '@/api/warehouses.api';
+import type { WarehouseListFilter } from '@/api/warehouses.api';
 import type { CreateWarehouseFormData, UpdateWarehouseFormData } from '@/schemas/warehouses.schema';
 import { showSuccess, showError } from '@/utils/toast';
 import { getErrorMessage } from '@/utils/error';
 
-export function useWarehouses(page = 1, limit = 20) {
+export function useWarehouses(page = 1, limit = 20, filter?: WarehouseListFilter) {
   return useQuery({
-    queryKey: ['warehouses', page, limit],
+    queryKey: ['warehouses', page, limit, filter],
     queryFn: async () => {
-      const res = await warehousesApi.getAll(page, limit);
+      const res = await warehousesApi.getAll(page, limit, filter);
       return res.data.data;
     },
   });
