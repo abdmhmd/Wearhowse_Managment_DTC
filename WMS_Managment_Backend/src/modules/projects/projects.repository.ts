@@ -294,7 +294,8 @@ export class ProjectsRepository {
   }
 
   async getCloseReport(projectId: number) {
-    // 1. Pending return materials (active custodies)
+    // 1. Pending return materials (active OR return-pending custodies — a
+    //    custody mid-return must still block closure, D16)
     const pendingCustodiesRes = await pool.query(
       `SELECT c.id AS custody_id, c.item_id, c.quantity, c.unit_code, c.status, c.condition,
               c.assigned_to, u.full_name AS assigned_to_name,
@@ -306,7 +307,7 @@ export class ProjectsRepository {
        JOIN users u ON u.id = c.assigned_to
        JOIN warehouses w ON w.id = c.warehouse_id
        LEFT JOIN transactions it ON it.id = c.issued_transaction_id
-       WHERE c.project_id = $1 AND c.status = 'active' AND c.is_active = true
+       WHERE c.project_id = $1 AND c.status IN ('active', 'return_pending') AND c.is_active = true
        ORDER BY c.created_at DESC`,
       [projectId]
     );

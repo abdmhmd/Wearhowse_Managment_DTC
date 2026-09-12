@@ -56,7 +56,7 @@ afterAll(async () => { await cleanup(prefix); });
 
 describe('project close rules', () => {
   test('close is blocked while the project has an active custody', async () => {
-    await expect(projectsService.close(projectId, approverId)).rejects.toThrow(/active custody/i);
+    await expect(projectsService.close(projectId, approverId)).rejects.toThrow(/active or return-pending custody/i);
   });
 
   test('close succeeds after the custody is returned', async () => {

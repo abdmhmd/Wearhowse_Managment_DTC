@@ -346,7 +346,7 @@ export class ProjectsService {
       const activeCustodies = await custodiesRepository.countActiveCustodiesByProject(id);
       if (activeCustodies > 0) {
         throw new ValidationError(
-          `Cannot close project with ${activeCustodies} active custody record(s). Return all durable items first.`,
+          `Cannot close project with ${activeCustodies} active or return-pending custody record(s). Return all durable items first.`,
           { active_custodies: activeCustodies }
         );
       }

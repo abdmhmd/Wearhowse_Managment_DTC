@@ -244,12 +244,12 @@ export class CustodiesRepository {
     return res.rows[0] || null;
   }
 
-  /** Count active custody records belonging to a project */
+  /** Count active and return-pending custody records belonging to a project */
   async countActiveCustodiesByProject(projectId: number): Promise<number> {
     const res = await pool.query(
       `SELECT COUNT(*)::int AS total
        FROM custodies
-       WHERE project_id = $1 AND status = 'active' AND is_active = true`,
+       WHERE project_id = $1 AND status IN ('active', 'return_pending') AND is_active = true`,
       [projectId]
     );
     return res.rows[0].total;
