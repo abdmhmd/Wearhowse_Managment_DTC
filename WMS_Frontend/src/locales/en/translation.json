@@ -323,7 +323,20 @@
       "title": "Warehouses",
       "subtitle": "Manage warehouse locations",
       "create": "Create Warehouse",
-      "edit": "Edit Warehouse"
+      "edit": "Edit Warehouse",
+      "department": "Department",
+      "noDepartment": "Central (No Department)",
+      "isMain": "Main Warehouse",
+      "isMainHelp": "The main warehouse receives from suppliers. Each department has at most one main warehouse.",
+      "type": "Type",
+      "typeMain": "Main",
+      "typeSub": "Sub",
+      "filterByDepartment": "Filter by Department",
+      "filterByType": "Filter by Type",
+      "errors": {
+        "MAIN_WAREHOUSE_EXISTS": "This department already has a main warehouse.",
+        "DEPARTMENT_NOT_FOUND": "The selected department does not exist."
+      }
     },
     "items": {
       "title": "Items",
