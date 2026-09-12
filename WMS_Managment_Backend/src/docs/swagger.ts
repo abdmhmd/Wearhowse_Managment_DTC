@@ -127,10 +127,6 @@ const swaggerDocument = {
       get: { tags: ['Units'], summary: 'List all units', responses: { '200': { description: 'Success' } } },
       post: { tags: ['Units'], summary: 'Create unit', responses: { '201': { description: 'Created' } } },
     },
-    '/suppliers': {
-      get: { tags: ['Suppliers'], summary: 'List all suppliers', responses: { '200': { description: 'Success' } } },
-      post: { tags: ['Suppliers'], summary: 'Create supplier', responses: { '201': { description: 'Created' } } },
-    },
     '/departments': {
       get: { tags: ['Departments'], summary: 'List all departments', responses: { '200': { description: 'Success' } } },
       post: { tags: ['Departments'], summary: 'Create department', responses: { '201': { description: 'Created' } } },
@@ -174,7 +170,6 @@ const swaggerDocument = {
                       type: { $ref: '#/components/schemas/TransactionType' },
                       warehouse_id: { type: 'integer' },
                       to_warehouse_id: { type: 'integer', description: 'Required for TRF' },
-                      supplier_id: { type: 'integer' },
                       department_id: { type: 'integer', description: 'Required for LN' },
                       notes: { type: 'string' },
                     },
