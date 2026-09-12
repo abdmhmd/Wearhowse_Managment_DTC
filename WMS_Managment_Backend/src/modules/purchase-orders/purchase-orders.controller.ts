@@ -7,8 +7,6 @@ import {
   createPurchaseOrderSchema,
   updatePurchaseOrderSchema,
   receivePoSchema,
-  allocatePoSchema,
-  transferAllocationSchema,
 } from './purchase-orders.validator';
 import { writeAudit } from '../authorization/audit.service';
 
@@ -163,77 +161,11 @@ export class PurchaseOrdersController {
         action: 'PO_RECEIVED',
         resource: 'purchase_orders',
         resource_id: id,
-        details: { lines: parsed.data.lines, transaction_id: result.transaction_id },
+        details: { lines: parsed.data.lines, transaction_id: result.transaction_id, linked_transfer_id: result.linked_transfer_id ?? null },
         ip_address: req.ip,
         user_agent: req.headers?.['user-agent'] ?? null,
       });
       sendData(res, result, { message: 'Stock received successfully' });
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async allocate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const id = Number(req.params.id);
-      if (isNaN(id)) throw new ValidationError('Invalid purchase order ID');
-      const parsed = allocatePoSchema.safeParse(req.body);
-      if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
-
-      const result = await purchaseOrdersService.allocate(id, parsed.data, req.user);
-      await writeAudit({
-        user_id: req.user!.id,
-        action: 'PO_ALLOCATED',
-        resource: 'purchase_order_allocations',
-        resource_id: result.id,
-        details: { po_id: id, detail_id: parsed.data.detail_id, dest_warehouse_id: parsed.data.dest_warehouse_id, quantity: parsed.data.quantity },
-        ip_address: req.ip,
-        user_agent: req.headers?.['user-agent'] ?? null,
-      });
-      sendData(res, result, { statusCode: 201, message: 'Stock allocated successfully' });
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async transfer(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const allocationId = Number(req.params.id);
-      if (isNaN(allocationId)) throw new ValidationError('Invalid allocation ID');
-      const parsed = transferAllocationSchema.safeParse(req.body);
-      if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
-
-      const result = await purchaseOrdersService.transferAllocation(allocationId, parsed.data.quantity, req.user);
-      await writeAudit({
-        user_id: req.user!.id,
-        action: 'PO_TRANSFERRED',
-        resource: 'purchase_order_allocations',
-        resource_id: allocationId,
-        details: { quantity: parsed.data.quantity, transaction_id: result.transaction_id },
-        ip_address: req.ip,
-        user_agent: req.headers?.['user-agent'] ?? null,
-      });
-      sendData(res, result, { message: 'Stock transferred successfully' });
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async cancelAllocation(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const allocationId = Number(req.params.id);
-      if (isNaN(allocationId)) throw new ValidationError('Invalid allocation ID');
-      const result = await purchaseOrdersService.cancelAllocation(allocationId, req.user);
-      await writeAudit({
-        user_id: req.user!.id,
-        action: 'PO_ALLOCATION_CANCELLED',
-        resource: 'purchase_order_allocations',
-        resource_id: allocationId,
-        details: { allocation_id: allocationId, released_quantity: result.released_quantity },
-        ip_address: req.ip,
-        user_agent: req.headers?.['user-agent'] ?? null,
-      });
-      sendData(res, result, { message: 'Allocation cancelled successfully' });
     } catch (err) {
       next(err);
     }
@@ -261,15 +193,15 @@ export class PurchaseOrdersController {
 
   async confirmTransfer(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const allocationId = Number(req.params.id);
-      if (isNaN(allocationId)) throw new ValidationError('Invalid allocation ID');
-      const result = await purchaseOrdersService.confirmTransfer(allocationId, req.user);
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new ValidationError('Invalid purchase order ID');
+      const result = await purchaseOrdersService.confirmTransfer(id, req.user);
       await writeAudit({
         user_id: req.user!.id,
         action: 'PO_TRANSFER_CONFIRMED',
-        resource: 'purchase_order_allocations',
-        resource_id: allocationId,
-        details: { allocation_id: allocationId },
+        resource: 'purchase_orders',
+        resource_id: id,
+        details: { po_number: result.po.po_number, transaction_id: result.transaction_id },
         ip_address: req.ip,
         user_agent: req.headers?.['user-agent'] ?? null,
       });

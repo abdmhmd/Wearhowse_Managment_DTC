@@ -72,40 +72,14 @@ router.post(
   purchaseOrdersController.confirmReceive.bind(purchaseOrdersController)
 );
 
-// POST /api/purchase-orders/:id/allocations — reserve received stock for a destination
+// POST /api/purchase-orders/:id/confirm-transfer — approve the D8 auto-created
+// transfer (draft TRF) so the received stock moves main -> sub warehouse.
+// Reuses purchase-orders:receive (the transfer gate); the old
+// purchase-orders:allocate / purchase-orders:transfer permissions were
+// removed in migration 046.
 router.post(
-  '/:id/allocations',
-  authorize('purchase-orders:allocate'),
-  purchaseOrdersController.allocate.bind(purchaseOrdersController)
-);
-
-// POST /api/purchase-orders/allocations/:id/transfer — move allocated stock
-// Registered AFTER '/:id/...' routes is fine because Express matches in order;
-// this path has a distinct prefix ('allocations') so no shadowing occurs.
-router.post(
-  '/allocations/:id/transfer',
-  authorize('purchase-orders:transfer'),
-  purchaseOrdersController.transfer.bind(purchaseOrdersController)
-);
-
-// DELETE /api/purchase-orders/allocations/:id — cancel/release allocated stock
-router.delete(
-  '/allocations/:id',
-  authorize('purchase-orders:allocate'),
-  purchaseOrdersController.cancelAllocation.bind(purchaseOrdersController)
-);
-
-// POST /api/purchase-orders/allocations/:id/cancel — cancel/release allocated stock
-router.post(
-  '/allocations/:id/cancel',
-  authorize('purchase-orders:allocate'),
-  purchaseOrdersController.cancelAllocation.bind(purchaseOrdersController)
-);
-
-// POST /api/purchase-orders/allocations/:id/confirm-transfer — confirm transfer movement
-router.post(
-  '/allocations/:id/confirm-transfer',
-  authorize('purchase-orders:transfer'),
+  '/:id/confirm-transfer',
+  authorize('purchase-orders:receive'),
   purchaseOrdersController.confirmTransfer.bind(purchaseOrdersController)
 );
 

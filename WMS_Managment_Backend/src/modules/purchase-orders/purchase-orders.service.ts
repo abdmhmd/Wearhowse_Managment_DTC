@@ -8,7 +8,6 @@ import { purchaseOrdersRepository as repo } from './purchase-orders.repository';
 import {
   canTransition,
   RECEIVABLE_STATUSES,
-  ALLOCATABLE_STATUSES,
   type PurchaseOrderStatus,
 } from './purchase-orders.types';
 import type { CreatePoInput, PoLineInput } from './purchase-orders.repository';
@@ -16,7 +15,6 @@ import { transactionsService } from '../transactions/transactions.service';
 import { itemsRepository } from '../items/items.repository';
 import { unitConversionsRepository } from '../unit-conversions/unit-conversions.repository';
 import { warehousesRepository } from '../warehouses/warehouses.repository';
-import { getStockAvailability } from './stock-availability';
 
 export class PurchaseOrdersService {
   /**
@@ -308,22 +306,6 @@ export class PurchaseOrdersService {
         throw new ValidationError(`Cannot cancel a purchase order with status '${po.status}'`, { status: po.status }, 'INVALID_PURCHASE_ORDER_STATUS');
       }
 
-      // Once physical stock has been received the PO may only be cancelled
-      // when no open reservations remain (they reference the received stock).
-      if (['partially_received', 'received'].includes(po.status)) {
-        const openRes = await client.query(
-          `SELECT COALESCE(SUM(quantity_allocated - quantity_transferred), 0)::float8 AS open_qty
-           FROM purchase_order_allocations WHERE po_id = $1 AND status IN ('allocated', 'partially_transferred')`,
-          [id]
-        );
-        if (Number(openRes.rows[0].open_qty) > 0) {
-          throw new ValidationError(
-            'Cannot cancel: received stock still has open allocations. Transfer or cancel the allocations first.',
-            { open_allocations: Number(openRes.rows[0].open_qty) }
-          );
-        }
-      }
-
       await repo.updateStatus(client, id, 'cancelled', {
         cancelled_by: user!.id,
         cancelled_at: new Date(),
@@ -335,10 +317,11 @@ export class PurchaseOrdersService {
   }
 
   /**
-   * Close a fully received PO once nothing is pending: every allocation fully
-   * transferred/cancelled and every allocated unit moved out of the main
-   * warehouse. Unallocated received stock intentionally stays in the main
-   * warehouse as general stock.
+   * Close a fully received PO once nothing is pending. For PR-linked purchase
+   * orders D8 auto-creates a draft Transfer to the request creator's
+   * sub-warehouse; the PO may only be closed after that transfer has been
+   * CONFIRMED (approved) by a second user, so the received stock is no longer
+   * sitting unassigned in the receiving main warehouse.
    */
   async close(id: number, user?: AuthUserContext): Promise<any> {
     return runInTransaction(async (client) => {
@@ -350,15 +333,21 @@ export class PurchaseOrdersService {
         throw new ValidationError(`Cannot close a purchase order with status '${po.status}' — it must be fully received first`, { status: po.status }, 'INVALID_PURCHASE_ORDER_STATUS');
       }
 
-      const openRes = await client.query(
-        `SELECT COALESCE(SUM(quantity_allocated - quantity_transferred), 0)::float8 AS open_qty
-         FROM purchase_order_allocations WHERE po_id = $1 AND status IN ('allocated', 'partially_transferred', 'pending_confirmation')`,
+      // [D8] A PR-linked PO carries draft auto-transfers until a second user
+      // confirms them (each partial receive drafts one TRF). Closing would
+      // leave the drafted movement dangling, so confirm every draft TRF first.
+      const pendingTrf = await client.query(
+        `SELECT id, transaction_no FROM transactions
+          WHERE purchase_order_id = $1 AND type = 'TRF' AND status = 'draft'
+          ORDER BY id`,
         [id]
       );
-      if (Number(openRes.rows[0].open_qty) > 0) {
-        throw new ValidationError('Cannot close: allocations are still open (not fully transferred)', {
-          open_allocations: Number(openRes.rows[0].open_qty),
-        }, 'PO_CANNOT_CLOSE');
+      if (pendingTrf.rows.length > 0) {
+        throw new ValidationError(
+          'Cannot close: an auto-created transfer has not been confirmed yet. Confirm the linked transfer(s) first.',
+          { transfer_ids: pendingTrf.rows.map((r) => r.id) },
+          'PO_CANNOT_CLOSE'
+        );
       }
 
       await repo.updateStatus(client, id, 'closed');
@@ -453,262 +442,104 @@ export class PurchaseOrdersService {
         [id]
       );
 
-      logger.info(`[PO_RECEIVED] PO ${po.po_number} received via RV ${rvHeader.transaction_no}`, 'purchase-orders');
+      // [D8] PR-linked purchase orders: auto-create a DRAFT Transfer to the
+      // request creator's sub-warehouse for the quantities just received.
+      // Anything here either commits with (or rolls back) the RV above — the
+      // movement is only realised when a second user confirms it. Standalone
+      // POs (not generated from a purchase request) are never auto-transferred:
+      // their received stock simply stays in the main warehouse as general stock.
+      let linkedTransfer: { id?: number; transaction_no?: string } | null = null;
+      let transferDestination: { id: number; code: string } | null = null;
+
+      const prRes = await client.query(
+        `SELECT id, request_no, department_id, warehouse_id, created_by, status
+           FROM purchase_requests WHERE purchase_order_id = $1`,
+        [id]
+      );
+      const pr = prRes.rows[0];
+      if (pr && pr.status === 'admin_approved') {
+        // Destination = the request creator's UNIQUE active non-main warehouse
+        // in the same department (derived via user_warehouses). Zero or several
+        // matches fail the receive so the RV is rolled back — the movement
+        // destination must never be guessed.
+        const destRes = await client.query(
+          `SELECT w.id, w.code, w.name_ar, w.name_en, w.department_id
+             FROM warehouses w
+             JOIN user_warehouses uw ON uw.warehouse_id = w.id
+            WHERE uw.user_id = $1 AND w.department_id = $2
+              AND w.is_active = true AND w.is_main = false
+            ORDER BY w.id`,
+          [pr.created_by, pr.department_id]
+        );
+        const destinations = destRes.rows;
+        if (destinations.length === 0) {
+          throw new ValidationError(
+            'Cannot auto-transfer this receipt: the purchase request creator has no active sub-warehouse assigned in the department.',
+            { request_no: pr.request_no },
+            'NO_TRANSFER_DESTINATION'
+          );
+        }
+        if (destinations.length > 1) {
+          throw new ValidationError(
+            'Cannot auto-transfer this receipt: the purchase request creator is assigned multiple sub-warehouses in the department.',
+            { request_no: pr.request_no, warehouse_ids: destinations.map((d: any) => d.id) },
+            'AMBIGUOUS_TRANSFER_DESTINATION'
+          );
+        }
+        const dest = destinations[0];
+        transferDestination = dest;
+
+        const trfHeader = await transactionsService.createDraft(
+          {
+            type: 'TRF',
+            department_id: pr.department_id ?? po.department_id,
+            warehouse_id: po.warehouse_id,
+            to_warehouse_id: dest.id,
+            purchase_order_id: po.id,
+            created_by: user!.id,
+            notes: `Auto-generated from Purchase Order ${po.po_number} for Purchase Request ${pr.request_no}`,
+          },
+          payload.lines.map((line) => {
+            const detail = detailMap.get(line.detail_id)!;
+            return {
+              item_id: detail.item_id,
+              quantity: line.quantity,
+              unit_code: detail.unit_code,
+              unit_price: 0,
+              batch_number: null,
+            };
+          }),
+          client
+        );
+        await client.query(
+          `UPDATE purchase_orders
+           SET linked_transfer_id = $2, auto_transfer_created = true
+           WHERE id = $1`,
+          [id, trfHeader.id]
+        );
+        linkedTransfer = trfHeader;
+      }
+
+      logger.info(
+        `[PO_RECEIVED] PO ${po.po_number} received via RV ${rvHeader.transaction_no}${linkedTransfer ? `; auto-TRF ${linkedTransfer.transaction_no}` : ''}`,
+        'purchase-orders'
+      );
 
       return {
         message: 'Stock received successfully',
         transaction_id: rvHeader.id,
         transaction_no: rvHeader.transaction_no,
         status: newStatus,
+        auto_transfer_created: !!linkedTransfer,
+        linked_transfer_id: linkedTransfer?.id ?? null,
+        linked_transfer_no: linkedTransfer?.transaction_no ?? null,
+        linked_transfer_destination_warehouse_id: transferDestination?.id ?? null,
+        linked_transfer_destination_warehouse_code: transferDestination?.code ?? null,
       };
     });
   }
 
-  // ── Allocation (reservation only — NO physical movement) ────────────────
-
-  async allocate(
-    id: number,
-    payload: { detail_id: number; dest_warehouse_id: number; quantity: number },
-    user?: AuthUserContext
-  ): Promise<any> {
-    return runInTransaction(async (client) => {
-      const po = await repo.findHeaderByIdForUpdate(client, id);
-      if (!po) throw new NotFoundError('PurchaseOrder', 'PURCHASE_ORDER_NOT_FOUND');
-      this.assertPoInScope(po, user);
-
-      if (!ALLOCATABLE_STATUSES.includes(po.status)) {
-        throw new ValidationError(`Cannot allocate from a purchase order with status '${po.status}' — it must be approved and received first`, { status: po.status });
-      }
-
-      const detail = await repo.findDetailByIdForUpdate(client, payload.detail_id);
-      if (!detail || detail.po_id !== id) {
-        throw new NotFoundError('PurchaseOrderLine', 'PO_LINE_NOT_FOUND', { detail_id: payload.detail_id });
-      }
-
-      const received = Number(detail.quantity_received);
-      if (received <= 0) {
-        throw new ValidationError('Nothing has been received for this line yet — receive stock before allocating', { detail_id: payload.detail_id }, 'ALLOCATE_EXCEEDS_RECEIVED');
-      }
-
-      // Cumulative safety invariant: allocated_total + new <= received.
-      const allocatable = received - Number(detail.quantity_allocated);
-      if (Number(payload.quantity) > allocatable) {
-        throw new ValidationError(
-          `Allocation exceeds the allocatable quantity. Received: ${received}, already allocated: ${Number(detail.quantity_allocated)}, allocatable remaining: ${allocatable}`,
-          { detail_id: payload.detail_id, received, allocated: Number(detail.quantity_allocated), requested: Number(payload.quantity), available: allocatable },
-          'ALLOCATE_EXCEEDS_AVAILABLE'
-        );
-      }
-
-      // Destination warehouse: active NON-MAIN department warehouse.
-      const dwRes = await client.query(
-        'SELECT id, code, name_ar, name_en, department_id, is_main, is_active FROM warehouses WHERE id = $1 AND is_active = true',
-        [payload.dest_warehouse_id]
-      );
-      const dest = dwRes.rows[0];
-      if (!dest) throw new ValidationError('Destination warehouse does not exist', { dest_warehouse_id: payload.dest_warehouse_id });
-      if (dest.is_main) {
-        throw new ValidationError('Allocation destination cannot be a main warehouse', { dest_warehouse_id: payload.dest_warehouse_id }, 'MAIN_WAREHOUSE_DESTINATION');
-      }
-      if (dest.department_id == null) {
-        throw new ValidationError('Destination warehouse is not linked to a department', { dest_warehouse_id: payload.dest_warehouse_id });
-      }
-      if (po.department_id != null && dest.department_id !== po.department_id) {
-        throw new ValidationError('Destination warehouse does not belong to the purchase order department', {
-          dest_warehouse_id: payload.dest_warehouse_id,
-          dest_department: dest.department_id,
-          po_department: po.department_id,
-        }, 'INVALID_DESTINATION_WAREHOUSE');
-      }
-      if (user!.role === 'sub_warehouse_manager' && !user!.warehouse_ids.includes(payload.dest_warehouse_id)) {
-        throw new ForbiddenError('Destination warehouse is not assigned to you');
-      }
-
-      // Availability overlay: open reservations across ALL purchase orders must
-      // never exceed the physical balance of the source warehouse.
-      const availability = await getStockAvailability(detail.item_id, po.warehouse_id, client);
-      if (availability.available_stock < Number(payload.quantity)) {
-        throw new ValidationError(
-          `Insufficient available stock in the source warehouse. Physical: ${availability.physical_stock}, reserved: ${availability.allocated_stock}, available: ${availability.available_stock}, requested: ${payload.quantity}`,
-          { ...availability, requested: payload.quantity }
-        );
-      }
-
-      // Latest receiving voucher for traceability.
-      const lastRv = await client.query(
-        `SELECT MAX(id) AS id FROM transactions WHERE purchase_order_id = $1 AND type = 'RV' AND status = 'approved'`,
-        [id]
-      );
-
-      const allocation = await repo.insertAllocation(client, {
-        po_detail_id: detail.id,
-        po_id: id,
-        source_warehouse_id: po.warehouse_id,
-        dest_warehouse_id: payload.dest_warehouse_id,
-        quantity_allocated: payload.quantity,
-        receive_transaction_id: lastRv.rows[0]?.id ?? null,
-        allocated_by: user!.id,
-      });
-      await repo.incrementDetailAllocated(client, detail.id, payload.quantity);
-
-      logger.info(
-        `[PO_ALLOCATED] PO ${po.po_number}: ${payload.quantity} x item#${detail.item_id} reserved -> WH ${payload.dest_warehouse_id}`,
-        'purchase-orders'
-      );
-
-      return allocation;
-    });
-  }
-
-  // ── Transfer (physical move MAIN -> destination) ─────────────────────────
-
-  async transferAllocation(allocationId: number, quantity: number, user?: AuthUserContext): Promise<any> {
-    return runInTransaction(async (client) => {
-      // 1. Lock the allocation row (source/dest/PO ids loaded from the row —
-      //    never from the client).
-      const allocation = await repo.findAllocationByIdForUpdate(client, allocationId);
-      if (!allocation) throw new NotFoundError('Allocation', 'ALLOCATION_NOT_FOUND');
-      this.assertPoInScope({ warehouse_id: allocation.source_warehouse_id }, user);
-
-      if (!['allocated', 'partially_transferred'].includes(allocation.status)) {
-        throw new ValidationError(`Cannot transfer an allocation with status '${allocation.status}'`, { status: allocation.status },
-          allocation.status === 'transferred' ? 'ALLOCATION_ALREADY_TRANSFERRED' : 'INVALID_PURCHASE_ORDER_STATUS');
-      }
-
-      const remaining = Number(allocation.quantity_allocated) - Number(allocation.quantity_transferred);
-      if (quantity > remaining) {
-        throw new ValidationError(
-          `Transfer exceeds the remaining allocated quantity (${remaining})`,
-          { allocation_id: allocationId, allocated: Number(allocation.quantity_allocated), transferred: Number(allocation.quantity_transferred), requested: quantity },
-          'TRANSFER_EXCEEDS_ALLOCATED'
-        );
-      }
-
-      // 2. TRF voucher through the EXISTING engine: approveTransaction's TRF
-      //    branch deducts the source iws balance under lock, credits the
-      //    destination, logs both movement legs and posts the transfer journal
-      //    entry — inside THIS transaction.
-      const detail = await repo.findDetailByIdForUpdate(client, allocation.po_detail_id);
-      const trfHeader = await transactionsService.createDraft(
-        {
-          type: 'TRF',
-          department_id: allocation.po_department_id,
-          warehouse_id: allocation.source_warehouse_id,
-          to_warehouse_id: allocation.dest_warehouse_id,
-          purchase_order_id: allocation.po_id,
-          created_by: user!.id,
-          notes: `Auto-generated from Purchase Order ${allocation.po_number} allocation #${allocation.id}`,
-        },
-        [
-          {
-            item_id: detail.item_id,
-            quantity,
-            unit_code: detail.unit_code,
-            unit_price: 0,
-            batch_number: null,
-          },
-        ],
-        client
-      );
-      await transactionsService.approveTransaction(trfHeader.id!, user!.id, client);
-
-      // 3. Allocation bookkeeping. D9: a transfer is NOT final until a second
-      //    user confirms it. The TRF already moved physical stock, so the
-      //    allocation enters 'pending_confirmation' and the pending TRF id is
-      //    recorded for the confirmation step. Any previous confirmation is
-      //    reset so a re-transfer must be re-confirmed.
-      const newTransferred = Number(allocation.quantity_transferred) + quantity;
-      await client.query(
-        `UPDATE purchase_order_allocations
-         SET quantity_transferred = $2,
-             status = 'pending_confirmation'::allocation_status,
-             transferred_by = $3, transferred_at = NOW(), transfer_transaction_id = $4,
-             pending_transaction_id = $4,
-             transfer_confirmed_by = NULL, transfer_confirmed_at = NULL
-         WHERE id = $1`,
-        [allocationId, newTransferred, user!.id, trfHeader.id!]
-      );
-
-      // 4. Parent aggregates.
-      await repo.incrementDetailTransferred(client, allocation.po_detail_id, quantity);
-
-      logger.info(
-        `[PO_TRANSFERRED] Allocation #${allocationId}: ${quantity} moved via TRF ${trfHeader.transaction_no} (awaiting confirmation)`,
-        'purchase-orders'
-      );
-
-      return {
-        message: 'Stock transferred successfully; awaiting confirmation by another user',
-        allocation_id: allocationId,
-        transaction_id: trfHeader.id,
-        transaction_no: trfHeader.transaction_no,
-        status: 'pending_confirmation',
-        quantity_transferred: newTransferred,
-        remaining: Number(allocation.quantity_allocated) - newTransferred,
-      };
-    });
-  }
-
-  // ── Allocation Cancellation / Deallocation ──────────────────────────────
-
-  async cancelAllocation(allocationId: number, user?: AuthUserContext): Promise<any> {
-    return runInTransaction(async (client) => {
-      const allocation = await repo.findAllocationByIdForUpdate(client, allocationId);
-      if (!allocation) throw new NotFoundError('Allocation', 'ALLOCATION_NOT_FOUND');
-      this.assertPoInScope({ warehouse_id: allocation.source_warehouse_id }, user);
-
-      if (!['allocated', 'partially_transferred'].includes(allocation.status)) {
-        throw new ValidationError(
-          `Cannot cancel an allocation with status '${allocation.status}'`,
-          { status: allocation.status },
-          'INVALID_ALLOCATION_STATUS'
-        );
-      }
-
-      // Quantity that was reserved but NOT transferred
-      const unTransferredQty = Number(allocation.quantity_allocated) - Number(allocation.quantity_transferred);
-
-      // Decrement detail's quantity_allocated by the unTransferred amount
-      if (unTransferredQty > 0) {
-        await client.query(
-          `UPDATE purchase_order_details
-           SET quantity_allocated = GREATEST(quantity_allocated - $2, 0)
-           WHERE id = $1`,
-          [allocation.po_detail_id, unTransferredQty]
-        );
-      }
-
-      if (Number(allocation.quantity_transferred) === 0) {
-        // Nothing was transferred: the reservation is fully released. The row
-        // cannot hold quantity_allocated = 0 (CHECK quantity_allocated > 0),
-        // so a full cancellation removes the allocation row entirely.
-        await client.query('DELETE FROM purchase_order_allocations WHERE id = $1', [allocationId]);
-      } else {
-        // Partially transferred: clamp the reservation down to the quantity
-        // actually moved (keeps quantity_allocated > 0).
-        await client.query(
-          `UPDATE purchase_order_allocations
-           SET status = 'cancelled'::allocation_status,
-               quantity_allocated = quantity_transferred
-           WHERE id = $1`,
-          [allocationId]
-        );
-      }
-
-      logger.info(
-        `[PO_ALLOCATION_CANCELLED] Allocation #${allocationId} cancelled by user ${user?.id ?? 'system'} (released ${unTransferredQty})`,
-        'purchase-orders'
-      );
-
-      return {
-        message: 'Allocation cancelled successfully',
-        allocation_id: allocationId,
-        released_quantity: unTransferredQty,
-      };
-    });
-  }
-
-  // ── [NP3] Explicit Confirmations for Inbound & Outbound Movements ────────
+  // ── [NP3] Explicit Confirmation for Inbound Movement ─────────────────────
 
   async confirmReceive(id: number, user?: AuthUserContext): Promise<any> {
     return runInTransaction(async (client) => {
@@ -745,59 +576,86 @@ export class PurchaseOrdersService {
     });
   }
 
-  async confirmTransfer(allocationId: number, user?: AuthUserContext): Promise<any> {
+  /**
+   * [D8] Confirm the auto-created transfer(s) of a PR-linked purchase order.
+   * Approving the linked TRF(s) realises the movement: stock leaves the
+   * receiving MAIN warehouse and enters the request creator's sub-warehouse.
+   * Every draft TRF drafted for this PO is confirmed in the same transaction
+   * (a partially received PO drafts one TRF per receive call). D9 two-party
+   * confirmation — the user who drafted a transfer (the receiver) may not
+   * confirm their own movement.
+   */
+  async confirmTransfer(id: number, user?: AuthUserContext): Promise<any> {
     return runInTransaction(async (client) => {
-      const allocation = await repo.findAllocationByIdForUpdate(client, allocationId);
-      if (!allocation) throw new NotFoundError('Allocation', 'ALLOCATION_NOT_FOUND');
-      this.assertPoInScope({ warehouse_id: allocation.source_warehouse_id }, user);
+      const po = await repo.findHeaderByIdForUpdate(client, id);
+      if (!po) throw new NotFoundError('PurchaseOrder', 'PURCHASE_ORDER_NOT_FOUND');
+      this.assertPoInScope(po, user);
 
-      // D9: only a transfer that has physically moved stock (pending_confirmation)
-      // can be confirmed. Legacy rows already finalised as transferred are also
-      // accepted so repeated confirms stay idempotent.
-      if (!['pending_confirmation', 'transferred', 'partially_transferred'].includes(allocation.status)) {
+      if (!['received', 'partially_received'].includes(po.status)) {
         throw new ValidationError(
-          `Cannot confirm transfer for an allocation with status '${allocation.status}'. It must be transferred first.`,
-          { status: allocation.status },
-          'INVALID_ALLOCATION_STATUS'
+          `Cannot confirm a transfer for a purchase order with status '${po.status}'. It must be received first.`,
+          { status: po.status },
+          'INVALID_PURCHASE_ORDER_STATUS'
         );
       }
 
-      // D9: two-party confirmation — the user who executed the transfer may not
-      // confirm their own movement.
-      if (user && allocation.transferred_by === user.id) {
-        throw new ForbiddenError(
-          'Cannot confirm a transfer you executed yourself. Another user must confirm it.',
-          { allocation_id: allocationId, transferred_by: allocation.transferred_by }
+      if (po.linked_transfer_id == null) {
+        throw new ValidationError(
+          'This purchase order has no linked transfer to confirm.',
+          { po_id: id },
+          'NO_LINKED_TRANSFER'
         );
       }
 
-      const finalStatus = Number(allocation.quantity_transferred) >= Number(allocation.quantity_allocated)
-        ? 'transferred'
-        : 'partially_transferred';
-      await client.query(
-        `UPDATE purchase_order_allocations
-         SET transfer_confirmed_by = $2, transfer_confirmed_at = NOW(),
-             status = $3::allocation_status
-         WHERE id = $1`,
-        [allocationId, user!.id, finalStatus]
+      // Confirm EVERY draft auto-transfer belonging to this PO. A partially
+      // received PO drafts one TRF per receive, so only chasing the latest
+      // linked_transfer_id would leave earlier drafts dangling forever.
+      const trfRes = await client.query(
+        `SELECT id, transaction_no, created_by, status FROM transactions
+          WHERE purchase_order_id = $1 AND type = 'TRF' AND status = 'draft'
+          ORDER BY id`,
+        [id]
       );
+      const trfs = trfRes.rows;
+      if (trfs.length === 0) {
+        throw new ConflictError(
+          'There are no draft transfers left to confirm for this purchase order.',
+          'LINKED_TRANSFER_ALREADY_CONFIRMED',
+          { po_id: id }
+        );
+      }
+
+      for (const trf of trfs) {
+        // D9 two-party: the receiver who drafted the transfer cannot confirm it.
+        if (user && trf.created_by === user.id) {
+          throw new ForbiddenError(
+            'Cannot confirm a transfer you created yourself. Another user must confirm it.',
+            { po_id: id, transfer_created_by: trf.created_by }
+          );
+        }
+        await transactionsService.approveTransaction(trf.id, user!.id, client);
+      }
+      const lastTrf = trfs[trfs.length - 1];
 
       logger.info(
-        `[PO_TRANSFER_CONFIRMED] Allocation #${allocationId} transfer confirmed by user ${user!.id} → ${finalStatus}`,
+        `[PO_TRANSFER_CONFIRMED] PO ${po.po_number} confirmed ${trfs.length} linked TRF(s) (${trfs.map((t) => t.transaction_no).join(', ')}) by user ${user!.id}`,
         'purchase-orders'
       );
 
       return {
         message: 'Transfer confirmed successfully',
-        allocation_id: allocationId,
-        status: finalStatus,
+        transaction_id: lastTrf.id,
+        transaction_no: lastTrf.transaction_no,
+        transfer_count: trfs.length,
+        status: 'approved',
         transfer_confirmed_by: user!.id,
         transfer_confirmed_at: new Date(),
+        po: await this.loadFullPo(client, id),
       };
     });
   }
 
-  /** Load the full PO (header + details + allocations) using an existing client. */
+  /** Load the full PO (header + details) using an existing client. */
   private async loadFullPo(client: PoolClient, id: number): Promise<any> {
     // findById uses the module pool; reuse its SQL by delegating after commit
     // would break atomicity guarantees for callers wanting the final state, so
@@ -810,32 +668,41 @@ export class PurchaseOrdersService {
        WHERE pod.po_id = $1 ORDER BY pod.id`,
       [id]
     );
-    const allocationsRes = await client.query(
-      `SELECT poa.*, i.item_code, i.name_ar AS item_name_ar, i.name_en AS item_name_en
-       FROM purchase_order_allocations poa
-       JOIN purchase_order_details pod ON pod.id = poa.po_detail_id
-       JOIN items i ON i.id = pod.item_id
-       WHERE poa.po_id = $1 ORDER BY poa.id`,
-      [id]
-    );
-    return { ...headerRes.rows[0], details: detailsRes.rows, allocations: allocationsRes.rows };
+    return { ...headerRes.rows[0], details: detailsRes.rows };
   }
 }
 
-// Header select shared between repository findAll/findById and the service's
-// transactional reload. Kept identical to PO_SELECT in the repository.
+// Header select shared between the service's transactional reload and the
+// repository select (fields mirrored in purchase-orders.repository PO_SELECT).
 const REPO_SELECT = `
   SELECT po.id, po.po_number, NULLIF(po.supplier_name, '') AS supplier_name, po.warehouse_id, po.department_id,
          po.status, po.order_date, po.expected_date, po.notes,
          po.created_by, po.approved_by, po.approved_at,
          po.cancelled_by, po.cancelled_at, po.received_at, po.is_active,
+         po.receive_confirmed_by, po.receive_confirmed_at,
          po.created_at, po.updated_at,
          w.is_main AS warehouse_is_main, w.code AS warehouse_code,
          w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
-         d.code AS department_code, d.name_ar AS department_name_ar, d.name_en AS department_name_en
-  FROM purchase_orders po
-  JOIN warehouses w ON w.id = po.warehouse_id
-  LEFT JOIN departments d ON d.id = po.department_id
-  WHERE po.id = $1 AND po.is_active = true`;
+         d.code AS department_code, d.name_ar AS department_name_ar, d.name_en AS department_name_en,
+         -- Auto-PO linkage: which purchase request generated this PO (1-to-1).
+         preq.id AS purchase_request_id,
+         preq.request_no AS purchase_request_no,
+         -- [D8] Auto-created transfer linkage (draft TRF -> Sub-WH confirm).
+         po.linked_transfer_id,
+         po.auto_transfer_created,
+         lt.transaction_no AS linked_transfer_no,
+         lt.status::text AS linked_transfer_status,
+         ltw.id AS linked_transfer_dest_warehouse_id,
+         ltw.code AS linked_transfer_dest_warehouse_code,
+         ltw.name_ar AS linked_transfer_dest_warehouse_name_ar,
+         ltw.name_en AS linked_transfer_dest_warehouse_name_en
+FROM purchase_orders po
+   JOIN warehouses w ON w.id = po.warehouse_id
+   LEFT JOIN departments d ON d.id = po.department_id
+   LEFT JOIN users ru ON ru.id = po.receive_confirmed_by
+   LEFT JOIN purchase_requests preq ON preq.purchase_order_id = po.id
+   LEFT JOIN transactions lt ON lt.id = po.linked_transfer_id
+   LEFT JOIN warehouses ltw ON ltw.id = lt.to_warehouse_id
+   WHERE po.id = $1 AND po.is_active = true`;
 
 export const purchaseOrdersService = new PurchaseOrdersService();
