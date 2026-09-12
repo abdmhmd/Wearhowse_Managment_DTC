@@ -28,6 +28,7 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  *  13. supervisor create with an item of ANOTHER department      -> 400 (rejected)
  *  14. supervisor create with an invalid/inactive unit          -> 400 (rejected)
  *  15. department_manager GET /api/requests/catalog             -> 403 (no requests:create)
+ *  16. supervisor issues THEIR OWN request                      -> 403 (M5 distinct-party rule)
  */
 const prefix = `${TEST_PREFIX}supreq_`;
 let app: any;
@@ -328,5 +329,21 @@ describe('Create request: supervisor department + project enforcement', () => {
       .set('Authorization', `Bearer ${dmA.token}`);
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
+  });
+
+  test('16: supervisor issuing their OWN request -> 403 (M5 distinct-party rule)', async () => {
+    // ownRequestId belongs to supA (created in test 1). Issue is a warehouse
+    // action — the requesting supervisor must never be the executor.
+    const res = await request(app)
+      .post(`/api/requests/${ownRequestId}/issue`)
+      .set('Authorization', `Bearer ${supA.token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('AUTH_FORBIDDEN');
+
+    const row = await pool.query(
+      'SELECT status FROM material_requests WHERE id = $1',
+      [ownRequestId]
+    );
+    expect(row.rows[0].status).toBe('pending'); // untouched
   });
 });
