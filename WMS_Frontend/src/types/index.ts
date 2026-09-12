@@ -29,7 +29,15 @@ export type Permission =
   | 'batches:view'
   | 'projects:view' | 'projects:create' | 'projects:update' | 'projects:close' | 'projects:delete' | 'projects:supervisors'
   | 'custodies:view' | 'custodies:view_own' | 'custodies:return'
-  | 'purchase-orders:view' | 'purchase-orders:create' | 'purchase-orders:update' | 'purchase-orders:approve' | 'purchase-orders:cancel' | 'purchase-orders:receive' | 'purchase-orders:allocate' | 'purchase-orders:transfer';
+  | 'purchase-orders:view' | 'purchase-orders:create' | 'purchase-orders:update' | 'purchase-orders:approve' | 'purchase-orders:cancel' | 'purchase-orders:receive' | 'purchase-orders:allocate' | 'purchase-orders:transfer'
+  | 'purchase-requests:view'
+  | 'purchase-requests:view_own'
+  | 'purchase-requests:create'
+  | 'purchase-requests:cancel'
+  | 'purchase-requests:approve-dept'
+  | 'purchase-requests:reject-dept'
+  | 'purchase-requests:approve-admin'
+  | 'purchase-requests:reject-admin';
 
 export type PurchaseOrderStatus = 'draft' | 'approved' | 'partially_received' | 'received' | 'closed' | 'cancelled';
 export type AllocationStatus = 'allocated' | 'partially_transferred' | 'transferred' | 'cancelled' | 'pending_confirmation';
@@ -105,6 +113,74 @@ export interface PurchaseOrder {
   details?: PurchaseOrderLine[];
   allocations?: PurchaseOrderAllocation[];
   created_at?: string;
+  /** Set when the PO was AUTO-CREATED from a purchase request (1-to-1). */
+  purchase_request_id?: number | null;
+  purchase_request_no?: string | null;
+}
+
+export type PurchaseRequestStatus = 'pending' | 'dept_approved' | 'admin_approved' | 'rejected' | 'cancelled';
+
+export type PurchaseRequestPermission =
+  | 'purchase-requests:view'
+  | 'purchase-requests:view_own'
+  | 'purchase-requests:create'
+  | 'purchase-requests:cancel'
+  | 'purchase-requests:approve-dept'
+  | 'purchase-requests:reject-dept'
+  | 'purchase-requests:approve-admin'
+  | 'purchase-requests:reject-admin';
+
+export interface PurchaseRequestItem {
+  id: number;
+  purchase_request_id: number;
+  item_id: number;
+  item_code: string;
+  item_name_ar: string | null;
+  item_name_en?: string | null;
+  quantity: number | string;
+  unit_code: string;
+  notes: string | null;
+  created_at?: string;
+}
+
+export interface PurchaseRequest {
+  id: number;
+  request_no: string;
+  department_id: number;
+  department_code?: string | null;
+  department_name_ar: string | null;
+  department_name_en: string | null;
+  warehouse_id: number;
+  warehouse_code: string | null;
+  warehouse_name_ar: string | null;
+  warehouse_name_en: string | null;
+  warehouse_is_main: boolean;
+  created_by: number;
+  created_by_username?: string;
+  created_by_name: string;
+  status: PurchaseRequestStatus;
+  notes: string | null;
+  dept_approved_by: number | null;
+  dept_approved_by_name: string | null;
+  dept_approved_at: string | null;
+  admin_approved_by: number | null;
+  admin_approved_by_name: string | null;
+  admin_approved_at: string | null;
+  rejected_by: number | null;
+  rejected_by_name: string | null;
+  rejection_reason: string | null;
+  rejected_at: string | null;
+  cancelled_by: number | null;
+  cancelled_by_name: string | null;
+  cancelled_at: string | null;
+  purchase_order_id: number | null;
+  /** Auto-generated PO number (the 1-to-1 linked PO, if any). */
+  po_number: string | null;
+  items_count: number;
+  quantity_total: number | string;
+  created_at: string;
+  updated_at: string;
+  items?: PurchaseRequestItem[];
 }
 
 export type TransactionType = 'RV' | 'LN' | 'RTV' | 'RTI' | 'ADJ' | 'TRF';
@@ -591,6 +667,14 @@ export const CUSTODY_STATUS_LABELS: Record<CustodyStatus, string> = {
   return_pending: 'Return Pending',
   damaged: 'Damaged',
   lost: 'Lost',
+};
+
+export const PURCHASE_REQUEST_STATUS_LABELS: Record<PurchaseRequestStatus, string> = {
+  pending: 'Pending',
+  dept_approved: 'Approved by Department',
+  admin_approved: 'Approved by Admin',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
 };
 
 export const CUSTODY_CONDITION_LABELS: Record<CustodyCondition, string> = {
