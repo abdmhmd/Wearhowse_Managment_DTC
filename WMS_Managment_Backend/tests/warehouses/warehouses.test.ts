@@ -113,3 +113,85 @@ describe('warehouses one-main-per-department', () => {
     expect(updated?.name_ar).toBe('Main WH Updated');
   });
 });
+
+describe('warehouses scope, filters and department linkage', () => {
+  test('filters by department_id and returns the department display names', async () => {
+    const deptId = await seedDepartment();
+    const linked = await warehousesService.create({
+      code: `${prefix}${shortId()}`,
+      name_ar: 'Linked WH',
+      department_id: deptId,
+    });
+    await warehousesService.create({
+      code: `${prefix}${shortId()}`,
+      name_ar: 'Central WH',
+    });
+
+    const { items } = await warehousesService.getAll(1, 20, undefined, { department_id: deptId });
+    expect(items.some((i: any) => i.id === linked.id)).toBe(true);
+    expect(items.every((i: any) => i.department_id === deptId)).toBe(true);
+    const row = items.find((i: any) => i.id === linked.id);
+    expect(row.department_name_ar).toBeTruthy();
+  });
+
+  test('filters by is_main (main vs sub)', async () => {
+    const deptId = await seedDepartment();
+    await warehousesService.create({
+      code: `${prefix}${shortId()}`,
+      name_ar: 'Main WH',
+      is_main: true,
+      department_id: deptId,
+    });
+    await warehousesService.create({
+      code: `${prefix}${shortId()}`,
+      name_ar: 'Sub WH',
+      department_id: deptId,
+    });
+
+    const mains = await warehousesService.getAll(1, 20, undefined, { is_main: true });
+    expect(mains.items.length).toBeGreaterThan(0);
+    expect(mains.items.every((i: any) => i.is_main === true)).toBe(true);
+
+    const subs = await warehousesService.getAll(1, 20, undefined, { is_main: false });
+    expect(subs.items.some((i: any) => i.is_main === true)).toBe(false);
+  });
+
+  test('clears the department link by submitting department_id: null', async () => {
+    const deptId = await seedDepartment();
+    const linked = await warehousesService.create({
+      code: `${prefix}${shortId()}`,
+      name_ar: 'Linked WH',
+      department_id: deptId,
+    });
+    const updated = await warehousesService.update(linked.id, { department_id: null });
+    expect(updated?.department_id).toBeNull();
+  });
+
+  test('rejects linking a non-existent department with DEPARTMENT_NOT_FOUND', async () => {
+    await expect(
+      warehousesService.create({
+        code: `${prefix}${shortId()}`,
+        name_ar: 'Ghost WH',
+        department_id: 99999999,
+      })
+    ).rejects.toMatchObject({ code: 'DEPARTMENT_NOT_FOUND' });
+  });
+
+  test('errors carry the MAIN_WAREHOUSE_EXISTS code', async () => {
+    const deptId = await seedDepartment();
+    await warehousesService.create({
+      code: `${prefix}${shortId()}`,
+      name_ar: 'Main WH',
+      is_main: true,
+      department_id: deptId,
+    });
+    await expect(
+      warehousesService.create({
+        code: `${prefix}${shortId()}`,
+        name_ar: 'Second Main WH',
+        is_main: true,
+        department_id: deptId,
+      })
+    ).rejects.toMatchObject({ code: 'MAIN_WAREHOUSE_EXISTS' });
+  });
+});

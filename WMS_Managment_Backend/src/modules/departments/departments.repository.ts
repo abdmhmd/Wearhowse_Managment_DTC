@@ -85,6 +85,18 @@ export class DepartmentsRepository {
     return res.rows[0] || null;
   }
 
+  /**
+   * Fetches a department by id, unrestricted by user scope. Used for
+   * referential-integrity pre-checks (e.g. warehouses linking a department).
+   */
+  async findById(id: number) {
+    const res = await pool.query(
+      'SELECT id, code, name_ar, name_en, created_at, updated_at FROM departments WHERE id = $1 AND is_active = true',
+      [id]
+    );
+    return res.rows[0] || null;
+  }
+
   create(data: { code: string; name_ar: string; name_en?: string }) {
     return pool.query(
       `INSERT INTO departments (code, name_ar, name_en) VALUES ($1, $2, $3) RETURNING *`,

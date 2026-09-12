@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { warehousesService } from './warehouses.service';
+import type { WarehouseListFilters } from './warehouses.repository';
 import { sendData, sendPaginated } from '../../utils/response';
 import { createWarehouseSchema, updateWarehouseSchema } from './warehouses.validator';
 import { NotFoundError, ValidationError } from '../../utils/AppError';
@@ -10,7 +11,17 @@ export class WarehousesController {
     try {
       const page = Math.max(1, Number(req.query.page) || 1);
       const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-      const { items, pagination } = await warehousesService.getAll(page, limit, req.user);
+
+      const filters: WarehouseListFilters = {};
+      const rawDepartment = req.query.department_id;
+      if (rawDepartment !== undefined && rawDepartment !== '' && rawDepartment !== 'null' && !Number.isNaN(Number(rawDepartment))) {
+        filters.department_id = Number(rawDepartment);
+      }
+      const rawMain = req.query.is_main;
+      if (rawMain === 'true') filters.is_main = true;
+      else if (rawMain === 'false') filters.is_main = false;
+
+      const { items, pagination } = await warehousesService.getAll(page, limit, req.user, filters);
       sendPaginated(res, items, pagination);
     } catch (e) { next(e); }
   }

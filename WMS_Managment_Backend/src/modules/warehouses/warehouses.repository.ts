@@ -2,9 +2,20 @@ import { pool } from '../../config/database';
 import { warehouseAccessClause, isWarehouseFallbackUser } from '../authorization/scope';
 import type { AuthUserContext } from '../authorization/authorization.service';
 
+export interface WarehouseListFilters {
+  department_id?: number;
+  is_main?: boolean;
+}
+
 export class WarehousesRepository {
-  findAll(limit?: number, offset?: number, user?: AuthUserContext) {
-    let query = 'SELECT id, code, name_ar, name_en, location, is_main, department_id, created_at, updated_at FROM warehouses WHERE is_active = true';
+  findAll(limit?: number, offset?: number, user?: AuthUserContext, filters?: WarehouseListFilters) {
+    let query =
+      `SELECT w.id, w.code, w.name_ar, w.name_en, w.location, w.is_main, w.department_id, ` +
+      `w.created_at, w.updated_at, ` +
+      `d.name_ar AS department_name_ar, d.name_en AS department_name_en ` +
+      `FROM warehouses w ` +
+      `LEFT JOIN departments d ON d.id = w.department_id ` +
+      `WHERE w.is_active = true`;
     const params: any[] = [];
     let paramIndex = 1;
 
@@ -13,9 +24,9 @@ export class WarehousesRepository {
         // Zero-assignment sub_warehouse_manager: expose the eligible
         // destination pool (active, non-main) so the create-request fallback
         // can list them.
-        query += ' AND is_main = false';
+        query += ' AND w.is_main = false';
       } else {
-        const scope = warehouseAccessClause(user, 'id', paramIndex);
+        const scope = warehouseAccessClause(user, 'w.id', paramIndex);
         if (scope.clause !== 'TRUE') {
           query += ` AND ${scope.clause}`;
           params.push(...scope.params);
@@ -24,7 +35,18 @@ export class WarehousesRepository {
       }
     }
 
-    query += ' ORDER BY code';
+    if (filters) {
+      if (filters.department_id !== undefined) {
+        query += ` AND w.department_id = $${paramIndex++}`;
+        params.push(filters.department_id);
+      }
+      if (filters.is_main !== undefined) {
+        query += ` AND w.is_main = $${paramIndex++}`;
+        params.push(filters.is_main);
+      }
+    }
+
+    query += ' ORDER BY w.code';
     if (limit !== undefined && offset !== undefined) {
       query += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
       params.push(limit, offset);
@@ -32,20 +54,35 @@ export class WarehousesRepository {
     return pool.query(query, params).then(r => r.rows);
   }
 
-  countAll(user?: AuthUserContext) {
-    let query = 'SELECT COUNT(*)::int AS total FROM warehouses WHERE is_active = true';
+  countAll(user?: AuthUserContext, filters?: WarehouseListFilters) {
+    let query = 'SELECT COUNT(*)::int AS total FROM warehouses w WHERE w.is_active = true';
     const params: any[] = [];
+    let paramIndex = 1;
+
     if (user) {
       if (isWarehouseFallbackUser(user)) {
-        query += ' AND is_main = false';
+        query += ' AND w.is_main = false';
       } else {
-        const scope = warehouseAccessClause(user, 'id', 1);
+        const scope = warehouseAccessClause(user, 'w.id', paramIndex);
         if (scope.clause !== 'TRUE') {
           query += ` AND ${scope.clause}`;
           params.push(...scope.params);
+          paramIndex += scope.params.length;
         }
       }
     }
+
+    if (filters) {
+      if (filters.department_id !== undefined) {
+        query += ` AND w.department_id = $${paramIndex++}`;
+        params.push(filters.department_id);
+      }
+      if (filters.is_main !== undefined) {
+        query += ` AND w.is_main = $${paramIndex++}`;
+        params.push(filters.is_main);
+      }
+    }
+
     return pool.query(query, params).then(r => r.rows[0].total);
   }
 
@@ -59,11 +96,17 @@ export class WarehousesRepository {
    * A user outside the scope gets `null` (treated as 404 by the controller).
    */
   async findById(id: number, user?: AuthUserContext) {
-    let query = 'SELECT id, code, name_ar, name_en, location, is_main, department_id, created_at, updated_at FROM warehouses WHERE id = $1 AND is_active = true';
+    let query =
+      `SELECT w.id, w.code, w.name_ar, w.name_en, w.location, w.is_main, w.department_id, ` +
+      `w.created_at, w.updated_at, ` +
+      `d.name_ar AS department_name_ar, d.name_en AS department_name_en ` +
+      `FROM warehouses w ` +
+      `LEFT JOIN departments d ON d.id = w.department_id ` +
+      `WHERE w.id = $1 AND w.is_active = true`;
     const params: any[] = [id];
 
     if (user) {
-      const scope = warehouseAccessClause(user, 'id', 2);
+      const scope = warehouseAccessClause(user, 'w.id', 2);
       if (scope.clause !== 'TRUE') {
         query += ` AND ${scope.clause}`;
         params.push(...scope.params);
