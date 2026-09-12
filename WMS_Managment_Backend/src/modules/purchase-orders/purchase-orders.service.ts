@@ -56,7 +56,7 @@ export class PurchaseOrdersService {
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
-  async getAll(page = 1, limit = 20, filters: { status?: string; supplier_id?: number; warehouse_id?: number; search?: string }, user?: AuthUserContext) {
+  async getAll(page = 1, limit = 20, filters: { status?: string; supplier_name?: string; warehouse_id?: number; search?: string }, user?: AuthUserContext) {
     const { items, total } = await repo.findAll(page, limit, filters, user);
     return {
       items,
@@ -80,12 +80,12 @@ export class PurchaseOrdersService {
    * Role-aware creation.
    *
    * - admin keeps full procurement control: explicit receiving main
-   *   warehouse, optional supplier, optional per-line unit price.
+   *   warehouse, optional supplier name, optional per-line unit price.
    * - sub_warehouse_manager expresses a pure MATERIAL REQUEST: item + quantity +
    *   unit (+ notes). The receiving main warehouse is DERIVED SERVER-SIDE
    *   from the authenticated user (department main warehouse first, then a
    *   uniquely-assigned main via user_warehouses). Client-supplied
-   *   warehouse_id / department_id / supplier_id / unit_price are IGNORED —
+   *   warehouse_id / department_id / supplier_name / unit_price are IGNORED —
    *   a forged payload can never steer procurement.
    */
   async create(
@@ -96,7 +96,7 @@ export class PurchaseOrdersService {
 
     const isManagerCreator = user.role === 'sub_warehouse_manager';
     let receivingWarehouseId = data.warehouse_id;
-    let supplierId = data.supplier_id ?? null;
+    let supplierName = data.supplier_name ?? null;
     let lines = data.lines;
 
     if (isManagerCreator) {
@@ -138,8 +138,8 @@ export class PurchaseOrdersService {
       receivingWarehouseId = derived.id;
 
       // The request stage carries NO procurement data.
-      supplierId = null;                                   // ignore client supplier
-      lines = lines.map(l => ({ ...l, unit_price: 0 }));   // ignore client prices
+      supplierName = null;                                // ignore client supplier name
+      lines = lines.map(l => ({ ...l, unit_price: 0 }));  // ignore client prices
     }
 
     if (!receivingWarehouseId) {
@@ -163,17 +163,17 @@ export class PurchaseOrdersService {
     // [NP7-DISBURSEMENT-VS-PURCHASE]
     // Purchase Orders are strictly for external procurement from a supplier.
     // Internal inter-warehouse movements are always material requests (disbursement).
-    // System admins creating a purchase order must specify an active supplier.
+    // System admins creating a purchase order must specify a supplier name.
     if (!isManagerCreator) {
-      if (!supplierId) {
+      const cleanName = supplierName == null ? null : supplierName.trim();
+      supplierName = cleanName && cleanName.length > 0 ? cleanName : null;
+      if (!supplierName) {
         throw new ValidationError(
-          'A purchase order from a system administrator must be linked to a supplier. For internal transfers, use a material disbursement request instead.',
-          { supplier_id: null },
+          'A purchase order from a system administrator must name the supplier. For internal transfers, use a material disbursement request instead.',
+          { supplier_name: null },
           'SUPPLIER_REQUIRED_FOR_ADMIN_PO'
         );
       }
-      const supRes = await pool.query('SELECT id FROM suppliers WHERE id = $1 AND is_active = true', [supplierId]);
-      if (!supRes.rows[0]) throw new ValidationError('Supplier not found or inactive', { supplier_id: supplierId });
     }
 
     // Lines: items must exist and be active; units valid per item.
@@ -185,7 +185,7 @@ export class PurchaseOrdersService {
         ...data,
         warehouse_id: receivingWarehouseId,
         lines,
-        supplier_id: supplierId,
+        supplier_name: supplierName,
         expected_date: data.expected_date ?? null,
         notes: data.notes ?? null,
         order_date: data.order_date ?? null,
@@ -202,7 +202,7 @@ export class PurchaseOrdersService {
     });
   }
 
-  async update(id: number, data: Partial<Pick<CreatePoInput, 'supplier_id' | 'warehouse_id' | 'expected_date' | 'order_date' | 'notes' | 'lines'>>, user?: AuthUserContext): Promise<any> {
+  async update(id: number, data: Partial<Pick<CreatePoInput, 'supplier_name' | 'warehouse_id' | 'expected_date' | 'order_date' | 'notes' | 'lines'>>, user?: AuthUserContext): Promise<any> {
     return runInTransaction(async (client) => {
       const po = await repo.findHeaderByIdForUpdate(client, id);
       if (!po) throw new NotFoundError('PurchaseOrder', 'PURCHASE_ORDER_NOT_FOUND');
@@ -219,12 +219,9 @@ export class PurchaseOrdersService {
   
       const fields: Record<string, any> = {};
 
-      if (data.supplier_id !== undefined) {
-        if (data.supplier_id !== null) {
-          const supRes = await client.query('SELECT id FROM suppliers WHERE id = $1 AND is_active = true', [data.supplier_id]);
-          if (!supRes.rows[0]) throw new ValidationError('Supplier not found or inactive', { supplier_id: data.supplier_id });
-        }
-        fields.supplier_id = data.supplier_id;
+      if (data.supplier_name !== undefined) {
+        const cleanName = data.supplier_name == null ? null : data.supplier_name.trim();
+        fields.supplier_name = cleanName && cleanName.length > 0 ? cleanName : '';
       }
 
       if (data.warehouse_id !== undefined && data.warehouse_id !== po.warehouse_id) {
@@ -412,7 +409,6 @@ export class PurchaseOrdersService {
       const rvHeader = await transactionsService.createDraft(
         {
           type: 'RV',
-          supplier_id: po.supplier_id,
           department_id: po.department_id,
           warehouse_id: po.warehouse_id,
           purchase_order_id: po.id,
@@ -829,12 +825,15 @@ export class PurchaseOrdersService {
 // Header select shared between repository findAll/findById and the service's
 // transactional reload. Kept identical to PO_SELECT in the repository.
 const REPO_SELECT = `
-  SELECT po.*, w.is_main AS warehouse_is_main, w.code AS warehouse_code,
+  SELECT po.id, po.po_number, NULLIF(po.supplier_name, '') AS supplier_name, po.warehouse_id, po.department_id,
+         po.status, po.order_date, po.expected_date, po.notes,
+         po.created_by, po.approved_by, po.approved_at,
+         po.cancelled_by, po.cancelled_at, po.received_at, po.is_active,
+         po.created_at, po.updated_at,
+         w.is_main AS warehouse_is_main, w.code AS warehouse_code,
          w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
-         s.name_ar AS supplier_name_ar, s.name_en AS supplier_name_en,
          d.code AS department_code, d.name_ar AS department_name_ar, d.name_en AS department_name_en
   FROM purchase_orders po
-  LEFT JOIN suppliers s ON s.id = po.supplier_id
   JOIN warehouses w ON w.id = po.warehouse_id
   LEFT JOIN departments d ON d.id = po.department_id
   WHERE po.id = $1 AND po.is_active = true`;

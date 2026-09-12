@@ -15,13 +15,13 @@ import { writeAudit } from '../authorization/audit.service';
 export class PurchaseOrdersController {
   async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { status, supplier_id, warehouse_id, search, page, limit } = req.query;
+      const { status, supplier_name, warehouse_id, search, page, limit } = req.query;
       const result = await purchaseOrdersService.getAll(
         page ? Number(page) : 1,
         limit ? Number(limit) : 20,
         {
           status: status as string,
-          supplier_id: supplier_id ? Number(supplier_id) : undefined,
+          supplier_name: typeof supplier_name === 'string' ? supplier_name : undefined,
           warehouse_id: warehouse_id ? Number(warehouse_id) : undefined,
           search: search as string,
         },

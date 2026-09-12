@@ -15,7 +15,14 @@ export const createPurchaseOrderSchema = z
     // department_id is NEVER accepted from the client — the service derives it
     // from the receiving warehouse. Stripped here so a forged value cannot pass.
     department_id: z.undefined().optional(),
-    supplier_id: z.number().int().positive().optional().nullable(),
+    // Free-text supplier (Phase 3 / D6): suppliers live outside the system.
+    // Trimmed + normalized (empty -> null) in the service layer.
+    supplier_name: z
+      .string()
+      .trim()
+      .max(255, 'supplier_name must be at most 255 characters')
+      .optional()
+      .nullable(),
     // warehouse_id is OPTIONAL at the schema level: warehouse managers never
     // send it (the backend derives their department main warehouse), while
     // admin must provide it — enforced in the service per role.
@@ -64,7 +71,14 @@ const poLinePartialSchema = z.object({
 export const updatePurchaseOrderSchema = z
   .object({
     department_id: z.undefined().optional(),
-    supplier_id: z.number().int().positive().optional().nullable(),
+    // Free-text supplier (Phase 3 / D6): suppliers live outside the system.
+    // Trimmed + normalized (empty -> null) in the service layer.
+    supplier_name: z
+      .string()
+      .trim()
+      .max(255, 'supplier_name must be at most 255 characters')
+      .optional()
+      .nullable(),
     warehouse_id: z.number().int().positive().optional(),
     order_date: z.string().nullable().optional(),
     expected_date: z

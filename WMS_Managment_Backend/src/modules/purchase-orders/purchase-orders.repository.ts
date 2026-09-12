@@ -48,7 +48,7 @@ export interface PoLineInput {
 }
 
 export interface CreatePoInput {
-  supplier_id?: number | null;
+  supplier_name?: string | null;
   warehouse_id: number;
   department_id: number | null;
   order_date?: string | null;
@@ -60,18 +60,17 @@ export interface CreatePoInput {
 
 export interface PurchaseOrderFilters {
   status?: string;
-  supplier_id?: number;
+  supplier_name?: string;
   warehouse_id?: number;
   search?: string;
 }
 
 const PO_SELECT = `
-  SELECT po.id, po.po_number, po.supplier_id, po.warehouse_id, po.department_id,
+  SELECT po.id, po.po_number, NULLIF(po.supplier_name, '') AS supplier_name, po.warehouse_id, po.department_id,
          po.status, po.order_date, po.expected_date, po.notes,
          po.created_by, po.approved_by, po.approved_at,
          po.cancelled_by, po.cancelled_at, po.received_at, po.is_active,
          po.created_at, po.updated_at,
-         s.name_ar AS supplier_name_ar, s.name_en AS supplier_name_en,
          w.code AS warehouse_code, w.name_ar AS warehouse_name_ar, w.name_en AS warehouse_name_en,
          w.is_main AS warehouse_is_main,
          d.code AS department_code, d.name_ar AS department_name_ar, d.name_en AS department_name_en,
@@ -84,7 +83,6 @@ const PO_SELECT = `
          COALESCE(line_agg.quantity_allocated, 0)        AS quantity_allocated,
          COALESCE(line_agg.quantity_transferred, 0)      AS quantity_transferred
   FROM purchase_orders po
-  LEFT JOIN suppliers s ON s.id = po.supplier_id
   JOIN warehouses w ON w.id = po.warehouse_id
   LEFT JOIN departments d ON d.id = po.department_id
   LEFT JOIN users cu ON cu.id = po.created_by
@@ -121,10 +119,10 @@ export class PurchaseOrdersRepository {
     let i = 1;
 
     if (filters.status) { where += ` AND po.status::text = $${i++}`; params.push(filters.status); }
-    if (filters.supplier_id) { where += ` AND po.supplier_id = $${i++}`; params.push(filters.supplier_id); }
+    if (filters.supplier_name) { where += ` AND po.supplier_name ILIKE $${i++}`; params.push(`%${filters.supplier_name}%`); }
     if (filters.warehouse_id) { where += ` AND po.warehouse_id = $${i++}`; params.push(filters.warehouse_id); }
     if (filters.search) {
-      where += ` AND (po.po_number ILIKE $${i} OR s.name_ar ILIKE $${i} OR s.name_en ILIKE $${i})`;
+      where += ` AND (po.po_number ILIKE $${i} OR po.supplier_name ILIKE $${i})`;
       params.push(`%${filters.search}%`);
       i++;
     }
@@ -140,7 +138,7 @@ export class PurchaseOrdersRepository {
     const offset = (page - 1) * limit;
     const [listRes, countRes] = await Promise.all([
       pool.query(`${PO_SELECT} ${where} ORDER BY po.created_at DESC LIMIT $${i++} OFFSET $${i++}`, [...params, limit, offset]),
-      pool.query(`SELECT COUNT(*)::int AS total FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id ${where}`, params),
+      pool.query(`SELECT COUNT(*)::int AS total FROM purchase_orders po ${where}`, params),
     ]);
     return { items: listRes.rows, total: countRes.rows[0].total };
   }
@@ -206,12 +204,12 @@ export class PurchaseOrdersRepository {
 
   async insertHeader(client: PoolClient, data: CreatePoInput & { po_number: string }): Promise<any> {
     const res = await client.query(
-      `INSERT INTO purchase_orders (po_number, supplier_id, warehouse_id, department_id, order_date, expected_date, notes, created_by)
+      `INSERT INTO purchase_orders (po_number, supplier_name, warehouse_id, department_id, order_date, expected_date, notes, created_by)
        VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, NOW()), $6, $7, $8)
        RETURNING *`,
       [
         data.po_number,
-        data.supplier_id ?? null,
+        data.supplier_name ?? '',
         data.warehouse_id,
         data.department_id,
         data.order_date ?? null,
@@ -226,7 +224,7 @@ export class PurchaseOrdersRepository {
   async updateHeader(
     client: PoolClient,
     id: number,
-    fields: Partial<{ supplier_id: number | null; warehouse_id: number; department_id: number | null; expected_date: string | null; order_date: string | null; notes: string | null }>
+    fields: Partial<{ supplier_name: string | null; warehouse_id: number; department_id: number | null; expected_date: string | null; order_date: string | null; notes: string | null }>
   ): Promise<any> {
     const keys = Object.keys(fields);
     if (keys.length === 0) return this.findHeaderById(id);
