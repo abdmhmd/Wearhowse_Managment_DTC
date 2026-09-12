@@ -16,16 +16,21 @@ import type { AuthUserContext } from '../authorization/authorization.service';
 /**
  * Material request workflow (enforced by the repository/service state machine):
  *
- *   pending  --(dept manager approves)-->  dept_approved
+ *   pending  --(sub-WH or dept manager approves)-->  wm_approved / dept_approved
  *   dept_approved --(dept manager forwards)--> forwarded
- *   forwarded --(admin approves)--> admin_approved --(admin issues)--> issued
- *   forwarded / pending --(admin rejects)--> admin_rejected
- *   pending / dept_approved / forwarded / admin_approved --(cancel)--> cancelled
+ *   forwarded --(approve)--> admin_approved --(issue)--> issued
+ *   forwarded --(reject)--> admin_rejected
+ *   pending  --(sub-WH rejects, D13)--> wm_rejected
+ *   pending / dept_approved / wm_approved / forwarded / admin_approved --(cancel)--> cancelled
  *
  * - department_manager approves and forwards ONLY requests of their own department
  *   (requests:approve / requests:forward).
- * - admin drives the final steps: approve (of forwarded requests), reject
- *   and issue (requests:approve / requests:reject / requests:issue).
+ * - sub_warehouse_manager approves supervisor-originated requests straight into
+ *   wm_approved and issues them (requests:approve / requests:issue). They may
+ *   also reject a PENDING request before it is approved (requests:reject, D13).
+ * - All authorization is permission-based (user.permissions) — no branch relies
+ *   on `role === 'admin'` anymore. After Phase 2 the system administrator holds
+ *   no requests:* permission, so every admin-only path is unreachable via HTTP.
  */
 export class MaterialRequestsService {
 
@@ -388,9 +393,16 @@ export class MaterialRequestsService {
     return false;
   }
 
-  private assertAdmin(user?: AuthUserContext) {
-    if (user && user.role !== 'admin') {
-      throw new AppError('Only the system administrator can perform this action', 403, 'AUTH_FORBIDDEN');
+  /**
+   * Defensive service-layer permission guard. The route middleware already
+   * enforces permissions; this repeats the check so the service stays safe
+   * when invoked directly (tests, internal callers). A `user` that is
+   * undefined (direct service call) is allowed through, matching the project
+   * convention for legacy/utility invocations.
+   */
+  private assertPermission(user: AuthUserContext | undefined, permission: string) {
+    if (user && !user.permissions.includes(permission)) {
+      throw new AppError(`Missing required permission: ${permission}`, 403, 'AUTH_FORBIDDEN');
     }
   }
 
@@ -427,10 +439,11 @@ export class MaterialRequestsService {
   }
 
   /**
-   * Department-level approval of a 'pending' request (department_manager /
-   * admin) OR warehouse-manager approval of a 'pending' request from a
-   * supervisor (sub_warehouse_manager) OR admin approval of a 'forwarded' request
-   * (admin).
+   * Department-level approval of a 'pending' request (department_manager) OR
+   * warehouse-manager approval of a 'pending' request from a supervisor
+   * (sub_warehouse_manager). The historical admin approval of a 'forwarded'
+   * request still exists for legacy data, but after Phase 2 no role that can
+   * approve holds it — the system administrator has no requests:* permission.
    */
   async approveRequest(requestId: number, approvedBy: number, user?: AuthUserContext) {
     return runInTransaction(async (client) => {
@@ -439,6 +452,7 @@ export class MaterialRequestsService {
       if (user && !this.inScope(request, user)) {
         throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
       }
+      this.assertPermission(user, PERMISSIONS.REQUESTS_APPROVE);
 
       // Mandatory authorization constraint: a department_manager may NEVER
       // approve a request they created themselves. Enforced here in the service
@@ -470,8 +484,9 @@ export class MaterialRequestsService {
       }
 
       if (request.status === 'forwarded') {
-        // Warehouse admin approves the forwarded request.
-        this.assertAdmin(user);
+        // The forwarded → admin_approved step is permission-gated
+        // (requests:approve). The system administrator no longer holds it after
+        // Phase 2, so this transition is unreachable via HTTP for legacy data.
         return materialRequestsRepository.updateStatus(client, requestId, 'admin_approved', {
           approved_by: approvedBy,
         });
@@ -481,7 +496,7 @@ export class MaterialRequestsService {
     });
   }
 
-  /** Department manager forwards a dept-approved request to the warehouse admin. */
+  /** Department manager forwards a dept-approved request to the admin layer. */
   async forwardRequest(requestId: number, forwardedBy: number, user?: AuthUserContext) {
     return runInTransaction(async (client) => {
       const request = await materialRequestsRepository.findByIdForUpdate(client, requestId);
@@ -489,6 +504,7 @@ export class MaterialRequestsService {
       if (user && !this.inScope(request, user)) {
         throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
       }
+      this.assertPermission(user, PERMISSIONS.REQUESTS_FORWARD);
 
       if (request.status !== 'dept_approved') {
         throw new ValidationError(
@@ -510,18 +526,33 @@ export class MaterialRequestsService {
       if (user && !this.inScope(request, user)) {
         throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
       }
+      this.assertPermission(user, PERMISSIONS.REQUESTS_REJECT);
 
-      // Admin rejection: allowed while the request is forwarded to the admin,
-      // or while it is still awaiting department approval (early rejection).
-      if (request.status !== 'forwarded' && request.status !== 'pending') {
-        throw new ValidationError(`Cannot reject a request with status '${request.status}'`, { status: request.status });
+      // D13: a sub-warehouse manager rejects a request BEFORE it is approved.
+      // Pending requests land in wm_rejected (never issued). Legacy forwarded
+      // requests are still rejected into admin_rejected. An already-approved
+      // request can NEVER be rejected — that would silently discard a stock
+      // decision (conflict, 409).
+      if (request.status === 'pending') {
+        return materialRequestsRepository.updateStatus(client, requestId, 'wm_rejected', {
+          rejected_by: rejectedBy,
+          rejection_reason: reason,
+        });
       }
-      if (request.status === 'forwarded') this.assertAdmin(user);
-
-      return materialRequestsRepository.updateStatus(client, requestId, 'admin_rejected', {
-        rejected_by: rejectedBy,
-        rejection_reason: reason,
-      });
+      if (request.status === 'forwarded') {
+        return materialRequestsRepository.updateStatus(client, requestId, 'admin_rejected', {
+          rejected_by: rejectedBy,
+          rejection_reason: reason,
+        });
+      }
+      if (['wm_approved', 'dept_approved', 'admin_approved'].includes(request.status)) {
+        throw new ConflictError(
+          `Cannot reject a request with status '${request.status}'. It has already been approved.`,
+          'REQUEST_ALREADY_APPROVED',
+          { status: request.status }
+        );
+      }
+      throw new ValidationError(`Cannot reject a request with status '${request.status}'`, { status: request.status });
     });
   }
 
@@ -540,9 +571,12 @@ export class MaterialRequestsService {
         });
         throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
       }
+      this.assertPermission(user, PERMISSIONS.REQUESTS_ISSUE);
 
-      // Admin can issue from admin_approved; warehouse manager can issue from
-      // wm_approved (supervisor-originated requests routed directly to them).
+      // The sub-warehouse manager issues supervisor-originated requests from
+      // wm_approved. The historical admin_approved issue path is kept for
+      // legacy data but is permission-gated: the system administrator holds no
+      // requests:* permission after Phase 2, so it is unreachable via HTTP.
       if (user?.role === 'sub_warehouse_manager') {
         if (request.status !== 'wm_approved') {
           logger.warn('[ISSUE_FAILED] Invalid status for WM issue', 'material-requests', {
@@ -555,7 +589,6 @@ export class MaterialRequestsService {
           );
         }
       } else {
-        this.assertAdmin(user);
         if (request.status !== 'admin_approved') {
           logger.warn('[ISSUE_FAILED] Invalid status for admin issue', 'material-requests', {
             requestId, issuedBy, requestStatus: request.status, expectedStatus: 'admin_approved',
@@ -735,15 +768,21 @@ export class MaterialRequestsService {
       const request = await materialRequestsRepository.findByIdForUpdate(client, requestId);
       if (!request) throw new NotFoundError('MaterialRequest', 'REQUEST_NOT_FOUND', { id: requestId });
       // State machine: cancellable until admin approval (admin_approved is only
-      // cancellable by an admin, before the stock is actually issued).
+      // cancellable by a user holding requests:cancel, before the stock is
+      // actually issued).
       const cancellableByOwner = ['pending', 'dept_approved', 'wm_approved', 'forwarded'].includes(request.status);
-      const cancellableByAdmin = ['pending', 'dept_approved', 'wm_approved', 'forwarded', 'admin_approved'].includes(request.status);
+      const cancellableByCancelRole = ['pending', 'dept_approved', 'wm_approved', 'forwarded', 'admin_approved'].includes(request.status);
 
-      // Ownership check: only admin may cancel someone else's request;
-      // every other user may only cancel their own cancellable requests.
-      const isAdmin = cancellerRole === 'admin';
+      // Ownership check: only the system administrator master-canceller (additionally
+      // guarded by the requests:cancel permission when the caller provides a
+      // user context) may cancel someone else's request; every other user may
+      // only cancel their own cancellable requests. The system administrator
+      // lost requests:cancel in Phase 2, so its admin-cancel path is unreachable
+      // via HTTP.
+      const hasCancelPermission = user?.permissions.includes(PERMISSIONS.REQUESTS_CANCEL) ?? true;
+      const isAdmin = cancellerRole === 'admin' && hasCancelPermission;
       if (isAdmin) {
-        if (!cancellableByAdmin) {
+        if (!cancellableByCancelRole) {
           throw new ValidationError(`Cannot cancel a request with status '${request.status}'`, { status: request.status }, 'INVALID_REQUEST_STATUS');
         }
       } else {

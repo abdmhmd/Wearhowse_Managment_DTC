@@ -355,7 +355,7 @@ export class PurchaseOrdersService {
 
       const openRes = await client.query(
         `SELECT COALESCE(SUM(quantity_allocated - quantity_transferred), 0)::float8 AS open_qty
-         FROM purchase_order_allocations WHERE po_id = $1 AND status IN ('allocated', 'partially_transferred')`,
+         FROM purchase_order_allocations WHERE po_id = $1 AND status IN ('allocated', 'partially_transferred', 'pending_confirmation')`,
         [id]
       );
       if (Number(openRes.rows[0].open_qty) > 0) {
@@ -616,33 +616,37 @@ export class PurchaseOrdersService {
       );
       await transactionsService.approveTransaction(trfHeader.id!, user!.id, client);
 
-      // 3. Allocation bookkeeping.
+      // 3. Allocation bookkeeping. D9: a transfer is NOT final until a second
+      //    user confirms it. The TRF already moved physical stock, so the
+      //    allocation enters 'pending_confirmation' and the pending TRF id is
+      //    recorded for the confirmation step. Any previous confirmation is
+      //    reset so a re-transfer must be re-confirmed.
       const newTransferred = Number(allocation.quantity_transferred) + quantity;
-      const newStatus = newTransferred >= Number(allocation.quantity_allocated)
-        ? 'transferred'
-        : 'partially_transferred';
       await client.query(
         `UPDATE purchase_order_allocations
-         SET quantity_transferred = $2, status = $3::allocation_status,
-             transferred_by = $4, transferred_at = NOW(), transfer_transaction_id = $5
+         SET quantity_transferred = $2,
+             status = 'pending_confirmation'::allocation_status,
+             transferred_by = $3, transferred_at = NOW(), transfer_transaction_id = $4,
+             pending_transaction_id = $4,
+             transfer_confirmed_by = NULL, transfer_confirmed_at = NULL
          WHERE id = $1`,
-        [allocationId, newTransferred, newStatus, user!.id, trfHeader.id!]
+        [allocationId, newTransferred, user!.id, trfHeader.id!]
       );
 
       // 4. Parent aggregates.
       await repo.incrementDetailTransferred(client, allocation.po_detail_id, quantity);
 
       logger.info(
-        `[PO_TRANSFERRED] Allocation #${allocationId}: ${quantity} moved via TRF ${trfHeader.transaction_no}`,
+        `[PO_TRANSFERRED] Allocation #${allocationId}: ${quantity} moved via TRF ${trfHeader.transaction_no} (awaiting confirmation)`,
         'purchase-orders'
       );
 
       return {
-        message: 'Stock transferred successfully',
+        message: 'Stock transferred successfully; awaiting confirmation by another user',
         allocation_id: allocationId,
         transaction_id: trfHeader.id,
         transaction_no: trfHeader.transaction_no,
-        status: newStatus,
+        status: 'pending_confirmation',
         quantity_transferred: newTransferred,
         remaining: Number(allocation.quantity_allocated) - newTransferred,
       };
@@ -724,6 +728,15 @@ export class PurchaseOrdersService {
         );
       }
 
+      // D9: two-party confirmation — the user who created the PO may not
+      // confirm its own receipt.
+      if (user && po.created_by === user.id) {
+        throw new ForbiddenError(
+          'Cannot confirm receipt of a purchase order you created. Another user must confirm it.',
+          { po_id: id, created_by: po.created_by }
+        );
+      }
+
       await client.query(
         `UPDATE purchase_orders
          SET receive_confirmed_by = $2, receive_confirmed_at = NOW()
@@ -742,7 +755,10 @@ export class PurchaseOrdersService {
       if (!allocation) throw new NotFoundError('Allocation', 'ALLOCATION_NOT_FOUND');
       this.assertPoInScope({ warehouse_id: allocation.source_warehouse_id }, user);
 
-      if (!['transferred', 'partially_transferred'].includes(allocation.status)) {
+      // D9: only a transfer that has physically moved stock (pending_confirmation)
+      // can be confirmed. Legacy rows already finalised as transferred are also
+      // accepted so repeated confirms stay idempotent.
+      if (!['pending_confirmation', 'transferred', 'partially_transferred'].includes(allocation.status)) {
         throw new ValidationError(
           `Cannot confirm transfer for an allocation with status '${allocation.status}'. It must be transferred first.`,
           { status: allocation.status },
@@ -750,21 +766,35 @@ export class PurchaseOrdersService {
         );
       }
 
+      // D9: two-party confirmation — the user who executed the transfer may not
+      // confirm their own movement.
+      if (user && allocation.transferred_by === user.id) {
+        throw new ForbiddenError(
+          'Cannot confirm a transfer you executed yourself. Another user must confirm it.',
+          { allocation_id: allocationId, transferred_by: allocation.transferred_by }
+        );
+      }
+
+      const finalStatus = Number(allocation.quantity_transferred) >= Number(allocation.quantity_allocated)
+        ? 'transferred'
+        : 'partially_transferred';
       await client.query(
         `UPDATE purchase_order_allocations
-         SET transfer_confirmed_by = $2, transfer_confirmed_at = NOW()
+         SET transfer_confirmed_by = $2, transfer_confirmed_at = NOW(),
+             status = $3::allocation_status
          WHERE id = $1`,
-        [allocationId, user!.id]
+        [allocationId, user!.id, finalStatus]
       );
 
       logger.info(
-        `[PO_TRANSFER_CONFIRMED] Allocation #${allocationId} transfer confirmed by user ${user!.id}`,
+        `[PO_TRANSFER_CONFIRMED] Allocation #${allocationId} transfer confirmed by user ${user!.id} → ${finalStatus}`,
         'purchase-orders'
       );
 
       return {
         message: 'Transfer confirmed successfully',
         allocation_id: allocationId,
+        status: finalStatus,
         transfer_confirmed_by: user!.id,
         transfer_confirmed_at: new Date(),
       };

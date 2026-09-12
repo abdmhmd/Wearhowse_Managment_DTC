@@ -1,9 +1,10 @@
 import { runInTransaction, pool } from '../../config/database';
 import { custodiesRepository, CustodyStatus, CustodyCondition } from './custodies.repository';
 import { transactionsService } from '../transactions/transactions.service';
-import { NotFoundError, ValidationError } from '../../utils/AppError';
+import { NotFoundError, ValidationError, ForbiddenError } from '../../utils/AppError';
 import { PaginationMeta } from '../../utils/response';
 import { scopeForUser, type DataScope } from '../authorization/scope';
+import { PERMISSIONS } from '../authorization/permissions';
 import type { AuthUserContext } from '../authorization/authorization.service';
 
 async function custodyInScope(
@@ -116,6 +117,10 @@ export class CustodiesService {
       if (user && !(await custodyInScope(custody, user))) {
         throw new NotFoundError('Custody', 'CUSTODY_NOT_FOUND', { id });
       }
+      // Defensive permission guard (route middleware enforces the same).
+      if (user && !user.permissions.includes(PERMISSIONS.CUSTODIES_RETURN)) {
+        throw new ForbiddenError('Missing required permission: custodies:return');
+      }
 
       if (custody.status !== 'active') {
         throw new ValidationError('Custody is already returned', { id, status: custody.status });
@@ -135,7 +140,10 @@ export class CustodiesService {
       }
 
       // Supervisor / department_manager (NONE scope): request return instead
-      // of immediately restoring stock. The warehouse manager confirms.
+      // of immediately restoring stock. D15: the supervisor initiates the
+      // return WITHOUT a condition — only the confirming sub-warehouse manager
+      // evaluates and sets the condition via receiveReturn. The supervisor's
+      // condition field is intentionally not persisted here.
       if (user) {
         const scope: DataScope = scopeForUser(user);
         if (scope === 'NONE' && user.id) {
@@ -215,12 +223,20 @@ export class CustodiesService {
   }
 
   /**
-   * Warehouse manager confirms receipt of a return_pending custody.
-   * Creates the RTI transaction and restores stock.
+   * Sub-warehouse manager confirms receipt of a return_pending custody and
+   * evaluates its condition (D15). Creates the RTI transaction and restores
+   * stock for 'good' condition; preserves the record for 'damaged'/'lost'.
+   *
+   * Routing note (Phase 2 / D3): the sub-warehouse manager is the sole
+   * custodian-write confirmation role. The `custodies:return` permission is
+   * also held by supervisors (so they can INITIATE returns), so a role check
+   * here routes the confirmation step to the correct custodian instead of
+   * letting the initiator self-confirm.
    */
   async receiveReturn(
     id: number,
     receivedBy: number,
+    condition?: CustodyCondition | null,
     user?: AuthUserContext
   ) {
     return runInTransaction(async (client) => {
@@ -228,6 +244,9 @@ export class CustodiesService {
       if (!custody) throw new NotFoundError('Custody', 'CUSTODY_NOT_FOUND', { id });
       if (user && !(await custodyInScope(custody, user))) {
         throw new NotFoundError('Custody', 'CUSTODY_NOT_FOUND', { id });
+      }
+      if (user && user.role !== 'sub_warehouse_manager') {
+        throw new ForbiddenError('Only the sub-warehouse manager can confirm a custody return');
       }
 
       if (custody.status !== 'return_pending') {
@@ -239,14 +258,19 @@ export class CustodiesService {
 
       const borrowedQty = Number(custody.quantity) || 0;
       const pendingQty = Number(custody.pending_return_quantity) || borrowedQty;
-      const condition = custody.condition ?? 'good';
+      // D15: the confirming Sub-WH sets the condition (defaults to a previously
+      // recorded one, then 'good').
+      const conditionValue = condition ?? custody.condition ?? 'good';
+      if (condition && !['good', 'damaged', 'lost'].includes(condition)) {
+        throw new ValidationError('Invalid return condition', { condition });
+      }
 
       // Damaged / lost: no stock restoration; preserve the record.
-      if (condition !== 'good') {
-        await custodiesRepository.markUnrestored(client, id, condition, custody.return_notes ?? null);
+      if (conditionValue !== 'good') {
+        await custodiesRepository.markUnrestored(client, id, conditionValue, custody.return_notes ?? null);
         return {
-          message: `Material received as ${condition}`,
-          status: condition,
+          message: `Material received as ${conditionValue}`,
+          status: conditionValue,
           custody_id: id,
         };
       }

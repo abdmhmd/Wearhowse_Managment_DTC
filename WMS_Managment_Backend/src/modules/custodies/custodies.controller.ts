@@ -70,13 +70,14 @@ export class CustodiesController {
     try {
       const id = Number(req.params.id);
       if (isNaN(id)) throw new ValidationError('Invalid custody ID');
-      const result = await custodiesService.receiveReturn(id, req.user!.id, req.user);
+      const condition = typeof req.body?.condition === 'string' ? req.body.condition : undefined;
+      const result = await custodiesService.receiveReturn(id, req.user!.id, condition, req.user);
       await writeAudit({
         user_id: req.user!.id,
         action: 'CUSTODY_RECEIVED',
         resource: 'custodies',
         resource_id: id,
-        details: { action: 'receive_return' },
+        details: { action: 'receive_return', condition: condition ?? null },
         ip_address: req.ip,
         user_agent: req.headers?.['user-agent'] ?? null,
       });

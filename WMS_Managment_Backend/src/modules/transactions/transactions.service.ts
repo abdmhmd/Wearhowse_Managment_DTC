@@ -32,6 +32,19 @@ export class TransactionsService {
     const scope: DataScope = scopeForUser(user);
     if (scope === 'GLOBAL') return true;
     if (scope === 'DEPARTMENT') {
+      // D11: a department_manager is blind to the department's main warehouse.
+      // A row is only visible when it touches one of the department's
+      // sub-warehouses — never a main warehouse, regardless of the
+      // department_id column.
+      if (user.role === 'department_manager') {
+        const whIds = [header.warehouse_id, header.to_warehouse_id].filter((v): v is number => v != null);
+        if (whIds.length === 0) return false;
+        const res = await pool.query(
+          'SELECT 1 FROM warehouses WHERE id = ANY($1) AND department_id = $2 AND is_active = true AND is_main = false LIMIT 1',
+          [whIds, user.department_id]
+        );
+        return res.rows.length > 0;
+      }
       if (header.department_id === user.department_id) return true;
       const whIds = [header.warehouse_id, header.to_warehouse_id].filter((v): v is number => v != null);
       if (whIds.length === 0) return false;
@@ -62,13 +75,22 @@ export class TransactionsService {
       const scope: DataScope = scopeForUser(user);
       if (scope === 'DEPARTMENT' && user.department_id != null) {
         const cond = where ? ' AND ' : ' WHERE ';
-        // Transactions of the department itself OR involving the department's
-        // own warehouses (e.g. LN vouchers issued from the department's main
-        // warehouse).
-        where += `${cond} (department_id = $${paramIndex++}
+        if (user.role === 'department_manager') {
+          // D11: a department_manager only ever sees rows touching the
+          // department's sub-warehouses. The department_id column alone is NOT
+          // sufficient (a main-warehouse row would otherwise leak through).
+          where += `${cond} (warehouse_id IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${paramIndex++} AND w.is_active = true AND w.is_main = false)
+              OR to_warehouse_id IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${paramIndex++} AND w.is_active = true AND w.is_main = false))`;
+          params.push(user.department_id, user.department_id);
+        } else {
+          // Transactions of the department itself OR involving the department's
+          // own warehouses (e.g. LN vouchers issued from the department's main
+          // warehouse).
+          where += `${cond} (department_id = $${paramIndex++}
               OR warehouse_id IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${paramIndex++} AND w.is_active = true)
               OR to_warehouse_id IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${paramIndex++} AND w.is_active = true))`;
-        params.push(user.department_id, user.department_id, user.department_id);
+          params.push(user.department_id, user.department_id, user.department_id);
+        }
       } else if (scope === 'WAREHOUSE' && user.warehouse_ids.length > 0) {
         const cond = where ? ' AND ' : ' WHERE ';
         where += `${cond} (warehouse_id = ANY($${paramIndex++}) OR to_warehouse_id = ANY($${paramIndex++}))`;

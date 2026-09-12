@@ -111,9 +111,14 @@ export function warehouseAccessClause(
     const parts: string[] = [];
     const params: any[] = [];
     if (user.department_id != null) {
+      // D11: a department_manager sees ONLY the department's sub-warehouses,
+      // never its main warehouse. sub_warehouse_manager users who resolve to
+      // DEPARTMENT (they have a department assigned) keep full department
+      // visibility, including the main warehouse they issue from.
+      const excludeMain = user.role === 'department_manager' ? ' AND w.is_main = false' : '';
       params.push(user.department_id);
       parts.push(
-        `${warehouseCol} IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${startIndex + params.length - 1} AND w.is_active = true)`
+        `${warehouseCol} IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${startIndex + params.length - 1} AND w.is_active = true${excludeMain})`
       );
     }
     if (user.warehouse_ids.length > 0) {

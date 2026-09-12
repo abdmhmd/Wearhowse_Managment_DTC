@@ -237,7 +237,7 @@ export class CustodiesRepository {
            condition = $3::custody_condition,
            returned_at = NOW(),
            notes = COALESCE($4, notes)
-       WHERE id = $1 AND is_active = true AND status = 'active'
+       WHERE id = $1 AND is_active = true AND status IN ('active', 'return_pending')
        RETURNING *`,
       [id, status, status, notes ?? null]
     );

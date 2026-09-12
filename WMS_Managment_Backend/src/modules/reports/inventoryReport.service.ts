@@ -154,8 +154,10 @@ export class InventoryReportService {
           const parts: string[] = [];
           let idx = movementParams.length + 1;
           if (filters.user.department_id != null) {
+            // D11: a department_manager never sees main-warehouse movements.
+            const excludeMain = filters.user.role === 'department_manager' ? ' AND w.is_main = false' : '';
             parts.push(
-              `sm.warehouse_id IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${idx} AND w.is_active = true)`
+              `sm.warehouse_id IN (SELECT w.id FROM warehouses w WHERE w.department_id = $${idx} AND w.is_active = true${excludeMain})`
             );
             movementParams.push(filters.user.department_id);
             idx++;

@@ -10,6 +10,7 @@ export type RequestStatus =
   | 'forwarded'        // forwarded by the department manager to the warehouse admin
   | 'admin_approved'   // approved by the warehouse admin
   | 'admin_rejected'   // rejected by the warehouse admin
+  | 'wm_rejected'      // rejected by the sub-warehouse manager BEFORE approval (Phase 2 / D13)
   | 'issued'           // stock issued (transaction completed)
   | 'cancelled';       // cancelled by the creator or an admin
 export type RequestPriority = 'low' | 'normal' | 'high' | 'urgent';
@@ -259,6 +260,7 @@ export class MaterialRequestsRepository {
     if (status === 'forwarded')      { sets.push(`forwarded_by = $${idx++}`, `forwarded_at = NOW()`); vals.push(options?.forwarded_by); }
     if (status === 'admin_approved') { sets.push(`approved_by = $${idx++}`, `approved_at = NOW()`); vals.push(options?.approved_by); }
     if (status === 'admin_rejected') { sets.push(`rejected_by = $${idx++}`, `rejection_reason = $${idx++}`); vals.push(options?.rejected_by, options?.rejection_reason); }
+    if (status === 'wm_rejected')    { sets.push(`rejected_by = $${idx++}`, `rejection_reason = $${idx++}`); vals.push(options?.rejected_by, options?.rejection_reason); }
     if (status === 'issued')         { sets.push(`issued_by = $${idx++}`, `issued_at = NOW()`, `transaction_id = $${idx++}`); vals.push(options?.issued_by, options?.transaction_id); }
 
     const res = await (client as any).query(
