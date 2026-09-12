@@ -31,11 +31,35 @@
     "supervisor": "Supervisor"
   },
   "auth": {
-    "login": "Sign in",
     "username": "Username",
     "password": "Password",
     "welcomeBack": "Welcome back, {{name}}!",
-    "loginFailed": "Login failed. Please try again."
+    "forgotPasswordTitle": "Forgot your password?",
+    "forgotPasswordHelp": "Contact your administrator to reset your password.",
+    "forgotPasswordDetails": "Call: [TBD] — Email: [TBD]",
+    "login": {
+      "title": "Sign in to your account",
+      "submit": "Sign in",
+      "submitting": "Signing in...",
+      "forgotPassword": "Forgot your password?",
+      "attempts": {
+        "remaining": "{{count}} attempt(s) remaining before additional delay.",
+        "resetHint": "Having trouble? Try resetting your password."
+      },
+      "errors": {
+        "AUTH_INVALID_CREDENTIALS": "Username or password is incorrect.",
+        "AUTH_ACCOUNT_DISABLED": "Your account is disabled. Contact your administrator.",
+        "AUTH_ROLE_DISABLED": "Your role is inactive. Contact your administrator.",
+        "AUTH_RATE_LIMITED": "Too many login attempts. Please try again later.",
+        "ERROR": "Login failed. Please try again."
+      },
+      "validation": {
+        "USERNAME_TOO_SHORT": "Username must be at least 3 characters long.",
+        "USERNAME_INVALID_CHARS": "Username may contain only letters, numbers, dots, underscores and dashes.",
+        "USERNAME_TOO_LONG": "Username must be 50 characters or fewer.",
+        "PASSWORD_TOO_SHORT": "Password must be at least 6 characters long."
+      }
+    }
   },
   "common": {
     "save": "Save",
