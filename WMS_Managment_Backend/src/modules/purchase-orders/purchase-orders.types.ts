@@ -6,18 +6,8 @@ export type PurchaseOrderStatus =
   | 'closed'
   | 'cancelled';
 
-export type AllocationStatus =
-  | 'allocated'
-  | 'partially_transferred'
-  | 'transferred'
-  | 'cancelled'
-  | 'pending_confirmation';
-
 /** Statuses in which a PO can still receive stock. */
 export const RECEIVABLE_STATUSES: PurchaseOrderStatus[] = ['approved', 'partially_received'];
-
-/** Statuses in which a PO can be allocated from. */
-export const ALLOCATABLE_STATUSES: PurchaseOrderStatus[] = ['approved', 'partially_received', 'received'];
 
 /**
  * Valid PO status transitions (server-authoritative).

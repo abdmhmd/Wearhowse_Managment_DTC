@@ -135,12 +135,3 @@ export const receivePoSchema = z.object({
     }),
 });
 
-export const allocatePoSchema = z.object({
-  detail_id: z.number({ message: 'detail_id is required' }).int().positive(),
-  dest_warehouse_id: z.number({ message: 'dest_warehouse_id is required' }).int().positive(),
-  quantity: z.number({ message: 'quantity is required' }).positive('quantity must be greater than 0'),
-});
-
-export const transferAllocationSchema = z.object({
-  quantity: z.number({ message: 'quantity is required' }).positive('quantity must be greater than 0'),
-});

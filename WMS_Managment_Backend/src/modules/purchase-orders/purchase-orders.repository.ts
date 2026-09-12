@@ -70,6 +70,7 @@ const PO_SELECT = `
          po.status, po.order_date, po.expected_date, po.notes,
          po.created_by, po.approved_by, po.approved_at,
          po.cancelled_by, po.cancelled_at, po.received_at, po.is_active,
+         po.receive_confirmed_by, po.receive_confirmed_at,
          po.created_at, po.updated_at,
          -- Auto-PO linkage: which purchase request generated this PO (1-to-1).
          preq.id AS purchase_request_id,
@@ -80,25 +81,34 @@ const PO_SELECT = `
          cu.username AS created_by_username, cu.full_name AS created_by_name,
          au.full_name AS approved_by_name,
          xu.full_name AS cancelled_by_name,
+         ru.full_name AS receive_confirmed_by_name,
          COALESCE(line_agg.lines_count, 0)::int          AS lines_count,
          COALESCE(line_agg.quantity_ordered, 0)          AS quantity_ordered,
          COALESCE(line_agg.quantity_received, 0)         AS quantity_received,
-         COALESCE(line_agg.quantity_allocated, 0)        AS quantity_allocated,
-         COALESCE(line_agg.quantity_transferred, 0)      AS quantity_transferred
+         -- [D8] Auto-created transfer linkage (draft TRF -> Sub-WH confirm).
+         po.linked_transfer_id,
+         po.auto_transfer_created,
+         lt.transaction_no                               AS linked_transfer_no,
+         lt.status::text                                 AS linked_transfer_status,
+         ltw.id                                          AS linked_transfer_dest_warehouse_id,
+         ltw.code                                        AS linked_transfer_dest_warehouse_code,
+         ltw.name_ar                                     AS linked_transfer_dest_warehouse_name_ar,
+         ltw.name_en                                     AS linked_transfer_dest_warehouse_name_en
   FROM purchase_orders po
   JOIN warehouses w ON w.id = po.warehouse_id
   LEFT JOIN departments d ON d.id = po.department_id
   LEFT JOIN users cu ON cu.id = po.created_by
   LEFT JOIN users au ON au.id = po.approved_by
   LEFT JOIN users xu ON xu.id = po.cancelled_by
+  LEFT JOIN users ru ON ru.id = po.receive_confirmed_by
   LEFT JOIN purchase_requests preq ON preq.purchase_order_id = po.id
+  LEFT JOIN transactions lt ON lt.id = po.linked_transfer_id
+  LEFT JOIN warehouses ltw ON ltw.id = lt.to_warehouse_id
   LEFT JOIN (
     SELECT po_id,
            COUNT(*)::int                AS lines_count,
            SUM(quantity_ordered)        AS quantity_ordered,
-           SUM(quantity_received)       AS quantity_received,
-           SUM(quantity_allocated)      AS quantity_allocated,
-           SUM(quantity_transferred)    AS quantity_transferred
+           SUM(quantity_received)       AS quantity_received
     FROM purchase_order_details
     GROUP BY po_id
   ) line_agg ON line_agg.po_id = po.id
@@ -147,7 +157,7 @@ export class PurchaseOrdersRepository {
     return { items: listRes.rows, total: countRes.rows[0].total };
   }
 
-  /** Header + details + allocations with display names. Returns null when not found or soft-deleted. */
+  /** Header + details with display names. Returns null when not found or soft-deleted. */
   async findById(id: number): Promise<any | null> {
     const headerRes = await pool.query(`${PO_SELECT} WHERE po.id = $1 AND po.is_active = true`, [id]);
     const header = headerRes.rows[0];
@@ -165,28 +175,7 @@ export class PurchaseOrdersRepository {
       [id]
     );
 
-    const allocationsRes = await pool.query(
-      `SELECT poa.*,
-              i.item_code, i.name_ar AS item_name_ar, i.name_en AS item_name_en,
-              sw.code AS source_warehouse_code, sw.name_ar AS source_warehouse_name_ar, sw.name_en AS source_warehouse_name_en,
-              dw.code AS dest_warehouse_code, dw.name_ar AS dest_warehouse_name_ar, dw.name_en AS dest_warehouse_name_en,
-              ab.full_name AS allocated_by_name,
-              tb.full_name AS transferred_by_name,
-              t.transaction_no AS transfer_transaction_no
-       FROM purchase_order_allocations poa
-       JOIN purchase_order_details pod ON pod.id = poa.po_detail_id
-       JOIN items i ON i.id = pod.item_id
-       JOIN warehouses sw ON sw.id = poa.source_warehouse_id
-       JOIN warehouses dw ON dw.id = poa.dest_warehouse_id
-       LEFT JOIN users ab ON ab.id = poa.allocated_by
-       LEFT JOIN users tb ON tb.id = poa.transferred_by
-       LEFT JOIN transactions t ON t.id = poa.transfer_transaction_id
-       WHERE poa.po_id = $1
-       ORDER BY poa.id`,
-      [id]
-    );
-
-    return { ...header, details: detailsRes.rows, allocations: allocationsRes.rows };
+    return { ...header, details: detailsRes.rows };
   }
 
   async findHeaderById(id: number): Promise<any | null> {
@@ -292,89 +281,6 @@ export class PurchaseOrdersRepository {
     const res = await client.query('SELECT * FROM purchase_order_details WHERE id = $1 FOR UPDATE', [detailId]);
     return res.rows[0] || null;
   }
-
-  async incrementDetailAllocated(client: PoolClient, detailId: number, qty: number): Promise<void> {
-    // The CHECK constraint ck_pod_allocated_le_received is the final guard:
-    // if it is violated the whole transaction rolls back.
-    await client.query(
-      'UPDATE purchase_order_details SET quantity_allocated = quantity_allocated + $2 WHERE id = $1',
-      [detailId, qty]
-    );
-  }
-
-  async incrementDetailTransferred(client: PoolClient, detailId: number, qty: number): Promise<void> {
-    await client.query(
-      'UPDATE purchase_order_details SET quantity_transferred = quantity_transferred + $2 WHERE id = $1',
-      [detailId, qty]
-    );
-  }
-
-  // ── Allocations ──────────────────────────────────────────────────────────
-
-  async insertAllocation(
-    client: PoolClient,
-    data: {
-      po_detail_id: number;
-      po_id: number;
-      source_warehouse_id: number;
-      dest_warehouse_id: number;
-      quantity_allocated: number;
-      receive_transaction_id?: number | null;
-      allocated_by: number;
-    }
-  ): Promise<any> {
-    const res = await client.query(
-      `INSERT INTO purchase_order_allocations
-         (po_detail_id, po_id, source_warehouse_id, dest_warehouse_id, quantity_allocated, status, receive_transaction_id, allocated_by, allocated_at)
-       VALUES ($1, $2, $3, $4, $5, 'allocated', $6, $7, NOW())
-       RETURNING *`,
-      [
-        data.po_detail_id,
-        data.po_id,
-        data.source_warehouse_id,
-        data.dest_warehouse_id,
-        data.quantity_allocated,
-        data.receive_transaction_id ?? null,
-        data.allocated_by,
-      ]
-    );
-    return res.rows[0];
-  }
-
-  async findAllocationById(id: number): Promise<any | null> {
-    const res = await pool.query(
-      `SELECT poa.*, po.warehouse_id AS po_warehouse_id, po.po_number, po.status AS po_status,
-              po.department_id AS po_department_id
-       FROM purchase_order_allocations poa JOIN purchase_orders po ON po.id = poa.po_id
-       WHERE poa.id = $1`,
-      [id]
-    );
-    return res.rows[0] || null;
-  }
-
-  async findAllocationByIdForUpdate(client: PoolClient, id: number): Promise<any | null> {
-    const res = await client.query(
-      `SELECT poa.*, po.warehouse_id AS po_warehouse_id, po.po_number, po.status AS po_status,
-              po.department_id AS po_department_id
-       FROM purchase_order_allocations poa JOIN purchase_orders po ON po.id = poa.po_id
-       WHERE poa.id = $1 FOR UPDATE OF poa`,
-      [id]
-    );
-    return res.rows[0] || null;
-  }
-
-  /**
-   * OPEN reservation per (item, source warehouse) across ALL purchase orders —
-   * the overlay subtracted from physical stock to obtain availability.
-   */
-  static readonly OPEN_ALLOCATION_SQL = `
-    SELECT pod.item_id, poa.source_warehouse_id,
-           SUM(poa.quantity_allocated - poa.quantity_transferred) AS open_qty
-    FROM purchase_order_allocations poa
-    JOIN purchase_order_details pod ON pod.id = poa.po_detail_id
-    WHERE poa.status IN ('allocated', 'partially_transferred')
-    GROUP BY pod.item_id, poa.source_warehouse_id
-  `;
 }
 
 export const purchaseOrdersRepository = new PurchaseOrdersRepository();
