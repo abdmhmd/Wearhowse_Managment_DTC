@@ -70,4 +70,28 @@ describe('Frontend API Error Mapper', () => {
     const mapped = mapApiError(error);
     expect(mapped.key).toBe('errors.unexpected');
   });
+
+  it('maps AUTH_INVALID_CREDENTIALS to the generic login error', () => {
+    const error = { response: { status: 401, data: { error: { code: 'AUTH_INVALID_CREDENTIALS' } } } };
+    expect(mapApiError(error).key).toBe('auth.login.errors.AUTH_INVALID_CREDENTIALS');
+    expect(isKnownBusinessError(error)).toBe(true);
+  });
+
+  it('maps AUTH_ACCOUNT_DISABLED to the disabled-account login error', () => {
+    const error = { response: { status: 401, data: { error: { code: 'AUTH_ACCOUNT_DISABLED' } } } };
+    expect(mapApiError(error).key).toBe('auth.login.errors.AUTH_ACCOUNT_DISABLED');
+    expect(isKnownBusinessError(error)).toBe(true);
+  });
+
+  it('maps AUTH_ROLE_DISABLED to the disabled-role login error', () => {
+    const error = { response: { status: 401, data: { error: { code: 'AUTH_ROLE_DISABLED' } } } };
+    expect(mapApiError(error).key).toBe('auth.login.errors.AUTH_ROLE_DISABLED');
+    expect(isKnownBusinessError(error)).toBe(true);
+  });
+
+  it('maps AUTH_RATE_LIMITED to the rate-limited login error', () => {
+    const error = { response: { status: 429, data: { error: { code: 'AUTH_RATE_LIMITED' } } } };
+    expect(mapApiError(error).key).toBe('auth.login.errors.AUTH_RATE_LIMITED');
+    expect(isKnownBusinessError(error)).toBe(true);
+  });
 });
