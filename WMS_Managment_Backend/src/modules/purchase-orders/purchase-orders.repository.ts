@@ -8,33 +8,35 @@ import type { PurchaseOrderStatus } from './purchase-orders.types';
  * Scope clause for purchase orders.
  *
  * - admin sees every PO (GLOBAL).
- * - sub_warehouse_manager sees only POs whose RECEIVING (main) warehouse is
- *   explicitly assigned to them; zero-assignment sub-warehouse managers
- *   resolve to FALSE (fail closed) — the material-request zero-assignment
- *   fallback does not apply to procurement.
+ * - A sub_warehouse_manager sees only POs whose RECEIVING warehouse is
+ *   personally assigned to them via `user_warehouses` — regardless of whether
+ *   the manager is department-assigned (DEPARTMENT scope, the mandatory
+ *   production shape) or not (WAREHOUSE scope). The department is NEVER a PO
+ *   visibility axis and the department main warehouse is never implicitly in
+ *   scope. Zero assigned warehouses resolve to FALSE (fail closed) — the
+ *   material-request zero-assignment fallback does not apply to procurement.
  * - department_manager / supervisor hold no purchase-orders permissions, so
- *   they never reach this clause in practice; if a future grant is added,
- *   DEPARTMENT resolves to the department's warehouses.
+ *   they never reach this clause in practice; the DEPARTMENT branch here is the
+ *   department-assigned sub_warehouse_manager case only.
  */
 export function poScopeClause(user: AuthUserContext, startIndex = 1): { clause: string; params: any[] } {
   const scope = scopeForUser(user);
   let n = startIndex;
   if (scope === 'GLOBAL') return { clause: 'TRUE', params: [] };
   if (scope === 'WAREHOUSE') {
-    // Assigned warehouses PLUS the manager's own department main warehouse
-    // (department-derived procurement requests are visible to their creator).
-    const parts: string[] = [];
-    const params: any[] = [];
-    if (user.warehouse_ids.length > 0) {
-      parts.push(`po.warehouse_id = ANY($${n++})`);
-      params.push(user.warehouse_ids);
-    }
-    if (user.department_id != null) {
-      parts.push(`po.department_id = $${n++}`);
-      params.push(user.department_id);
-    }
-    if (parts.length === 0) return { clause: 'FALSE', params: [] };
-    return { clause: `(${parts.join(' OR ')})`, params };
+    // Department-less sub-warehouse manager: only personally assigned
+    // warehouse(s) via user_warehouses (resolved into user.warehouse_ids on
+    // every authenticated request).
+    if (user.warehouse_ids.length === 0) return { clause: 'FALSE', params: [] };
+    return { clause: `po.warehouse_id = ANY($${n++})`, params: [user.warehouse_ids] };
+  }
+  if (scope === 'DEPARTMENT') {
+    // Department-assigned sub-warehouse manager: ONLY POs whose receiving
+    // warehouse is personally assigned via user_warehouses — never the whole
+    // department, never the department main warehouse. Fail closed when the
+    // manager holds no assignments.
+    if (user.warehouse_ids.length === 0) return { clause: 'FALSE', params: [] };
+    return { clause: `po.warehouse_id = ANY($${n++})`, params: [user.warehouse_ids] };
   }
   return { clause: 'FALSE', params: [] };
 }

@@ -20,8 +20,9 @@ export class PurchaseOrdersService {
   /**
    * View/mutation scope for a single PO. Out-of-scope resources are hidden as
    * 404 (project convention — see custodies/material-requests services).
-   * A sub_warehouse_manager additionally sees POs whose receiving warehouse
-   * belongs to his department (department-derived procurement requests).
+   * A sub_warehouse_manager may act on a PO only when its receiving warehouse
+   * is personally assigned via user_warehouses — whether the manager is
+   * department-assigned (DEPARTMENT scope) or not (WAREHOUSE scope).
    */
   private assertPoInScope(
     po: { warehouse_id: number; department_id?: number | null },
@@ -32,13 +33,13 @@ export class PurchaseOrdersService {
     if (scope === 'GLOBAL') return;
     if (scope === 'WAREHOUSE') {
       if (user.warehouse_ids.includes(po.warehouse_id)) return;
-      // Department-derived requests: a manager sees POs of his own
-      // department's main warehouse even without an explicit assignment.
-      if (
-        user.role === 'sub_warehouse_manager' &&
-        user.department_id != null &&
-        po.department_id === user.department_id
-      ) return;
+    }
+    if (scope === 'DEPARTMENT') {
+      // Department-assigned sub_warehouse_manager (mandatory production shape):
+      // ONLY personally assigned warehouses via user_warehouses are in scope —
+      // never the whole department, never the department main warehouse. Zero
+      // assigned warehouses fails closed to 404.
+      if (user.warehouse_ids.includes(po.warehouse_id)) return;
     }
     throw new NotFoundError('PurchaseOrder', 'PURCHASE_ORDER_NOT_FOUND');
   }
