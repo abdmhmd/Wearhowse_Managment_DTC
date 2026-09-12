@@ -96,7 +96,10 @@
     "status": "الحالة",
     "view": "عرض",
     "notes": "الملاحظات",
-    "saving": "جارٍ الحفظ…"
+    "saving": "جارٍ الحفظ…",
+    "prev": "السابق",
+    "next": "التالي",
+    "empty": "لا يوجد شيء لعرضه"
   },
   "table": {
     "id": "المعرّف",
@@ -778,5 +781,24 @@
     "notFound": "العنصر المطلوب غير موجود.",
     "forbidden": "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
     "unauthorized": "يرجى تسجيل الدخول للمتابعة."
+  },
+  "components": {
+    "searchableSelect": {
+      "select": "اختر عنصراً",
+      "searchPlaceholder": "بحث...",
+      "clearSelection": "مسح الاختيار",
+      "loading": "جارٍ التحميل...",
+      "noResults": "لا توجد نتائج"
+    },
+    "itemPicker": {
+      "title": "اختيار الأصناف",
+      "searchPlaceholder": "بحث بالاسم أو الكود...",
+      "loadError": "تعذّر تحميل الأصناف.",
+      "empty": "لا توجد أصناف تطابق بحثك.",
+      "resultsLabel": "الأصناف",
+      "selectedCount": "تم اختيار {{count}}",
+      "page": "صفحة {{page}} من {{total}}",
+      "confirm": "إضافة المحدد"
+    }
   }
 }

@@ -2,21 +2,22 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useCreatePurchaseRequest } from '@/hooks/useCreatePurchaseRequest';
-import { useItems } from '@/hooks/useItems';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useAuthStore } from '@/store/auth.store';
 import { PageHeader, Button, Input, Select } from '@/components/ui';
+import ItemPickerModal from '@/components/pickers/ItemPickerModal';
 import { TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { getLocalizedName } from '@/i18n/helpers';
 
 interface LineDraft {
   item_id: string;
+  item_label: string;
   quantity: string;
   unit_code: string;
   notes: string;
 }
 
-const emptyLine: LineDraft = { item_id: '', quantity: '', unit_code: '', notes: '' };
+const emptyLine: LineDraft = { item_id: '', item_label: '', quantity: '', unit_code: '', notes: '' };
 
 export default function CreatePurchaseRequestPage() {
   const { t } = useTranslation();
@@ -28,6 +29,7 @@ export default function CreatePurchaseRequestPage() {
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([{ ...emptyLine }]);
   const [error, setError] = useState('');
+  const [pickerIndex, setPickerIndex] = useState<number | null>(null);
 
   // Warehouse picker: the request must target a main warehouse of the user's
   // department. The backend enforces this authoritatively.
@@ -37,9 +39,6 @@ export default function CreatePurchaseRequestPage() {
     user?.department_id != null ? w.department_id === user.department_id : true
   );
 
-  const { data: itemsData } = useItems(1, 500);
-  const items = itemsData?.items || [];
-
   const warehouseOptions = [
     { value: '', label: t('common.select') },
     ...mainWarehouses.map((w: any) => ({
@@ -47,21 +46,19 @@ export default function CreatePurchaseRequestPage() {
       label: getLocalizedName({ name_ar: w.name_ar, name_en: w.name_en }) || w.code || String(w.id),
     })),
   ];
-  const itemOptions = [
-    { value: '', label: t('common.select') },
-    ...items.map((it: any) => ({
-      value: String(it.id),
-      label: `${it.item_code} — ${getLocalizedName({ name_ar: it.name_ar, name_en: it.name_en })}`,
-    })),
-  ];
 
   const setLine = (index: number, patch: Partial<LineDraft>) => {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
   };
 
-  const handleItemChange = (index: number, itemIdStr: string) => {
-    const item = items.find((it: any) => String(it.id) === itemIdStr);
-    setLine(index, { item_id: itemIdStr, unit_code: item ? item.unit_code : '' });
+  const handlePickedItems = (items: any[]) => {
+    if (pickerIndex == null || items.length === 0) return;
+    const item = items[0];
+    setLine(pickerIndex, {
+      item_id: String(item.id),
+      unit_code: item.unit_code ?? '',
+      item_label: `${item.item_code} — ${getLocalizedName({ name_ar: item.name_ar, name_en: item.name_en })}`,
+    });
   };
 
   const linesValid =
@@ -126,10 +123,18 @@ export default function CreatePurchaseRequestPage() {
           {lines.map((line, index) => (
             <div key={index} className="grid grid-cols-12 gap-2 items-end">
               <div className="col-span-12 md:col-span-5">
-                <Select label={t('pages.purchaseRequests.item')} id={`pr-item-${index}`} value={line.item_id}
-                  onChange={(e) => handleItemChange(index, e.target.value)}
-                  options={itemOptions}
-                  placeholder={t('pages.purchaseRequests.selectItem')} />
+                <span className="block text-sm font-medium text-gray-700 mb-1">{t('pages.purchaseRequests.item')}</span>
+                <button
+                  type="button"
+                  id={`pr-item-${index}`}
+                  aria-label={t('pages.purchaseRequests.item')}
+                  onClick={() => setPickerIndex(index)}
+                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm text-left focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                >
+                  {line.item_label || (
+                    <span className="text-gray-400">{t('pages.purchaseRequests.selectItem')}</span>
+                  )}
+                </button>
               </div>
               <div className="col-span-4 md:col-span-2">
                 <Input type="number" min="0" step="any" id={`pr-qty-${index}`} label={t('pages.purchaseRequests.quantity')}
@@ -170,6 +175,19 @@ export default function CreatePurchaseRequestPage() {
           {createMutation.isPending ? t('common.saving') : t('pages.purchaseRequests.create')}
         </Button>
       </div>
+
+      <ItemPickerModal
+        isOpen={pickerIndex !== null}
+        onClose={() => setPickerIndex(null)}
+        mode="single"
+        title={t('pages.purchaseRequests.selectItem')}
+        warehouseId={warehouseId ? Number(warehouseId) : null}
+        excludeIds={lines
+          .map((l) => l.item_id)
+          .filter((id, i) => id && i !== pickerIndex)
+          .map(Number)}
+        onSelect={handlePickedItems}
+      />
     </div>
   );
 }

@@ -92,7 +92,10 @@
     "view": "View",
     "notes": "Notes",
     "saving": "Saving…",
-    "delete": "Delete"
+    "delete": "Delete",
+    "prev": "Previous",
+    "next": "Next",
+    "empty": "Nothing to show"
   },
   "table": {
     "id": "ID",
@@ -772,5 +775,24 @@
     "notFound": "The requested item was not found.",
     "forbidden": "You do not have permission to perform this action.",
     "unauthorized": "Please sign in to continue."
+  },
+  "components": {
+    "searchableSelect": {
+      "select": "Select an option",
+      "searchPlaceholder": "Search...",
+      "clearSelection": "Clear selection",
+      "loading": "Loading...",
+      "noResults": "No results found"
+    },
+    "itemPicker": {
+      "title": "Select Items",
+      "searchPlaceholder": "Search by name or code...",
+      "loadError": "Failed to load items.",
+      "empty": "No items match your search.",
+      "resultsLabel": "Items",
+      "selectedCount": "{{count}} selected",
+      "page": "Page {{page}} of {{total}}",
+      "confirm": "Add Selected"
+    }
   }
 }

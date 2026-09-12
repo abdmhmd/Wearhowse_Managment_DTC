@@ -31,9 +31,16 @@ const seedLookups = () => {
   );
 };
 
+async function pickItem(user: ReturnType<typeof userEvent.setup>, index: number, name: string) {
+  const trigger = screen.getAllByLabelText('Item')[index];
+  await user.click(trigger);
+  await user.click(await screen.findByRole('button', { name: new RegExp(name) }));
+}
+
 describe('create purchase request form', () => {
   it('disables submit until the form is valid (no items → disabled)', async () => {
     seedLookups();
+    const user = userEvent.setup();
     renderWithProviders(<CreatePurchaseRequestPage />);
     await screen.findByRole('heading', { name: 'New Purchase Request' });
 
@@ -43,13 +50,11 @@ describe('create purchase request form', () => {
     // Only department-1 main warehouses are offered.
     await screen.findByRole('option', { name: 'Main Warehouse 1' });
     const warehouse = screen.getByLabelText('Warehouse');
-    await userEvent.selectOptions(warehouse, '11');
+    await user.selectOptions(warehouse, '11');
 
-    await screen.findByRole('option', { name: /IT-100/ });
-    const item = screen.getByLabelText('Item');
-    await userEvent.selectOptions(item, '10');
+    await pickItem(user, 0, 'Acid');
     const quantity = screen.getByLabelText('Quantity');
-    await userEvent.type(quantity, '50');
+    await user.type(quantity, '50');
 
     expect(submit).toBeEnabled();
   });
@@ -62,8 +67,7 @@ describe('create purchase request form', () => {
 
     await screen.findByRole('option', { name: 'Main Warehouse 1' });
     await user.selectOptions(screen.getByLabelText('Warehouse'), '11');
-    await screen.findByRole('option', { name: /IT-100/ });
-    await user.selectOptions(screen.getAllByLabelText('Item')[0], '10');
+    await pickItem(user, 0, 'Acid');
     await user.type(screen.getAllByLabelText('Quantity')[0], '50');
 
     const submit = screen.getByRole('button', { name: 'New Purchase Request' });
@@ -74,7 +78,7 @@ describe('create purchase request form', () => {
     expect(submit).toBeDisabled();
 
     // Fill the second line → valid again.
-    await user.selectOptions(screen.getAllByLabelText('Item')[1], '11');
+    await pickItem(user, 1, 'Gloves');
     await user.type(screen.getAllByLabelText('Quantity')[1], '25');
     expect(submit).toBeEnabled();
   });
@@ -111,11 +115,10 @@ describe('create purchase request form', () => {
 
     await screen.findByRole('option', { name: 'Main Warehouse 1' });
     await user.selectOptions(screen.getByLabelText('Warehouse'), '11');
-    await screen.findByRole('option', { name: /IT-100/ });
-    await user.selectOptions(screen.getAllByLabelText('Item')[0], '10');
+    await pickItem(user, 0, 'Acid');
     await user.type(screen.getAllByLabelText('Quantity')[0], '50');
     await user.click(screen.getByText('Add Item'));
-    await user.selectOptions(screen.getAllByLabelText('Item')[1], '11');
+    await pickItem(user, 1, 'Gloves');
     await user.type(screen.getAllByLabelText('Quantity')[1], '25');
 
     await user.click(screen.getByRole('button', { name: 'New Purchase Request' }));
