@@ -98,6 +98,22 @@ export function mapApiError(error: any): MappedApiError {
     // ── material requests ───────────────────────────────────────────────────
     case 'REQUEST_NOT_FOUND':
       return { key: 'pages.materialRequests.errors.notFound' };
+
+    // ── purchase requests ───────────────────────────────────────────────────
+    case 'PURCHASE_REQUEST_NOT_FOUND':
+      return { key: 'pages.purchaseRequests.errors.notFound' };
+    case 'PURCHASE_REQUEST_INVALID_STATUS':
+      return { key: 'pages.purchaseRequests.errors.invalidStatus' };
+    case 'PURCHASE_REQUEST_ALREADY_PROCESSED':
+      return { key: 'pages.purchaseRequests.errors.alreadyProcessed' };
+    case 'WAREHOUSE_DEPARTMENT_MISMATCH':
+      return { key: 'pages.purchaseRequests.errors.warehouseDepartmentMismatch' };
+    case 'ITEM_INVALID':
+      return { key: 'pages.purchaseRequests.errors.invalidItem' };
+    case 'UNIT_INVALID':
+      return { key: 'pages.purchaseRequests.errors.invalidUnit' };
+    case 'NO_DEPARTMENT':
+      return { key: 'pages.purchaseRequests.errors.noDepartment' };
   }
 
   // HTTP-status fallbacks for codes without a specific business mapping.
