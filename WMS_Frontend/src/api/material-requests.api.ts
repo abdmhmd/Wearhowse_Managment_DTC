@@ -9,8 +9,8 @@ export interface MaterialRequestsFilter {
 }
 
 export interface CreateMaterialRequestPayload {
-  department_id: number;
-  warehouse_id: number;
+  department_id?: number;
+  warehouse_id?: number;
   request_type: RequestType;
   project_id?: number | null;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
@@ -34,10 +34,21 @@ export interface RequestCatalogItem {
   is_consumable: boolean;
 }
 
+export interface DestinationWarehouse {
+  id: number;
+  code: string;
+  name_ar: string | null;
+  name_en: string | null;
+}
+
 export interface RequestCatalog {
   department: { id: number; name_ar: string | null; name_en: string | null } | null;
   warehouses: Warehouse[];
   items: RequestCatalogItem[];
+  /** Resolved sub-warehouse destination for the caller (lowest eligible id),
+   *  or null when the department has no sub-warehouse. Read-only for the
+   *  supervisor create flow — derived server-side, never chosen by the client. */
+  destination_warehouse: DestinationWarehouse | null;
 }
 
 export const materialRequestsApi = {

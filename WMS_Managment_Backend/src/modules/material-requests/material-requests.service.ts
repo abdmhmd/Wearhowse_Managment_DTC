@@ -77,31 +77,42 @@ export class MaterialRequestsService {
     let departmentWarehouses: { id: number }[] = [];
 
     if (user?.role === 'supervisor') {
-      // ── Supervisor: department DERIVED from the authenticated user ─────────
-      // The supervisor's department is NEVER taken from the client payload. The
-      // destination warehouse MUST belong to that department — a payload
-      // `warehouse_id` of another department is rejected outright, so a
-      // supervisor cannot leak a request into a foreign department. When the
-      // department owns exactly one eligible (active, non-main) warehouse it is
-      // auto-selected, mirroring the frontend's single-warehouse behavior.
+      // ── Supervisor: destination DERIVED from the authenticated user ────────
+      // A supervisor is never asked to choose a warehouse and needs NO
+      // `user_warehouses` assignment: the destination is the department's OWN
+      // active sub-warehouse (is_main = false), resolved server-side. Any
+      // `warehouse_id` sent in the payload is IGNORED — the derived warehouse
+      // is authoritative, so a supervisor cannot leak a request into a foreign
+      // warehouse by spoofing it. When the department owns several sub-warehouses
+      // the lowest id wins deterministically (mirroring the catalog) and a
+      // warning is logged; with none configured the request is rejected up
+      // front with a specific, localized code.
       if (user.department_id == null) {
-        throw new ValidationError('Your account is not assigned to a department. Contact your administrator.', {});
+        throw new ValidationError('Your account is not assigned to a department. Contact your administrator.', {}, 'NO_DEPARTMENT');
       }
       departmentWarehouses = await warehousesRepository.findByDepartmentEligible(user.department_id);
-      if (data.warehouse_id == null) {
-        if (departmentWarehouses.length === 1) {
-          warehouseId = departmentWarehouses[0].id;
-        } else if (departmentWarehouses.length === 0) {
-          throw new ValidationError('Your department has no eligible warehouse to receive material requests. Contact your administrator.', {});
-        } else {
-          throw new ValidationError('Please select a warehouse belonging to your department.', {});
-        }
-      } else {
-        if (!departmentWarehouses.some((w) => w.id === data.warehouse_id)) {
-          throw new ValidationError('The selected warehouse does not belong to your department.', { warehouse_id: data.warehouse_id });
-        }
-        warehouseId = data.warehouse_id;
+      if (departmentWarehouses.length === 0) {
+        throw new ValidationError(
+          'Your department has no sub-warehouse configured to receive material requests. Contact your administrator.',
+          { department_id: user.department_id },
+          'NO_SUB_WAREHOUSE_FOR_DEPARTMENT'
+        );
       }
+      if (departmentWarehouses.length > 1) {
+        logger.warn(
+          `Department #${user.department_id} has ${departmentWarehouses.length} eligible sub-warehouses; supervisor #${user.id} destination derived to the lowest id`,
+          'material-requests',
+          { department_id: user.department_id, supervisor_id: user.id, candidates: departmentWarehouses.map((w) => w.id), derived: departmentWarehouses[0].id }
+        );
+      }
+      if (data.warehouse_id != null && data.warehouse_id !== departmentWarehouses[0].id) {
+        logger.warn(
+          `Supervisor #${user.id} sent warehouse_id=${data.warehouse_id}; ignored, derived destination warehouse_id=${departmentWarehouses[0].id}`,
+          'material-requests',
+          { supervisor_id: user.id, sent: data.warehouse_id, derived: departmentWarehouses[0].id }
+        );
+      }
+      warehouseId = departmentWarehouses[0].id;
     } else if (user && scope !== 'GLOBAL') {
       if (user.warehouse_ids.length > 0) {
         // ── Case A: the user HAS assigned warehouses ─────────────────────────
@@ -255,11 +266,19 @@ export class MaterialRequestsService {
     // /api/requests/catalog scope; this re-validation guarantees a hand-crafted
     // payload cannot reference a foreign or deactivated item/unit.
     if (user?.role === 'supervisor') {
-      const deptWarehouseIds = departmentWarehouses.map((w) => w.id);
+      // The catalog exposes items stored in ANY active warehouse of the
+      // supervisor's department — stock lives in the department MAIN warehouse
+      // and issues move MAIN -> sub-warehouse. The create-side validation
+      // therefore checks the item's warehouse belongs to the supervisor's
+      // department (matching the catalog scope exactly), so an item the catalog
+      // offers can never be rejected at creation time with a misleading generic
+      // error (the previous check against only the non-main destination list
+      // rejected exactly the catalog-exposed items homed in the main warehouse).
       for (const line of data.items) {
         const itemRow = await pool.query(
-          `SELECT i.id, i.is_active, i.warehouse_id
+          `SELECT i.id, i.is_active, i.warehouse_id, w.department_id AS wh_department_id
              FROM items i
+             JOIN warehouses w ON w.id = i.warehouse_id
             WHERE i.id = $1`,
           [line.item_id]
         );
@@ -267,10 +286,11 @@ export class MaterialRequestsService {
         if (!item || !item.is_active) {
           throw new ValidationError('The selected item does not exist or is inactive', { item_id: line.item_id });
         }
-        if (!deptWarehouseIds.includes(item.warehouse_id)) {
+        if (item.wh_department_id !== user.department_id) {
           throw new ValidationError(
             'The selected item does not belong to your department',
-            { item_id: line.item_id, warehouse_id: item.warehouse_id }
+            { item_id: line.item_id, warehouse_id: item.warehouse_id },
+            'ITEM_NOT_IN_DEPARTMENT'
           );
         }
         const unitRow = await pool.query(
@@ -323,15 +343,20 @@ export class MaterialRequestsService {
    * items / units / departments) — which a `supervisor` correctly does NOT
    * have permission to read.
    *
-   *  - department  : the caller's department (names resolved from the auth user)
-   *  - warehouses  : eligible (active, non-main) warehouses of that department
-   *  - items       : ACTIVE items stored in the department's eligible
-   *                  warehouses, each carrying its authoritative BASE unit
-   *                  (unit is derived from the item — never freely chosen)
-   *
-   * Callers without a department (e.g. a global admin) receive
-   * department=null and empty warehouse/item lists.
-   */
+*  - department  : the caller's department (names resolved from the auth user)
+ *  - warehouses  : eligible (active, non-main) warehouses of that department
+ *  - items       : ACTIVE items stored in the department's warehouses (any
+ *                  active warehouse, incl. the main stock source), each
+ *                  carrying its authoritative BASE unit (unit is derived from
+ *                  the item — never freely chosen)
+ *  - destination_warehouse : the resolvable sub-warehouse destination (lowest
+ *                  eligible id) of the department, or null when the department
+ *                  has no sub-warehouse — so a supervisor is never asked to
+ *                  pick and the UI can render it read-only.
+ *
+ * Callers without a department (e.g. a global admin) receive
+ * department=null and empty warehouse/item lists.
+ */
   async getRequestCatalog(user: AuthUserContext) {
     const departmentId = user.department_id;
     const department =
@@ -366,7 +391,28 @@ export class MaterialRequestsService {
           ).then((r) => r.rows),
     ]);
 
-    return { department, warehouses, items };
+    // Destination warehouse for the supervisor create flow: `warehouses` is
+    // already the department's eligible (active, non-main) list ordered by id,
+    // so the lowest id is authoritative for creation. Exposed read-only so the
+    // UI can render it and enable the submit button only when one exists.
+    let destinationWarehouse: { id: number; code: string; name_ar: string | null; name_en: string | null } | null = null;
+    if (warehouses.length > 0) {
+      destinationWarehouse = {
+        id: warehouses[0].id,
+        code: warehouses[0].code,
+        name_ar: warehouses[0].name_ar,
+        name_en: warehouses[0].name_en,
+      };
+      if (warehouses.length > 1) {
+        logger.warn(
+          `Department #${departmentId} has ${warehouses.length} eligible sub-warehouses; catalog destination derived to the lowest id for user #${user.id}`,
+          'material-requests',
+          { department_id: departmentId, user_id: user.id, candidates: warehouses.map((w) => w.id), derived: warehouses[0].id }
+        );
+      }
+    }
+
+    return { department, warehouses, items, destination_warehouse: destinationWarehouse };
   }
 
   async getById(id: number, user?: AuthUserContext) {

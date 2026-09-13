@@ -285,7 +285,7 @@ describe('Issue flow — end-to-end with correct warehouse architecture', () => 
       wmB.token = await login(wmB);
     });
 
-    test('supervisor cannot create request targeting main warehouse', async () => {
+    test('supervisor injected main-warehouse id is IGNORED — destination derived to the dept sub-warehouse (201)', async () => {
       const destWh2 = await pool.query(
         'SELECT id FROM warehouses WHERE department_id = $1 AND is_main = false AND is_active = true LIMIT 1',
         [mainWhDept]
@@ -294,8 +294,11 @@ describe('Issue flow — end-to-end with correct warehouse architecture', () => 
       const res = await createRequest(supB.token, mainWh2, [
         { item_id: item, quantity: 1, unit_code: unitCode },
       ]);
-      // mainWh2 has is_main=true → either "does not belong" (supervisor check) or "main warehouse" check
-      expect(res.status).toBe(400);
+      // mainWh2 has is_main=true, but a supervisor's payload warehouse_id is
+      // IGNORED: the destination is always the department's derived sub-warehouse
+      // (lowest eligible non-main id), so the request targets destWh2 — never main.
+      expect(res.status).toBe(201);
+      expect(res.body.data.warehouse_id).toBe(Number(destWh2.rows[0].id));
     });
   });
 

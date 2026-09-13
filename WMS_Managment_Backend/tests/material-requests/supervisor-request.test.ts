@@ -14,7 +14,7 @@ import { shortId, TEST_PREFIX, seedCategory, seedUnit, seedWarehouse, seedDepart
  * project belongs to the supervisor's department (existing 409 rule).
  *
  *   1. supervisor, own department warehouse              -> 201 (department derived)
- *   2. supervisor, warehouse of ANOTHER department       -> 400 (rejected)
+ *   2. supervisor injects a warehouse of ANOTHER department -> IGNORED, derived 201
  *   3. supervisor, own warehouse + spoofed foreign department_id -> 409 conflict
  *   4. supervisor, own project (supervisor_id == user.id)-> 201
  *   5. supervisor, another supervisor's project (same dept) -> 400 (rejected)
@@ -179,17 +179,17 @@ describe('Create request: supervisor department + project enforcement', () => {
     expect(row.rows[0].status).toBe('pending');
   });
 
-  test('2: supervisor + warehouse of ANOTHER department -> 400 (rejected)', async () => {
+  test('2: supervisor injects a warehouse of ANOTHER department -> IGNORED, derived destination used (201)', async () => {
     const res = await createRequest(supA.token, whB, items());
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
-    expect(res.body.error.message).toMatch(/does not belong to your department/i);
+    expect(res.status).toBe(201);
+    // The destination is DERIVED from the supervisor's own department — the
+    // injected foreign warehouse_id is ignored, never honored.
+    expect(res.body.data.warehouse_id).toBe(whA);
+    expect(res.body.data.department_id).toBe(deptA);
 
-    const count = await pool.query(
-      'SELECT COUNT(*)::int AS n FROM material_requests WHERE requested_by = $1',
-      [supA.id]
-    );
-    expect(count.rows[0].n).toBe(1); // only the request from test 1
+    // Remove the extra row so the creation-count assertions in later tests
+    // (which only count the requests created in tests 1 and 4) stay stable.
+    await pool.query('DELETE FROM material_requests WHERE id = $1', [res.body.data.id]);
   });
 
   test('3: supervisor + own warehouse + spoofed foreign department_id -> 409 conflict', async () => {
@@ -303,7 +303,7 @@ describe('Create request: supervisor department + project enforcement', () => {
   test('13: supervisor create with an item of ANOTHER department -> 400 (rejected)', async () => {
     const res = await createRequest(supA.token, whA, [{ item_id: itemBId, quantity: 1, unit_code: unitCode }]);
     expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.code).toBe('ITEM_NOT_IN_DEPARTMENT');
     expect(res.body.error.message).toMatch(/does not belong to your department/i);
 
     const count = await pool.query(

@@ -742,7 +742,9 @@
         "forbidden": "You do not have permission to perform this action.",
         "warehouseScope": "You cannot perform this action for this warehouse.",
         "mainWarehouseDestination": "Items cannot be issued directly to the main warehouse. A department warehouse must be used.",
-        "noMainWarehouse": "No main warehouse is configured for this department."
+        "noMainWarehouse": "No main warehouse is configured for this department.",
+        "noSubWarehouseForDepartment": "There is no sub-warehouse configured for this department. Contact the administrator.",
+        "itemNotInDepartment": "The selected item does not belong to your department."
       }
     }
   },
@@ -772,6 +774,8 @@
     "CONVERSION_NOT_FOUND": "Unit conversion not found",
     "INTERNAL_ERROR": "An internal error occurred. Please try again.",
     "unexpected": "An unexpected error occurred. Please try again.",
+    "unexpectedWithRequestId": "An unexpected error occurred. Reference: {{requestId}}",
+    "noDepartment": "Your account is not assigned to a department. Contact the administrator.",
     "notFound": "The requested item was not found.",
     "forbidden": "You do not have permission to perform this action.",
     "unauthorized": "Please sign in to continue."

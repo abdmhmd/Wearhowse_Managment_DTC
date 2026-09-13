@@ -22,6 +22,7 @@ interface ApiErrorPayload {
   code?: string;
   message?: string;
   details?: Record<string, any>;
+  requestId?: string;
 }
 
 function extract(error: any): { status: number; payload: ApiErrorPayload } {
@@ -33,6 +34,7 @@ function extract(error: any): { status: number; payload: ApiErrorPayload } {
       code: data?.error?.code,
       message: data?.error?.message ?? data?.message,
       details: data?.error?.details,
+      requestId: data?.error?.requestId ?? error?.response?.headers?.['x-request-id'],
     },
   };
 }
@@ -64,6 +66,12 @@ export function mapApiError(error: any): MappedApiError {
       return { key: 'pages.purchaseOrders.errors.invalidStatus' };
     case 'NO_MAIN_WAREHOUSE':
       return { key: 'pages.materialRequests.errors.noMainWarehouse' };
+    case 'NO_SUB_WAREHOUSE_FOR_DEPARTMENT':
+      return { key: 'pages.materialRequests.errors.noSubWarehouseForDepartment' };
+    case 'NO_DEPARTMENT':
+      return { key: 'errors.noDepartment' };
+    case 'ITEM_NOT_IN_DEPARTMENT':
+      return { key: 'pages.materialRequests.errors.itemNotInDepartment' };
     case 'MAIN_WAREHOUSE_DESTINATION':
       return { key: 'pages.materialRequests.errors.mainWarehouseDestination' };
     case 'MAIN_WAREHOUSE_REQUIRED':
@@ -124,6 +132,13 @@ export function mapApiError(error: any): MappedApiError {
       return { key: 'auth.login.errors.AUTH_ROLE_DISABLED' };
     case 'AUTH_RATE_LIMITED':
       return { key: 'auth.login.errors.AUTH_RATE_LIMITED' };
+  }
+
+  // Server-side failures (500+) carry a request id in the error body
+  // (`{ error: { requestId } }`) or the X-Request-Id header, set by the
+  // request logger. Expose it so the user can report the failed trace.
+  if (status >= 500 && payload.requestId) {
+    return { key: 'errors.unexpectedWithRequestId', params: { requestId: payload.requestId } };
   }
 
   // HTTP-status fallbacks for codes without a specific business mapping.

@@ -87,29 +87,31 @@ export default function CreateMaterialRequestPage() {
     .sort((a: any, b: any) => Number(a.id) - Number(b.id));
 
   // Supervisor: the request department is DERIVED from the authenticated user
-  // (never a client choice) and the destination warehouse MUST belong to that
-  // department. Only the supervisor's own department warehouses are shown —
-  // other departments' warehouses are not even selectable.
-  const supervisorWarehouses = isSupervisor
-    ? availableWarehouses.filter((w: any) => Number(w.department_id) === Number(user?.department_id))
-    : [];
-  const warehouseOptions = isSupervisor ? supervisorWarehouses : availableWarehouses;
+  // (never a client choice) and the destination warehouse is DERIVED server-side
+  // from the department's own sub-warehouse. The supervisor is NEVER asked to
+  // pick a warehouse and needs NO warehouse assignment — the catalog resolves
+  // it (destination_warehouse) and the UI renders it read-only. Any client
+  // warehouse_id is ignored by the backend.
+  const destinationWarehouse = isSupervisor ? (catalog?.destination_warehouse ?? null) : null;
+  const warehouseOptions = isSupervisor ? [] : availableWarehouses;
 
-  // Auto-assignment mirrors the backend rule: if exactly one eligible warehouse is available,
-  // it is auto-selected; if multiple are available (multi-warehouse targeting), a selector is shown.
+  // Auto-assignment mirrors the backend rule: sub_warehouse_manager / admin
+  // resolve exactly one eligible warehouse -> auto-select; multiple -> a selector
+  // is shown. A supervisor NEVER gets a selector — the destination is always
+  // derived (lowest eligible id of the department).
   const showWarehouseSelector = isSupervisor
-    ? supervisorWarehouses.length > 1
+    ? false
     : isSystemAdmin || !hasAssignedWarehouses || availableWarehouses.length > 1;
 
   const autoWarehouse = showWarehouseSelector
     ? undefined
     : isSupervisor
-      ? supervisorWarehouses[0]
+      ? destinationWarehouse
       : availableWarehouses[0];
 
   const autoDepartmentId = isSupervisor
     ? (user?.department_id != null ? Number(user.department_id) : undefined)
-    : (autoWarehouse ? Number(autoWarehouse.department_id) : undefined);
+    : (availableWarehouses[0] ? Number(availableWarehouses[0].department_id) : undefined);
 
   useEffect(() => {
     if (!showWarehouseSelector && autoWarehouse && !form.getValues('warehouse_id')) {
@@ -140,8 +142,13 @@ export default function CreateMaterialRequestPage() {
     setSubmitting(true);
     try {
       await createMutation.mutateAsync({
-        department_id: showWarehouseSelector ? formData.department_id : (autoDepartmentId as number),
-        warehouse_id: showWarehouseSelector ? formData.warehouse_id : autoWarehouse!.id,
+        // Supervisor: department and destination warehouse are DERIVED
+        // server-side — no selection fields are sent (any client warehouse_id
+        // is ignored by the backend anyway).
+        department_id: isSupervisor
+          ? (user?.department_id != null ? Number(user.department_id) : undefined)
+          : (showWarehouseSelector ? formData.department_id : (autoDepartmentId as number)),
+        warehouse_id: isSupervisor ? undefined : (showWarehouseSelector ? formData.warehouse_id : autoWarehouse!.id),
         request_type: formData.request_type,
         project_id: formData.project_id ? Number(formData.project_id) : null,
         priority: formData.priority,
@@ -220,7 +227,11 @@ export default function CreateMaterialRequestPage() {
           </div>
 
           {!canSubmit && (
-            <p className="text-sm text-red-600">{t('pages.materialRequests.noWarehouseAvailable')}</p>
+            <p className="text-sm text-red-600">
+              {isSupervisor
+                ? t('pages.materialRequests.errors.noSubWarehouseForDepartment')
+                : t('pages.materialRequests.noWarehouseAvailable')}
+            </p>
           )}
 
           {requestType === 'project' && (
