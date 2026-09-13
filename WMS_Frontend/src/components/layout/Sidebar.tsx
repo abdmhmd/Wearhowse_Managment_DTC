@@ -29,6 +29,7 @@ interface NavItem {
   path: string;
   icon: React.ElementType;
   permissions?: Permission[];
+  hideForAdmin?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -41,11 +42,11 @@ const navItems: NavItem[] = [
   { labelKey: 'nav.unitConversions', path: '/unit-conversions', icon: ArrowsRightLeftIcon, permissions: ['unit-conversions:view'] },
   { labelKey: 'nav.transactions', path: '/transactions', icon: DocumentTextIcon, permissions: ['transactions:view'] },
   { labelKey: 'nav.stockMovements', path: '/stock-movements', icon: ClipboardDocumentListIcon, permissions: ['stock-movements:view-all'] },
-  { labelKey: 'nav.materialRequests', path: '/requests', icon: ClipboardDocumentCheckIcon, permissions: ['requests:view', 'requests:view_own'] },
+  { labelKey: 'nav.materialRequests', path: '/requests', icon: ClipboardDocumentCheckIcon, permissions: ['requests:view', 'requests:view_own'], hideForAdmin: true },
   { labelKey: 'nav.purchaseOrders', path: '/purchase-orders', icon: ShoppingCartIcon, permissions: ['purchase-orders:view'] },
   { labelKey: 'nav.purchaseRequests', path: '/purchase-requests', icon: DocumentPlusIcon, permissions: ['purchase-requests:view', 'purchase-requests:view_own'] },
-  { labelKey: 'nav.projects', path: '/projects', icon: FolderIcon, permissions: ['projects:view'] },
-  { labelKey: 'nav.custodies', path: '/custodies', icon: ShieldCheckIcon, permissions: ['custodies:view'] },
+  { labelKey: 'nav.projects', path: '/projects', icon: FolderIcon, permissions: ['projects:view'], hideForAdmin: true },
+  { labelKey: 'nav.custodies', path: '/custodies', icon: ShieldCheckIcon, permissions: ['custodies:view'], hideForAdmin: true },
   { labelKey: 'nav.myCustody', path: '/my-custody', icon: ShieldCheckIcon, permissions: ['custodies:view_own'] },
   { labelKey: 'nav.reports', path: '/reports', icon: ChartBarIcon, permissions: ['reports:view'] },
   { labelKey: 'nav.settings', path: '/settings', icon: Cog6ToothIcon, permissions: ['settings:view'] },
@@ -70,7 +71,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   };
 
   const filteredItems = navItems.filter(
-    (item) => !item.permissions || canAny(...item.permissions)
+    (item) =>
+      (!item.permissions || canAny(...item.permissions)) &&
+      !(item.hideForAdmin && user?.role === 'admin')
   );
 
   return (

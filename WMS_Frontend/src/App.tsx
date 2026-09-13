@@ -121,7 +121,7 @@ export default function App() {
                   <Route path="/stock-movements" element={<StockMovementsPage />} />
                 </Route>
 
-                <Route element={<ProtectedRoute allowedPermissions={['projects:view', 'custodies:view']} />}>
+                <Route element={<ProtectedRoute allowedPermissions={['projects:view', 'custodies:view']} blockedRoles={['admin']} />}>
                   <Route path="/projects" element={<ProjectsPage />} />
                   <Route path="/projects/:id" element={<ProjectDetailPage />} />
                   <Route path="/custodies" element={<CustodiesPage />} />
