@@ -13,6 +13,7 @@
     "seed:demo:full": "ts-node scripts/seed-demo.ts",
     "seed:local": "ts-node scripts/seed-local-db.ts",
     "seed:realistic": "ts-node scripts/seed-realistic-data.ts",
+    "seed:campus": "ts-node scripts/seed-campus-data.ts",
     "reset:admin": "ts-node scripts/reset-admin-password.ts",
     "reset-demo": "ts-node scripts/reset-demo-environment.ts",
     "seed-demo-items": "ts-node scripts/seed-demo-items.ts",
