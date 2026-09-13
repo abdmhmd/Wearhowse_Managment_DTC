@@ -39,8 +39,16 @@ interface CampusItem {
   expiry_alert_days: number;
 }
 
+// All base units the seeded items depend on. ensureUnit() skips any that
+// already exist, so on a DB that already has standard units only the missing
+// ones are inserted (fresh test DBs get all six).
 const UNITS = [
+  { code: 'PC', name_ar: 'قطعة', name_en: 'Piece' },
+  { code: 'BOX', name_ar: 'صندوق', name_en: 'Box' },
+  { code: 'KG', name_ar: 'كيلوجرام', name_en: 'Kilogram' },
+  { code: 'M', name_ar: 'متر', name_en: 'Meter' },
   { code: 'ROLL', name_ar: 'لفة', name_en: 'Roll' },
+  { code: 'L', name_ar: 'لتر', name_en: 'Liter' },
 ];
 
 const DEPARTMENTS = [
