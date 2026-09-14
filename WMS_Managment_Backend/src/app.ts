@@ -73,13 +73,22 @@ app.use('/api/purchase-requests', purchaseRequestsRoutes);
 
 import { testConnection } from './config/database';
 
-app.get('/health', async (_req: Request, res: Response) => {
+const healthHandler = async (_req: Request, res: Response) => {
   const isDbHealthy = await testConnection();
   if (!isDbHealthy) {
     return sendError(res, 'Database connection error', 503, 'SERVICE_UNAVAILABLE');
   }
-  sendData(res, { status: 'healthy', database: 'connected', timestamp: new Date() });
-});
+  sendData(res, {
+    status: 'ok',
+    version: process.env.npm_package_version || '1.0.0',
+    db: 'connected',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+};
+
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 app.use('/api', swaggerRoutes);
 

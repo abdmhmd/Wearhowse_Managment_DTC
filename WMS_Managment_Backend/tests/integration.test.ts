@@ -52,7 +52,17 @@ describe('API Integration Tests', () => {
       const res = await request(app).get('/health');
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.status).toBe('healthy');
+      expect(res.body.data.status).toBe('ok');
+      expect(res.body.data.version).toBeDefined();
+      expect(res.body.data.uptime).toEqual(expect.any(Number));
+      expect(res.body.data.timestamp).toBeDefined();
+    });
+
+    test('is available unauthenticated at /api/health', async () => {
+      const res = await request(app).get('/api/health');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.db).toBe('connected');
     });
   });
 

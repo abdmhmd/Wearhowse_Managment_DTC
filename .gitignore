@@ -10,6 +10,13 @@ yarn-error.log*
 .env.development
 .env.test
 .env.production
+.env.*.local
+
+# Backups
+backups/
+C:/WMS_Backups/
+*.sql.gz
+*.sql.zip
 
 # Build outputs
 dist/
@@ -29,6 +36,9 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Test artifacts
+coverage/
 
 # PostgreSQL local data (في حال وجودها)
 *.sqlite
