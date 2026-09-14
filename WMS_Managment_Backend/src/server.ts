@@ -10,19 +10,21 @@ import { pool, getConnectionInfo } from './config/database';
 import { env } from './utils/env';
 import { logger } from './utils/logger';
 
-const server = app.listen(env.PORT, async () => {
+const PORT = env.PORT;
+
+const server = app.listen(PORT, '0.0.0.0', async () => {
   const info = getConnectionInfo();
   try {
     await pool.query('SELECT NOW()');
     logger.info(
-      `Server running on port ${env.PORT} | ✅ Database connected (SSL: ${info.ssl}, host: ${info.host})`,
+      `Server running on port ${PORT} | ✅ Database connected (SSL: ${info.ssl}, host: ${info.host})`,
       'Server'
     );
   } catch (err: any) {
     // Do not crash on a DB outage: log it and let health checks report db:
     // "disconnected" until the database is reachable again.
     logger.error(
-      `Server running on port ${env.PORT} | ❌ Database connection failed: ${err.message}`,
+      `Server running on port ${PORT} | ❌ Database connection failed: ${err.message}`,
       'Server'
     );
   }
