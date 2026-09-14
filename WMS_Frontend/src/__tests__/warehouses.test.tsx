@@ -1,5 +1,6 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import WarehousesPage from '@/pages/warehouses/WarehousesPage';
@@ -60,7 +61,8 @@ describe('warehouses page', () => {
     await screen.findByRole('heading', { name: 'Warehouses' });
     await screen.findAllByText('IT Department');
 
-    await userEvent.selectOptions(screen.getByLabelText('Filter by Department'), '1');
+    fireEvent.click(screen.getByLabelText('Filter by Department'));
+    fireEvent.click(await screen.findByRole('option', { name: /IT Department/ }));
     await waitFor(() => {
       expect(
         mockApi.get.mock.calls.some(([url, config]: any[]) => url === '/warehouses' && config?.params?.department_id === 1)
@@ -97,6 +99,7 @@ describe('warehouses page', () => {
 
     const dept = screen.getByLabelText('Department');
     expect(dept).toBeInTheDocument();
+    fireEvent.click(dept);
     expect(await screen.findByText('Central (No Department)')).toBeInTheDocument();
     await screen.findAllByText('IT Department');
 
@@ -113,8 +116,8 @@ describe('warehouses page', () => {
     await screen.findByRole('heading', { name: 'Warehouses' });
 
     await userEvent.click(screen.getByRole('button', { name: 'Create Warehouse' }));
-    await screen.findAllByText('IT Department');
-    await userEvent.selectOptions(screen.getByLabelText('Department'), '1');
+    fireEvent.click(screen.getByLabelText('Department'));
+    fireEvent.click(await screen.findByRole('option', { name: /IT Department/ }));
     await userEvent.type(screen.getByLabelText('Code'), 'WH-X');
     await userEvent.type(screen.getByLabelText('Name'), 'Extra');
     await userEvent.click(screen.getByLabelText('Main Warehouse'));
@@ -130,7 +133,8 @@ describe('warehouses page', () => {
     await screen.findByRole('heading', { name: 'Warehouses' });
 
     await userEvent.click(screen.getByRole('button', { name: 'Create Warehouse' }));
-    await userEvent.selectOptions(screen.getByLabelText('Department'), '');
+    fireEvent.click(screen.getByLabelText('Department'));
+    fireEvent.click(await screen.findByRole('option', { name: /Central \(No Department\)/ }));
     await userEvent.type(screen.getByLabelText('Code'), 'WH-C2');
     await userEvent.type(screen.getByLabelText('Name'), 'Central Two');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));

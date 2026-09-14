@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -48,9 +49,9 @@ describe('create purchase request form', () => {
     expect(submit).toBeDisabled();
 
     // Only department-1 main warehouses are offered.
-    await screen.findByRole('option', { name: 'Main Warehouse 1' });
     const warehouse = screen.getByLabelText('Warehouse');
-    await user.selectOptions(warehouse, '11');
+    await user.click(warehouse);
+    await user.click(await screen.findByRole('option', { name: /Main Warehouse 1/ }));
 
     await pickItem(user, 0, 'Acid');
     const quantity = screen.getByLabelText('Quantity');
@@ -65,8 +66,8 @@ describe('create purchase request form', () => {
     renderWithProviders(<CreatePurchaseRequestPage />);
     await screen.findByRole('heading', { name: 'New Purchase Request' });
 
-    await screen.findByRole('option', { name: 'Main Warehouse 1' });
-    await user.selectOptions(screen.getByLabelText('Warehouse'), '11');
+    await user.click(screen.getByLabelText('Warehouse'));
+    await user.click(await screen.findByRole('option', { name: /Main Warehouse 1/ }));
     await pickItem(user, 0, 'Acid');
     await user.type(screen.getAllByLabelText('Quantity')[0], '50');
 
@@ -113,8 +114,8 @@ describe('create purchase request form', () => {
     renderWithProviders(<CreatePurchaseRequestPage />);
     await screen.findByRole('heading', { name: 'New Purchase Request' });
 
-    await screen.findByRole('option', { name: 'Main Warehouse 1' });
-    await user.selectOptions(screen.getByLabelText('Warehouse'), '11');
+    await user.click(screen.getByLabelText('Warehouse'));
+    await user.click(await screen.findByRole('option', { name: /Main Warehouse 1/ }));
     await pickItem(user, 0, 'Acid');
     await user.type(screen.getAllByLabelText('Quantity')[0], '50');
     await user.click(screen.getByText('Add Item'));
