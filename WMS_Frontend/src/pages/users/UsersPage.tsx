@@ -1,18 +1,116 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedName, getLocalizedRoleLabel } from '@/i18n/helpers';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { SubmitHandler } from 'react-hook-form';
 import { useUsers, useCreateUser, useUpdateUser } from '@/hooks/useUsers';
 import { useDepartments } from '@/hooks/useDepartments';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useAuthStore } from '@/store/auth.store';
 import { createUserSchema, updateUserSchema, type CreateUserFormData, type UpdateUserFormData } from '@/schemas/users.schema';
-import { PageHeader, Button, DataTable, Modal, Input, Select, Badge } from '@/components/ui';
+import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, SearchableSelect } from '@/components/ui';
 import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import { type UserRole } from '@/types';
 import type { User } from '@/types';
+
+interface UserFormFieldsProps {
+  form: any;
+  departmentOptions: { value: number; label: string }[];
+  warehouseOptions: any[];
+  warehouseIds: number[];
+  onToggleWarehouse: (id: number) => void;
+  isEdit: boolean;
+  isLoading: boolean;
+  onSubmit: SubmitHandler<any>;
+  onCancel: () => void;
+}
+
+function UserFormFields({ form, departmentOptions, warehouseOptions, warehouseIds, onToggleWarehouse, isEdit, isLoading, onSubmit, onCancel }: UserFormFieldsProps) {
+  const { t } = useTranslation();
+  const role = useWatch({ control: form.control, name: 'role' }) as UserRole | undefined;
+  const departmentId = useWatch({ control: form.control, name: 'department_id' });
+
+  const isAdmin = role === 'admin';
+  const showWarehouses = role === 'sub_warehouse_manager' || role === 'supervisor';
+  const departmentError = form.formState.errors.department_id?.message as string | undefined;
+  const roleError = form.formState.errors.role?.message as string | undefined;
+
+  // Administrators have no department: clear (and lock) the selection whenever
+  // the role switches to admin — the value is sent as null on submit.
+  useEffect(() => {
+    if (isAdmin) {
+      form.setValue('department_id', null as any, { shouldValidate: false });
+    }
+  }, [isAdmin, form]);
+
+  const roleOptions = (['admin', 'sub_warehouse_manager', 'department_manager', 'supervisor'] as UserRole[]).map((value) => ({ value, label: getLocalizedRoleLabel(value) }));
+
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <Input id="user-username" label={t('form.username')} {...form.register('username')} error={form.formState.errors.username?.message} />
+      {!isEdit && <Input id="user-password" label={t('form.password')} type="password" {...form.register('password')} error={form.formState.errors.password?.message} />}
+      {isEdit && <Input id="user-password" label={t('form.newPassword')} type="password" {...form.register('password')} />}
+      <Input id="user-fullname" label={t('form.fullName')} {...form.register('full_name')} error={form.formState.errors.full_name?.message} />
+      <Select id="user-role" label={t('form.role')} {...form.register('role')} error={roleError} options={roleOptions} placeholder={t('form.selectRole')} />
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('pages.users.department')}</label>
+        <SearchableSelect
+          options={departmentOptions}
+          value={(departmentId ?? null) as number | null}
+          onChange={(value) => form.setValue('department_id', value === null ? (null as any) : Number(value), { shouldValidate: true })}
+          placeholder={t('pages.users.departmentPlaceholder')}
+          searchPlaceholder={t('pages.users.departmentSearchPlaceholder')}
+          disabled={isAdmin}
+          aria-label={t('pages.users.department')}
+        />
+        {departmentError ? (
+          <p className="mt-1 text-sm text-red-600">{t(departmentError)}</p>
+        ) : (
+          <p className="mt-1 text-xs text-gray-400">{t('pages.users.departmentHelp')}</p>
+        )}
+      </div>
+
+      {showWarehouses && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.warehouses')}</label>
+          <div className="border rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
+            {warehouseOptions.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-gray-400">{t('common.noData')}</p>
+            ) : (
+              warehouseOptions.map((w: any) => (
+                <label key={w.id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={warehouseIds.includes(w.id)}
+                    onChange={() => onToggleWarehouse(w.id)}
+                    className="rounded border-gray-300"
+                  />
+                  {getLocalizedName(w)}
+                </label>
+              ))
+            )}
+          </div>
+          <p className="mt-1 text-xs text-gray-400">{t('pages.users.warehousesHelp')}</p>
+        </div>
+      )}
+
+      {isEdit && (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" {...form.register('is_active')} className="rounded border-gray-300" />
+          {t('form.active')}
+        </label>
+      )}
+
+      <div className="flex justify-end gap-3">
+        <Button variant="secondary" type="button" onClick={onCancel}>{t('common.cancel')}</Button>
+        <Button type="submit" isLoading={isLoading}>{isEdit ? t('common.save') : t('common.create')}</Button>
+      </div>
+    </form>
+  );
+}
 
 export default function UsersPage() {
   const { t } = useTranslation();
@@ -34,9 +132,6 @@ export default function UsersPage() {
   const departmentOptions = (departmentsData?.items || []).map((d: any) => ({ value: d.id, label: getLocalizedName(d) }));
   const warehouseOptions = warehousesData?.items || [];
 
-  const isWarehouseRole = (role?: string) => role === 'sub_warehouse_manager';
-  const isDepartmentRole = (role?: string) => role === 'department_manager' || role === 'supervisor';
-
   const toggleWarehouse = (id: number) => {
     setWarehouseIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
@@ -54,16 +149,25 @@ export default function UsersPage() {
 
   const handleUpdate = async (formData: UpdateUserFormData) => {
     if (!editingUser) return;
-    const data: any = { ...formData, warehouse_ids: warehouseIds };
+    // Reject on the client BEFORE it round-trips: a non-admin must keep a
+    // department (mirrors the backend DEPARTMENT_REQUIRED_FOR_ROLE rule).
+    const finalRole = (formData.role ?? editingUser.role) as UserRole;
+    const finalDepartment = formData.department_id !== undefined ? formData.department_id : (editingUser.department_id ?? null);
+    if (finalRole !== 'admin' && (finalDepartment === undefined || finalDepartment === null)) {
+      updateForm.setError('department_id', { type: 'custom', message: 'pages.users.departmentRequiredForRole' });
+      return;
+    }
+    const data: any = {
+      ...formData,
+      warehouse_ids: warehouseIds,
+      department_id: finalRole === 'admin' ? null : finalDepartment,
+    };
     if (!data.password) delete data.password;
-    if (!data.department_id) delete data.department_id;
     await updateMutation.mutateAsync({ id: editingUser.id, data });
     setEditingUser(null);
     updateForm.reset();
     setWarehouseIds([]);
   };
-
-  const roleOptions = (['admin', 'sub_warehouse_manager', 'department_manager', 'supervisor'] as UserRole[]).map((value) => ({ value, label: getLocalizedRoleLabel(value) }));
 
   const columns = [
     { key: 'id', header: t('table.id') },
@@ -109,62 +213,40 @@ export default function UsersPage() {
     },
   ];
 
-  const renderForm = (form: any, onSubmit: any, isLoading: boolean, isEdit = false) => (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      <Input label={t('form.username')} {...form.register('username')} error={form.formState.errors.username?.message} />
-      {!isEdit && <Input label={t('form.password')} type="password" {...form.register('password')} error={form.formState.errors.password?.message} />}
-      {isEdit && <Input label={t('form.newPassword')} type="password" {...form.register('password')} />}
-      <Input label={t('form.fullName')} {...form.register('full_name')} error={form.formState.errors.full_name?.message} />
-      <Select label={t('form.role')} {...form.register('role')} error={form.formState.errors.role?.message} options={roleOptions} placeholder={t('form.selectRole')} />
-      {isDepartmentRole(form.watch('role')) && (
-        <Select label={t('form.department')} {...form.register('department_id')} error={form.formState.errors.department_id?.message} options={departmentOptions} placeholder={t('form.selectDepartment')} />
-      )}
-      {isWarehouseRole(form.watch('role')) && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.warehouses')}</label>
-          <div className="border rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
-            {warehouseOptions.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-gray-400">{t('common.noData')}</p>
-            ) : (
-              warehouseOptions.map((w: any) => (
-                <label key={w.id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={warehouseIds.includes(w.id)}
-                    onChange={() => toggleWarehouse(w.id)}
-                    className="rounded border-gray-300"
-                  />
-                  {getLocalizedName(w)}
-                </label>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-      {isEdit && (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" {...form.register('is_active')} className="rounded border-gray-300" />
-          {t('form.active')}
-        </label>
-      )}
-      <div className="flex justify-end gap-3">
-        <Button variant="secondary" type="button" onClick={() => { setIsCreateOpen(false); setEditingUser(null); form.reset(); }}>{t('common.cancel')}</Button>
-        <Button type="submit" isLoading={isLoading}>{isEdit ? t('common.save') : t('common.create')}</Button>
-      </div>
-    </form>
-  );
+  const closeCreate = () => { setIsCreateOpen(false); createForm.reset(); setWarehouseIds([]); };
+  const closeEdit = () => { setEditingUser(null); updateForm.reset(); setWarehouseIds([]); };
 
   return (
     <div>
       <PageHeader title={t('pages.users.title')} subtitle={t('pages.users.subtitle')} actions={can('users:create') ? <Button onClick={() => setIsCreateOpen(true)}><PlusIcon className="h-4 w-4 me-2" />{t('pages.users.create')}</Button> : undefined} />
       <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />
 
-      <Modal isOpen={isCreateOpen} onClose={() => { setIsCreateOpen(false); createForm.reset(); setWarehouseIds([]); }} title={t('pages.users.create')}>
-        {renderForm(createForm, handleCreate, createMutation.isPending)}
+      <Modal isOpen={isCreateOpen} onClose={closeCreate} title={t('pages.users.create')}>
+        <UserFormFields
+          form={createForm}
+          departmentOptions={departmentOptions}
+          warehouseOptions={warehouseOptions}
+          warehouseIds={warehouseIds}
+          onToggleWarehouse={toggleWarehouse}
+          isEdit={false}
+          isLoading={createMutation.isPending}
+          onSubmit={handleCreate}
+          onCancel={closeCreate}
+        />
       </Modal>
 
-      <Modal isOpen={!!editingUser} onClose={() => { setEditingUser(null); updateForm.reset(); setWarehouseIds([]); }} title={t('pages.users.edit')}>
-        {renderForm(updateForm, handleUpdate, updateMutation.isPending, true)}
+      <Modal isOpen={!!editingUser} onClose={closeEdit} title={t('pages.users.edit')}>
+        <UserFormFields
+          form={updateForm}
+          departmentOptions={departmentOptions}
+          warehouseOptions={warehouseOptions}
+          warehouseIds={warehouseIds}
+          onToggleWarehouse={toggleWarehouse}
+          isEdit
+          isLoading={updateMutation.isPending}
+          onSubmit={handleUpdate}
+          onCancel={closeEdit}
+        />
       </Modal>
     </div>
   );

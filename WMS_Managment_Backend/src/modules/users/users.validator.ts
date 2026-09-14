@@ -12,16 +12,6 @@ export const createUserSchema = z
     warehouse_ids: z.array(z.number().int().positive()).optional().default([]),
   })
   .superRefine((data, ctx) => {
-    if (
-      (data.role === 'department_manager' || data.role === 'supervisor') &&
-      (data.department_id === undefined || data.department_id === null)
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'department_id is required for this role',
-        path: ['department_id'],
-      });
-    }
     if (data.role === 'sub_warehouse_manager' && (!data.warehouse_ids || data.warehouse_ids.length === 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -50,16 +40,6 @@ export const updateUserSchema = z
         code: z.ZodIssueCode.custom,
         message: 'sub_warehouse_manager must be assigned at least one warehouse',
         path: ['warehouse_ids'],
-      });
-    }
-    if (
-      (data.role === 'department_manager' || data.role === 'supervisor') &&
-      data.department_id !== undefined && data.department_id === null
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'department_id is required for this role',
-        path: ['department_id'],
       });
     }
   });

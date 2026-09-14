@@ -20,12 +20,12 @@ export const createUserSchema = z
   })
   .superRefine((data, ctx) => {
     if (
-      (data.role === 'department_manager' || data.role === 'supervisor') &&
+      data.role !== 'admin' &&
       (data.department_id === undefined || data.department_id === null)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Department is required for this role',
+        message: 'pages.users.departmentRequiredForRole',
         path: ['department_id'],
       });
     }
@@ -43,13 +43,13 @@ export const updateUserSchema = z
   })
   .superRefine((data, ctx) => {
     if (
-      (data.role === 'department_manager' || data.role === 'supervisor') &&
-      data.department_id !== undefined &&
-      data.department_id === null
+      data.role &&
+      data.role !== 'admin' &&
+      (data.department_id === undefined || data.department_id === null)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Department is required for this role',
+        message: 'pages.users.departmentRequiredForRole',
         path: ['department_id'],
       });
     }

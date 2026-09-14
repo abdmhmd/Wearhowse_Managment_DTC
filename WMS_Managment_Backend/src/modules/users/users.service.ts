@@ -31,6 +31,16 @@ export class UsersService {
   }
 
   async create(data: User) {
+    // Service-level enforcement: every non-admin role MUST belong to a
+    // department — otherwise their data scope would silently resolve to NONE
+    // and department-managed warehouses / supervisors would be orphaned.
+    if (data.role !== 'admin' && (data.department_id === undefined || data.department_id === null)) {
+      throw new ValidationError(
+        'department_id is required for this role',
+        { role: data.role },
+        'DEPARTMENT_REQUIRED_FOR_ROLE'
+      );
+    }
     // Service-level enforcement (defense in depth): a sub_warehouse_manager MUST
     // be assigned to at least one warehouse, otherwise their data scope would
     // silently resolve to NONE and they could see nothing.
@@ -68,11 +78,12 @@ export class UsersService {
   }
 
   async update(id: number, data: Partial<User> & { is_active?: boolean }) {
+    const currentRes = await pool.query('SELECT role, department_id FROM users WHERE id = $1', [id]);
+    const currentUser = currentRes.rows[0];
+
     // Guard: prevent disabling or demoting the last active admin
     if (data.is_active === false || (data.role && data.role !== 'admin')) {
-      const currentRes = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
-      const current = currentRes.rows[0];
-      if (current?.role === 'admin') {
+      if (currentUser?.role === 'admin') {
         const countRes = await pool.query(
           "SELECT COUNT(*)::int AS total FROM users WHERE role = 'admin' AND is_active = true"
         );
@@ -86,15 +97,31 @@ export class UsersService {
     }
 
     const { warehouse_ids, ...restData } = data;
+
+    // Service-level enforcement: a non-admin role MUST keep a department. The
+    // check runs against the FINAL state of the user, since the request may
+    // change either the role or the department.
+    let finalRole: any;
+    if (currentUser) {
+      finalRole = (restData as any).role ?? currentUser.role;
+      const finalDepartment = (restData as any).department_id !== undefined
+        ? (restData as any).department_id
+        : currentUser.department_id ?? null;
+      if (finalRole !== 'admin' && (finalDepartment === undefined || finalDepartment === null)) {
+        throw new ValidationError(
+          'department_id is required for this role',
+          { user_id: id, role: finalRole },
+          'DEPARTMENT_REQUIRED_FOR_ROLE'
+        );
+      }
+    }
+
     await this.validateDepartment((restData as any).department_id);
 
     // Service-level enforcement: a sub_warehouse_manager must keep at least one
     // warehouse assignment. Checked against the FINAL state of the user (the
     // update may be changing either the role or the assignments).
-    {
-      const finalRole = (restData as any).role ?? await pool
-        .query('SELECT role FROM users WHERE id = $1', [id])
-        .then((r) => r.rows[0]?.role);
+    if (currentUser) {
       const finalAssignments = warehouse_ids !== undefined
         ? warehouse_ids
         : await usersRepository.getWarehouseAssignments(id);

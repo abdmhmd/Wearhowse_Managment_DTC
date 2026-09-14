@@ -103,7 +103,7 @@ describe('Admin user management (department + physical delete)', () => {
     expect(row.rows[0].department_id).toBe(deptA);
   });
 
-  test('create sub_warehouse_manager persists an optional department_id', async () => {
+  test('create sub_warehouse_manager persists department_id', async () => {
     const res = await createUser({
       role: 'sub_warehouse_manager',
       department_id: deptA,
@@ -116,10 +116,10 @@ describe('Admin user management (department + physical delete)', () => {
     expect(row.rows[0].department_id).toBe(deptA);
   });
 
-  test('create supervisor without department is rejected (400)', async () => {
+  test('create supervisor without department is rejected with DEPARTMENT_REQUIRED_FOR_ROLE (400)', async () => {
     const res = await createUser({ department_id: undefined });
     expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.code).toBe('DEPARTMENT_REQUIRED_FOR_ROLE');
   });
 
   test('create with a non-existent department is rejected (400)', async () => {
@@ -144,7 +144,7 @@ describe('Admin user management (department + physical delete)', () => {
     expect(row.rows[0].department_id).toBe(deptB);
   });
 
-  test('update can clear an optional department_id (WM)', async () => {
+  test('update cannot clear the department of a sub_warehouse_manager (400)', async () => {
     const created = await createUser({
       role: 'sub_warehouse_manager',
       department_id: deptA,
@@ -156,8 +156,8 @@ describe('Admin user management (department + physical delete)', () => {
       .put(`/api/users/${id}`)
       .set('Authorization', `Bearer ${admin.token}`)
       .send({ department_id: null });
-    expect(res.status).toBe(200);
-    expect(res.body.data.department_id).toBeNull();
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('DEPARTMENT_REQUIRED_FOR_ROLE');
   });
 
   test('update to an inactive/non-existent department is rejected (400)', async () => {

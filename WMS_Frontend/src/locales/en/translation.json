@@ -391,7 +391,13 @@
       "title": "Users",
       "subtitle": "Manage system users",
       "create": "Create User",
-      "edit": "Edit User"
+      "edit": "Edit User",
+      "department": "Department",
+      "departmentPlaceholder": "Select department",
+      "departmentSearchPlaceholder": "Search departments",
+      "departmentHelp": "Required for warehouse managers, department managers and supervisors. Only system administrators have no department.",
+      "departmentRequiredForRole": "Department is required for this role",
+      "warehousesHelp": "The warehouses this user is allowed to operate with."
     },
     "supervisors": {
       "title": "Supervisors",

@@ -397,7 +397,13 @@
       "title": "المستخدمون",
       "subtitle": "إدارة مستخدمي النظام",
       "create": "إنشاء مستخدم",
-      "edit": "تعديل المستخدم"
+      "edit": "تعديل المستخدم",
+      "department": "القسم",
+      "departmentPlaceholder": "اختر القسم",
+      "departmentSearchPlaceholder": "البحث في الأقسام",
+      "departmentHelp": "مطلوب لمديري المستودعات ومديري الأقسام والمشرفين. مسؤولو النظام فقط لا يحملون قسماً خاصاً بهم.",
+      "departmentRequiredForRole": "القسم مطلوب لهذا الدور",
+      "warehousesHelp": "المستودعات التي يُسمح لهذا المستخدم بالعمل فيها."
     },
     "supervisors": {
       "title": "المشرفون",

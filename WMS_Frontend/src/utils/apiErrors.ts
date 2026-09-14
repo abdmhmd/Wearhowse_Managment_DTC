@@ -117,6 +117,10 @@ export function mapApiError(error: any): MappedApiError {
     case 'NO_DEPARTMENT':
       return { key: 'pages.purchaseRequests.errors.noDepartment' };
 
+    // ── users ────────────────────────────────────────────────────────────────
+    case 'DEPARTMENT_REQUIRED_FOR_ROLE':
+      return { key: 'pages.users.departmentRequiredForRole' };
+
     // ── warehouses ───────────────────────────────────────────────────────────
     case 'MAIN_WAREHOUSE_EXISTS':
       return { key: 'pages.warehouses.errors.MAIN_WAREHOUSE_EXISTS' };

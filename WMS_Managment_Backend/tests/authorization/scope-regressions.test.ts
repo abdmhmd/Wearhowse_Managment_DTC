@@ -360,6 +360,7 @@ describe('Scope regressions (audit remediation)', () => {
           password_hash: 'dummy_hash',
           full_name: 'No WH',
           role: 'sub_warehouse_manager',
+          department_id: deptA,
         })
       ).rejects.toBeInstanceOf(ValidationError);
     });
@@ -370,6 +371,7 @@ describe('Scope regressions (audit remediation)', () => {
         password_hash: 'dummy_hash',
         full_name: 'Strip WH',
         role: 'sub_warehouse_manager',
+        department_id: deptA,
         warehouse_ids: [whA],
       });
       await expect(
@@ -389,6 +391,7 @@ describe('Scope regressions (audit remediation)', () => {
         password_hash: 'dummy_hash',
         full_name: 'Reassign',
         role: 'sub_warehouse_manager',
+        department_id: deptA,
         warehouse_ids: [whA],
       });
       const updated = await usersService.update(created.id, { warehouse_ids: [whB] });

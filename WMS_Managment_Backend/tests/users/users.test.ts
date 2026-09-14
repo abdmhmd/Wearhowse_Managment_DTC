@@ -1,6 +1,6 @@
 import { pool } from '../../src/config/database';
 import { usersService } from '../../src/modules/users/users.service';
-import { shortId, TEST_PREFIX, cleanup } from '../helpers';
+import { shortId, TEST_PREFIX, seedDepartment, cleanup } from '../helpers';
 
 const prefix = `${TEST_PREFIX}user_test_`;
 
@@ -8,14 +8,17 @@ afterAll(async () => { await cleanup(prefix); });
 
 describe('users CRUD', () => {
   let createdId: number;
+  let deptId: number;
 
   test('create', async () => {
+    deptId = await seedDepartment();
     const username = `${prefix}${shortId()}`;
     const result = await usersService.create({
       username,
       password_hash: 'dummy_hash',
       full_name: 'Test User',
       role: 'department_manager',
+      department_id: deptId,
     });
     expect(result).toMatchObject({ username, full_name: 'Test User', role: 'department_manager', is_active: true });
     expect(result.id).toBeGreaterThan(0);
