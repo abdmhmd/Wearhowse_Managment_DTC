@@ -7,7 +7,7 @@ import { useSupervisorsQuery, useCreateSupervisor, useUpdateSupervisor } from '@
 import { useAllDepartments } from '@/hooks/useDepartments';
 import { useAuthStore } from '@/store/auth.store';
 import { createSupervisorSchema, updateSupervisorSchema, type CreateSupervisorFormData, type UpdateSupervisorFormData } from '@/schemas/supervisors.schema';
-import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog, LoadingSpinner } from '@/components/ui';
+import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog, LoadingSpinner, SearchableSelect } from '@/components/ui';
 import { PlusIcon, PencilIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import type { Supervisor } from '@/types';
@@ -141,7 +141,24 @@ export default function SupervisorsPage() {
           <Input label={t('form.password')} type="password" {...createForm.register('password')} error={createForm.formState.errors.password?.message} />
           <Input label={t('form.fullName')} {...createForm.register('full_name')} error={createForm.formState.errors.full_name?.message} />
           {isAdmin ? (
-            <Select label={t('form.department')} {...createForm.register('department_id')} error={createForm.formState.errors.department_id?.message} options={departmentOptions} placeholder={t('pages.supervisors.selectDepartment')} />
+            <div>
+              <label htmlFor="sup-department" className="block text-sm font-medium text-gray-700 mb-1">
+                {t('form.department')}
+              </label>
+              <SearchableSelect
+                id="sup-department"
+                aria-label={t('form.department')}
+                value={(createForm.watch('department_id') ?? null) as number | null}
+                onChange={(v) => createForm.setValue('department_id', v === null ? (undefined as any) : Number(v), { shouldValidate: true })}
+                options={departmentOptions}
+                placeholder={t('components.departmentPicker.placeholder')}
+                searchPlaceholder={t('components.departmentPicker.searchPlaceholder')}
+                emptyMessage={t('components.departmentPicker.emptyMessage')}
+              />
+              {createForm.formState.errors.department_id?.message && (
+                <p className="mt-1 text-sm text-red-600">{createForm.formState.errors.department_id.message as string}</p>
+              )}
+            </div>
           ) : (
             <Input label={t('pages.supervisors.department')} value={getLocalizedName(myDepartment)} disabled />
           )}

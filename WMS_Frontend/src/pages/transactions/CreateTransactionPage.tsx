@@ -7,7 +7,7 @@ import { useItems } from '@/hooks/useItems';
 import { useAllUnits } from '@/hooks/useUnits';
 import { useUnitConversionsByItem } from '@/hooks/useUnitConversions';
 import { useCreateDraftTransaction } from '@/hooks/useTransactions';
-import { PageHeader, Button, Input, Select, Modal } from '@/components/ui';
+import { PageHeader, Button, Input, Select, Modal, SearchableSelect } from '@/components/ui';
 import { PlusIcon, TrashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { type TransactionType } from '@/types';
 import { useForm } from 'react-hook-form';
@@ -60,7 +60,7 @@ export default function CreateTransactionPage() {
     ? units.filter((u: any) => validUnits.includes(u.code)).map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }))
     : units.map((u: any) => ({ value: u.code, label: `${u.code} (${getLocalizedName(u)})` }));
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<CreateDraftTransactionFormFormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CreateDraftTransactionFormFormData>({
     resolver: zodResolver(createDraftTransactionFormSchema),
     defaultValues: {
       header: { type: 'RV', warehouse_id: undefined as any },
@@ -155,20 +155,49 @@ export default function CreateTransactionPage() {
                 ))}
               </select>
             </div>
-            <Select
-              label={`${t('form.warehouse')} *`}
-              {...register('header.warehouse_id')}
-              error={errors.header?.warehouse_id?.message}
-              placeholder={t('form.selectWarehouse')}
-              options={warehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
-            />
-            {transactionType === 'LN' && (
-              <Select
-                label={`${t('form.department')} *`}
-                {...register('header.department_id')}
-                placeholder={t('form.selectDepartment')}
-                options={departments.map((d: any) => ({ value: d.id || d.code, label: getLocalizedName(d) }))}
+            <div>
+              <label htmlFor="tx-warehouse" className="block text-sm font-medium text-gray-700 mb-1">
+                {`${t('form.warehouse')} *`}
+              </label>
+              <SearchableSelect
+                id="tx-warehouse"
+                aria-label={t('form.warehouse')}
+                value={(watch('header.warehouse_id') ?? null) as number | null}
+                onChange={(v) => setValue('header.warehouse_id', v === null ? (undefined as any) : Number(v), { shouldValidate: true })}
+                options={warehouses.map((w: any) => ({
+                  value: w.id,
+                  label: `${w.code} — ${getLocalizedName(w)}`,
+                  sublabel: w.department_name_ar || w.department_name_en
+                    ? getLocalizedName({ name_ar: w.department_name_ar, name_en: w.department_name_en })
+                    : undefined,
+                }))}
+                placeholder={t('components.warehousePicker.placeholder')}
+                searchPlaceholder={t('components.warehousePicker.searchPlaceholder')}
+                emptyMessage={t('components.warehousePicker.emptyMessage')}
               />
+              {errors.header?.warehouse_id?.message && (
+                <p className="mt-1 text-sm text-red-600">{errors.header.warehouse_id.message as string}</p>
+              )}
+            </div>
+            {transactionType === 'LN' && (
+              <div>
+                <label htmlFor="tx-department" className="block text-sm font-medium text-gray-700 mb-1">
+                  {`${t('form.department')} *`}
+                </label>
+                <SearchableSelect
+                  id="tx-department"
+                  aria-label={t('form.department')}
+                  value={(watch('header.department_id') ?? null) as number | null}
+                  onChange={(v) => setValue('header.department_id', v === null ? (undefined as any) : Number(v), { shouldValidate: true })}
+                  options={departments.map((d: any) => ({ value: d.id, label: getLocalizedName(d) }))}
+                  placeholder={t('components.departmentPicker.placeholder')}
+                  searchPlaceholder={t('components.departmentPicker.searchPlaceholder')}
+                  emptyMessage={t('components.departmentPicker.emptyMessage')}
+                />
+                {errors.header?.department_id?.message && (
+                  <p className="mt-1 text-sm text-red-600">{errors.header.department_id.message as string}</p>
+                )}
+              </div>
             )}
           </div>
           <div className="mt-4">

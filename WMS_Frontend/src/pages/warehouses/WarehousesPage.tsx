@@ -16,7 +16,7 @@ import {
   type CreateWarehouseFormData,
   type UpdateWarehouseFormData,
 } from '@/schemas/warehouses.schema';
-import { PageHeader, Button, DataTable, Modal, Input, Select, Badge } from '@/components/ui';
+import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, SearchableSelect } from '@/components/ui';
 import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
 import type { Warehouse } from '@/types';
@@ -138,12 +138,21 @@ export default function WarehousesPage() {
       <Input id="wh-code" label={t('form.code')} {...form.register('code')} error={form.formState.errors.code?.message} />
       <Input id="wh-name" label={t('form.name')} {...form.register('name_ar')} error={form.formState.errors.name_ar?.message} />
       <Input id="wh-location" label={t('form.location')} {...form.register('location')} />
-      <Select
-        id="wh-department"
-        label={t('pages.warehouses.department')}
-        {...form.register('department_id')}
-        options={formDepartmentOptions}
-      />
+      <div>
+        <label htmlFor="wh-department" className="block text-sm font-medium text-gray-700 mb-1">
+          {t('pages.warehouses.department')}
+        </label>
+        <SearchableSelect
+          id="wh-department"
+          aria-label={t('pages.warehouses.department')}
+          value={(form.watch('department_id') ?? null) as number | null}
+          onChange={(v) => form.setValue('department_id', v === null || v === '' ? ('' as any) : Number(v), { shouldValidate: true })}
+          options={formDepartmentOptions}
+          placeholder={t('components.departmentPicker.placeholder')}
+          searchPlaceholder={t('components.departmentPicker.searchPlaceholder')}
+          emptyMessage={t('components.departmentPicker.emptyMessage')}
+        />
+      </div>
       <div className="rounded-lg border border-gray-200 p-3">
         <div className="flex items-center gap-2">
           <input
@@ -174,13 +183,18 @@ export default function WarehousesPage() {
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="w-56">
-          <Select
+          <label htmlFor="wh-filter-department" className="block text-sm font-medium text-gray-700 mb-1">
+            {t('pages.warehouses.filterByDepartment')}
+          </label>
+          <SearchableSelect
             id="wh-filter-department"
-            label={t('pages.warehouses.filterByDepartment')}
-            value={filterDept}
-            onChange={(e) => { setFilterDept(e.target.value); setPage(1); }}
+            aria-label={t('pages.warehouses.filterByDepartment')}
+            value={filterDept || null}
+            onChange={(v) => { setFilterDept(v === null ? '' : String(v)); setPage(1); }}
             options={departmentOptions}
             placeholder={t('common.all')}
+            searchPlaceholder={t('components.departmentPicker.searchPlaceholder')}
+            emptyMessage={t('components.departmentPicker.emptyMessage')}
           />
         </div>
         <div className="w-56">
