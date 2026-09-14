@@ -9,10 +9,10 @@ import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useSupervisors } from '@/hooks/useUsers';
 import { useAuthStore } from '@/store/auth.store';
 import { createProjectSchema, updateProjectSchema, type CreateProjectFormData, type UpdateProjectFormData } from '@/schemas/projects.schema';
-import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog } from '@/components/ui';
+import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, ConfirmDialog, SearchableSelect } from '@/components/ui';
 import { PlusIcon, PencilIcon, LockClosedIcon, XCircleIcon, EyeIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/utils';
-import { getLocalizedName } from '@/i18n/helpers';
+import { getLocalizedName, getLocalizedRoleLabel } from '@/i18n/helpers';
 import type { Project } from '@/types';
 
 function cleanOptional(data: Record<string, any>) {
@@ -226,13 +226,24 @@ export default function ProjectsPage() {
       <Input label={t('pages.projects.name')} {...form.register('name')} error={form.formState.errors.name?.message} />
       <div className="grid grid-cols-2 gap-4">
         {!isEdit && !isWarehouseManager && !isSupervisor && (
-          <Select
-            label={t('pages.projects.department')}
-            {...form.register('department_id')}
-            error={form.formState.errors.department_id?.message}
-            placeholder={t('pages.projects.selectDepartment')}
-            options={departments.map((d: any) => ({ value: d.id, label: getLocalizedName(d) }))}
-          />
+          <div>
+            <label htmlFor="pj-department" className="block text-sm font-medium text-gray-700 mb-1">
+              {t('pages.projects.department')}
+            </label>
+            <SearchableSelect
+              id="pj-department"
+              aria-label={t('pages.projects.department')}
+              value={(form.watch('department_id') ?? null) as number | null}
+              onChange={(v) => form.setValue('department_id', v === null ? (undefined as any) : Number(v), { shouldValidate: true })}
+              options={departments.map((d: any) => ({ value: d.id, label: getLocalizedName(d) }))}
+              placeholder={t('components.departmentPicker.placeholder')}
+              searchPlaceholder={t('components.departmentPicker.searchPlaceholder')}
+              emptyMessage={t('components.departmentPicker.emptyMessage')}
+            />
+            {form.formState.errors.department_id?.message && (
+              <p className="mt-1 text-sm text-red-600">{form.formState.errors.department_id.message as string}</p>
+            )}
+          </div>
         )}
         {!isEdit && (isWarehouseManager || isSupervisor) && (
           <div>
@@ -262,13 +273,28 @@ export default function ProjectsPage() {
             </div>
           </div>
         ) : (
-          <Select
-            label={t('pages.projects.supervisor')}
-            {...form.register('supervisor_id')}
-            error={form.formState.errors.supervisor_id?.message}
-            placeholder={t('pages.projects.selectSupervisor')}
-            options={supervisors.map((u: any) => ({ value: u.id, label: u.full_name }))}
-          />
+          <div>
+            <label htmlFor="pj-supervisor" className="block text-sm font-medium text-gray-700 mb-1">
+              {t('pages.projects.supervisor')}
+            </label>
+            <SearchableSelect
+              id="pj-supervisor"
+              aria-label={t('pages.projects.supervisor')}
+              value={(form.watch('supervisor_id') ?? null) as number | null}
+              onChange={(v) => form.setValue('supervisor_id', v === null ? (undefined as any) : Number(v), { shouldValidate: true })}
+              options={supervisors.map((u: any) => ({
+                value: u.id,
+                label: `${u.full_name} — ${u.username}`,
+                sublabel: getLocalizedRoleLabel(u.role),
+              }))}
+              placeholder={t('components.userPicker.placeholder')}
+              searchPlaceholder={t('components.userPicker.searchPlaceholder')}
+              emptyMessage={t('components.userPicker.emptyMessage')}
+            />
+            {form.formState.errors.supervisor_id?.message && (
+              <p className="mt-1 text-sm text-red-600">{form.formState.errors.supervisor_id.message as string}</p>
+            )}
+          </div>
         )}
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -280,15 +306,32 @@ export default function ProjectsPage() {
             </div>
           </div>
         ) : (
-          <Select
-            label={t('pages.projects.warehouse')}
-            {...form.register('warehouse_id')}
-            error={form.formState.errors.warehouse_id?.message}
-            placeholder={t('pages.projects.selectWarehouse')}
-            disabled={isEdit && isDepartmentManager}
-            options={warehousesForDept(Number(form.watch('department_id')) || (editingProject?.department_id ?? 0))
-              .map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
-          />
+          <div>
+            <label htmlFor="pj-warehouse" className="block text-sm font-medium text-gray-700 mb-1">
+              {t('pages.projects.warehouse')}
+            </label>
+            <SearchableSelect
+              id="pj-warehouse"
+              aria-label={t('pages.projects.warehouse')}
+              value={(form.watch('warehouse_id') ?? null) as number | null}
+              onChange={(v) => form.setValue('warehouse_id', v === null ? (undefined as any) : Number(v), { shouldValidate: true })}
+              disabled={isEdit && isDepartmentManager}
+              options={warehousesForDept(Number(form.watch('department_id')) || (editingProject?.department_id ?? 0))
+                .map((w: any) => ({
+                  value: w.id,
+                  label: `${w.code} — ${getLocalizedName(w)}`,
+                  sublabel: w.department_name_ar || w.department_name_en
+                    ? getLocalizedName({ name_ar: w.department_name_ar, name_en: w.department_name_en })
+                    : undefined,
+                }))}
+              placeholder={t('components.warehousePicker.placeholder')}
+              searchPlaceholder={t('components.warehousePicker.searchPlaceholder')}
+              emptyMessage={t('components.warehousePicker.emptyMessage')}
+            />
+            {form.formState.errors.warehouse_id?.message && (
+              <p className="mt-1 text-sm text-red-600">{form.formState.errors.warehouse_id.message as string}</p>
+            )}
+          </div>
         )}
         <Input label={t('pages.projects.academicYear')} placeholder="2025/2026" {...form.register('academic_year')} />
       </div>
