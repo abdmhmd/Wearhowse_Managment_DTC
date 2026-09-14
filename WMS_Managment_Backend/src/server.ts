@@ -6,13 +6,26 @@ validateEnv();
 assertSafeEnv();
 
 import app from './app';
-import { pool, testConnection } from './config/database';
+import { pool, getConnectionInfo } from './config/database';
 import { env } from './utils/env';
 import { logger } from './utils/logger';
 
 const server = app.listen(env.PORT, async () => {
-  const dbOk = await testConnection();
-  logger.info(`Server running on port ${env.PORT} | DB: ${dbOk ? 'connected' : 'unavailable'}`, 'Server');
+  const info = getConnectionInfo();
+  try {
+    await pool.query('SELECT NOW()');
+    logger.info(
+      `Server running on port ${env.PORT} | ✅ Database connected (SSL: ${info.ssl}, host: ${info.host})`,
+      'Server'
+    );
+  } catch (err: any) {
+    // Do not crash on a DB outage: log it and let health checks report db:
+    // "disconnected" until the database is reachable again.
+    logger.error(
+      `Server running on port ${env.PORT} | ❌ Database connection failed: ${err.message}`,
+      'Server'
+    );
+  }
 });
 
 // ─── Scheduled Cleanup: Remove expired/revoked refresh tokens every 24 hours ───

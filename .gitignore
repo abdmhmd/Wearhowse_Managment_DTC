@@ -44,6 +44,13 @@ coverage/
 *.sqlite
 *.db
 
+# Aiven / DB TLS certificates — downloaded manually per environment, never commit.
+# Keeps the certs/ folder itself (via .gitkeep) while ignoring any real certs.
+certs/*.pem
+certs/*.crt
+certs/*.key
+!certs/.gitkeep
+
 # OpenCode or other AI temp files
 .opencode/
 

@@ -15,6 +15,14 @@ const envSchema = z.object({
     .int()
     .min(1000)
     .default(() => (process.env.NODE_ENV === 'production' ? 15 * 60 * 1000 : 10 * 1000)),
+  /**
+   * PostgreSQL TLS (Aiven / cloud) switches. Local development keeps
+   * DB_SSL=false; Aiven for PostgreSQL sets DB_SSL=true and, for cert
+   * verification, DB_SSL_CA_PATH pointing at the downloaded ca.pem.
+   */
+  DB_SSL: z.string().default('false'),
+  DB_SSL_REJECT_UNAUTHORIZED: z.string().default('true'),
+  DB_SSL_CA_PATH: z.string().default(''),
 });
 
 type EnvSchema = z.infer<typeof envSchema>;
@@ -105,5 +113,14 @@ export const env = {
   },
   get LOGIN_RATE_LIMIT_WINDOW_MS(): number {
     return (parsedEnv || validateEnv()).LOGIN_RATE_LIMIT_WINDOW_MS;
+  },
+  get DB_SSL(): string {
+    return (parsedEnv || validateEnv()).DB_SSL;
+  },
+  get DB_SSL_REJECT_UNAUTHORIZED(): string {
+    return (parsedEnv || validateEnv()).DB_SSL_REJECT_UNAUTHORIZED;
+  },
+  get DB_SSL_CA_PATH(): string {
+    return (parsedEnv || validateEnv()).DB_SSL_CA_PATH;
   },
 };

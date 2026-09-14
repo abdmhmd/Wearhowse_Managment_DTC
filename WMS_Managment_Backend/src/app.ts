@@ -71,20 +71,28 @@ app.use('/api/supervisors', supervisorsRoutes);
 app.use('/api/purchase-orders', purchaseOrdersRoutes);
 app.use('/api/purchase-requests', purchaseRequestsRoutes);
 
-import { testConnection } from './config/database';
+import { testConnection, getConnectionInfo } from './config/database';
 
 const healthHandler = async (_req: Request, res: Response) => {
   const isDbHealthy = await testConnection();
-  if (!isDbHealthy) {
-    return sendError(res, 'Database connection error', 503, 'SERVICE_UNAVAILABLE');
-  }
-  sendData(res, {
-    status: 'ok',
+  const info = getConnectionInfo();
+  const healthPayload = {
+    status: isDbHealthy ? 'ok' : 'degraded',
     version: process.env.npm_package_version || '1.0.0',
-    db: 'connected',
+    db: isDbHealthy ? 'connected' : 'disconnected',
+    ssl: info.ssl,
+    host: info.host,
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
-  });
+  };
+  if (!isDbHealthy) {
+    return res.status(503).json({
+      success: false,
+      error: { message: 'Database connection error', code: 'SERVICE_UNAVAILABLE' },
+      data: healthPayload,
+    });
+  }
+  sendData(res, healthPayload);
 };
 
 app.get('/health', healthHandler);
