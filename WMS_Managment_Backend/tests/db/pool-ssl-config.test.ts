@@ -64,7 +64,7 @@ function loadPoolConfig(overrides: EnvOverrides): any {
   }
 }
 
-describe('pool SSL config (Aiven / cloud)', () => {
+describe('pool SSL config (TLS opt-in / local default)', () => {
   it('uses no SSL by default in non-production environments', () => {
     const config = loadPoolConfig({ DB_SSL: undefined });
     expect(config.ssl).toBeUndefined();
@@ -102,13 +102,13 @@ describe('pool SSL config (Aiven / cloud)', () => {
   it('reports only non-sensitive connection info (host + ssl flag)', () => {
     jest.resetModules();
     const previous = process.env.DATABASE_URL;
-    process.env.DATABASE_URL = 'postgresql://avnadmin:secret@db-xyz.aivencloud.com:13000/defaultdb?sslmode=require';
+    process.env.DATABASE_URL = 'postgresql://app:secret@localhost:5432/db?sslmode=require';
     process.env.NODE_ENV = 'test';
     process.env.DB_SSL = 'true';
     try {
       const { getConnectionInfo } = require('../../src/config/database');
       const info = getConnectionInfo();
-      expect(info).toEqual({ ssl: true, host: 'db-xyz.aivencloud.com' });
+      expect(info).toEqual({ ssl: true, host: 'localhost' });
       expect(JSON.stringify(info)).not.toContain('secret');
     } finally {
       if (previous === undefined) delete process.env.DATABASE_URL;
