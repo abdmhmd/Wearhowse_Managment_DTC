@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCreatePurchaseRequest } from '@/hooks/useCreatePurchaseRequest';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useAuthStore } from '@/store/auth.store';
-import { PageHeader, Button, Input, Select } from '@/components/ui';
+import { PageHeader, Button, Input, Select, SearchableSelect } from '@/components/ui';
 import ItemPickerModal from '@/components/pickers/ItemPickerModal';
 import { TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { getLocalizedName } from '@/i18n/helpers';
@@ -39,13 +39,13 @@ export default function CreatePurchaseRequestPage() {
     user?.department_id != null ? w.department_id === user.department_id : true
   );
 
-  const warehouseOptions = [
-    { value: '', label: t('common.select') },
-    ...mainWarehouses.map((w: any) => ({
-      value: String(w.id),
-      label: getLocalizedName({ name_ar: w.name_ar, name_en: w.name_en }) || w.code || String(w.id),
-    })),
-  ];
+  const warehouseOptions = mainWarehouses.map((w: any) => ({
+    value: String(w.id),
+    label: `${w.code} — ${getLocalizedName(w)}`,
+    sublabel: w.department_name_ar || w.department_name_en
+      ? getLocalizedName({ name_ar: w.department_name_ar, name_en: w.department_name_en })
+      : undefined,
+  }));
 
   const setLine = (index: number, patch: Partial<LineDraft>) => {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
@@ -97,14 +97,21 @@ export default function CreatePurchaseRequestPage() {
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         <h3 className="font-medium text-gray-900 mb-3">{t('pages.purchaseRequests.details')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            id="pr-warehouse"
-            label={t('pages.purchaseRequests.warehouse')}
-            value={warehouseId}
-            onChange={(e) => setWarehouseId(e.target.value)}
-            options={warehouseOptions}
-            placeholder={t('pages.purchaseRequests.selectWarehouse')}
-          />
+          <div>
+            <label htmlFor="pr-warehouse" className="block text-sm font-medium text-gray-700 mb-1">
+              {t('pages.purchaseRequests.warehouse')}
+            </label>
+            <SearchableSelect
+              id="pr-warehouse"
+              aria-label={t('pages.purchaseRequests.warehouse')}
+              value={warehouseId}
+              onChange={(v) => setWarehouseId(v === null ? '' : String(v))}
+              options={warehouseOptions}
+              placeholder={t('components.warehousePicker.placeholder')}
+              searchPlaceholder={t('components.warehousePicker.searchPlaceholder')}
+              emptyMessage={t('components.warehousePicker.emptyMessage')}
+            />
+          </div>
           <Input id="pr-notes" label={t('common.notes')} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
       </div>

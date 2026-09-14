@@ -8,7 +8,7 @@ import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useAllUnits } from '@/hooks/useUnits';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { createItemSchema, updateItemSchema, type CreateItemFormData, type UpdateItemFormData } from '@/schemas/items.schema';
-import { PageHeader, Button, DataTable, Modal, Input, Select, Badge } from '@/components/ui';
+import { PageHeader, Button, DataTable, Modal, Input, Select, Badge, SearchableSelect } from '@/components/ui';
 import { PlusIcon, PencilIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { formatNumber } from '@/utils';
 import { getLocalizedName } from '@/i18n/helpers';
@@ -177,13 +177,30 @@ export default function ItemsPage() {
           />
         </div>
         <div className="grid grid-cols-3 gap-4">
-          <Select
-            label={t('form.warehouse')}
-            {...form.register('warehouse_id')}
-            error={form.formState.errors.warehouse_id?.message}
-            placeholder={t('form.selectWarehouse')}
-            options={warehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
-          />
+          <div>
+            <label htmlFor="item-warehouse" className="block text-sm font-medium text-gray-700 mb-1">
+              {t('form.warehouse')}
+            </label>
+            <SearchableSelect
+              id="item-warehouse"
+              aria-label={t('form.warehouse')}
+              value={(form.watch('warehouse_id') ?? null) as number | null}
+              onChange={(v) => form.setValue('warehouse_id', v === null ? (undefined as any) : Number(v), { shouldValidate: true })}
+              options={warehouses.map((w: any) => ({
+                value: w.id,
+                label: `${w.code} — ${getLocalizedName(w)}`,
+                sublabel: w.department_name_ar || w.department_name_en
+                  ? getLocalizedName({ name_ar: w.department_name_ar, name_en: w.department_name_en })
+                  : undefined,
+              }))}
+              placeholder={t('components.warehousePicker.placeholder')}
+              searchPlaceholder={t('components.warehousePicker.searchPlaceholder')}
+              emptyMessage={t('components.warehousePicker.emptyMessage')}
+            />
+            {form.formState.errors.warehouse_id?.message && (
+              <p className="mt-1 text-sm text-red-600">{form.formState.errors.warehouse_id.message as string}</p>
+            )}
+          </div>
           <Input label={t('form.minStockLevel')} type="number" step="0.0001" {...form.register('min_stock_level')} />
           <Input label={t('form.maxStockLevel')} type="number" step="0.0001" {...form.register('max_stock_level')} />
         </div>
@@ -247,13 +264,30 @@ export default function ItemsPage() {
           />
         </div>
         <div className="grid grid-cols-3 gap-4">
-          <Select
-            label={t('form.warehouse')}
-            {...form.register('warehouse_id')}
-            error={form.formState.errors.warehouse_id?.message}
-            placeholder={t('form.selectWarehouse')}
-            options={warehouses.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
-          />
+          <div>
+            <label htmlFor="item-warehouse" className="block text-sm font-medium text-gray-700 mb-1">
+              {t('form.warehouse')}
+            </label>
+            <SearchableSelect
+              id="item-warehouse"
+              aria-label={t('form.warehouse')}
+              value={(form.watch('warehouse_id') ?? null) as number | null}
+              onChange={(v) => form.setValue('warehouse_id', v === null ? (undefined as any) : Number(v), { shouldValidate: true })}
+              options={warehouses.map((w: any) => ({
+                value: w.id,
+                label: `${w.code} — ${getLocalizedName(w)}`,
+                sublabel: w.department_name_ar || w.department_name_en
+                  ? getLocalizedName({ name_ar: w.department_name_ar, name_en: w.department_name_en })
+                  : undefined,
+              }))}
+              placeholder={t('components.warehousePicker.placeholder')}
+              searchPlaceholder={t('components.warehousePicker.searchPlaceholder')}
+              emptyMessage={t('components.warehousePicker.emptyMessage')}
+            />
+            {form.formState.errors.warehouse_id?.message && (
+              <p className="mt-1 text-sm text-red-600">{form.formState.errors.warehouse_id.message as string}</p>
+            )}
+          </div>
           <Input label={t('form.minStockLevel')} type="number" step="0.0001" {...form.register('min_stock_level')} />
           <Input label={t('form.maxStockLevel')} type="number" step="0.0001" {...form.register('max_stock_level')} />
         </div>
@@ -300,14 +334,21 @@ export default function ItemsPage() {
           <option value="">{t('common.all')} {t('table.category')}</option>
           {categories.map((c: any) => <option key={c.code} value={c.code}>{getLocalizedName(c)}</option>)}
         </select>
-        <select
-          value={filter.warehouse_id || ''}
-          onChange={(e) => { setFilter({ ...filter, warehouse_id: e.target.value ? Number(e.target.value) : undefined }); setPage(1); }}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-        >
-          <option value="">{t('common.all')} {t('table.warehouse')}</option>
-          {warehouses.map((w: any) => <option key={w.id} value={w.id}>{getLocalizedName(w)}</option>)}
-        </select>
+        <SearchableSelect
+          aria-label={t('table.warehouse')}
+          value={filter.warehouse_id ?? null}
+          onChange={(v) => { setFilter({ ...filter, warehouse_id: v === null ? undefined : Number(v) }); setPage(1); }}
+          options={warehouses.map((w: any) => ({
+            value: w.id,
+            label: `${w.code} — ${getLocalizedName(w)}`,
+            sublabel: w.department_name_ar || w.department_name_en
+              ? getLocalizedName({ name_ar: w.department_name_ar, name_en: w.department_name_en })
+              : undefined,
+          }))}
+          placeholder={t('common.allWarehouses')}
+          searchPlaceholder={t('components.warehousePicker.searchPlaceholder')}
+          emptyMessage={t('components.warehousePicker.emptyMessage')}
+        />
       </div>
 
       <DataTable columns={columns} data={(data?.items || []) as any[]} pagination={data?.pagination ? { ...data.pagination, onPageChange: setPage } : undefined} emptyMessage={t('common.noData')} />

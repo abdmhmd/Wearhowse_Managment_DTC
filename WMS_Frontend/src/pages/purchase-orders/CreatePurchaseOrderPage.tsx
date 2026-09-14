@@ -8,7 +8,7 @@ import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useDepartments } from '@/hooks/useDepartments';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/api/client';
-import { PageHeader, Button, Input, Select } from '@/components/ui';
+import { PageHeader, Button, Input, Select, SearchableSelect } from '@/components/ui';
 import { TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { getLocalizedName } from '@/i18n/helpers';
 
@@ -81,13 +81,13 @@ export default function CreatePurchaseOrderPage() {
 
   const selectedWarehouse = mainWarehouses.find((w: any) => String(w.id) === warehouseId);
 
-  const warehouseOptions = [
-    { value: '', label: t('common.select') },
-    ...mainWarehouses.map((w: any) => ({
-      value: String(w.id),
-      label: getLocalizedName(w) || w.code || String(w.id),
-    })),
-  ];
+  const warehouseOptions = mainWarehouses.map((w: any) => ({
+    value: String(w.id),
+    label: `${w.code} — ${getLocalizedName(w)}`,
+    sublabel: w.department_name_ar || w.department_name_en
+      ? getLocalizedName({ name_ar: w.department_name_ar, name_en: w.department_name_en })
+      : undefined,
+  }));
   const itemOptions = [
     { value: '', label: t('common.select') },
     ...items.map((it: any) => ({ value: String(it.id), label: `${it.item_code} — ${getLocalizedName(it)}` })),
@@ -193,8 +193,21 @@ export default function CreatePurchaseOrderPage() {
             </>
           ) : (
             <>
-              <Select label={t('pages.purchaseOrders.receivingWarehouse')} value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)} options={warehouseOptions} />
+              <div>
+                <label htmlFor="po-warehouse" className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('pages.purchaseOrders.receivingWarehouse')}
+                </label>
+                <SearchableSelect
+                  id="po-warehouse"
+                  aria-label={t('pages.purchaseOrders.receivingWarehouse')}
+                  value={warehouseId}
+                  onChange={(v) => setWarehouseId(v === null ? '' : String(v))}
+                  options={warehouseOptions}
+                  placeholder={t('components.warehousePicker.placeholder')}
+                  searchPlaceholder={t('components.warehousePicker.searchPlaceholder')}
+                  emptyMessage={t('components.warehousePicker.emptyMessage')}
+                />
+              </div>
               <Input label={t('pages.purchaseOrders.supplier')} value={supplierName}
                 onChange={(e) => setSupplierName(e.target.value)} placeholder={t('pages.purchaseOrders.supplierPlaceholder')} />
               <Input type="date" label={t('pages.purchaseOrders.expectedDate')} value={expectedDate}

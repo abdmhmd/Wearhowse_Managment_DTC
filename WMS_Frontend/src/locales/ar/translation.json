@@ -809,6 +809,27 @@
       "selectedCount": "تم اختيار {{count}}",
       "page": "صفحة {{page}} من {{total}}",
       "confirm": "إضافة المحدد"
+    },
+    "warehousePicker": {
+      "placeholder": "اختر المستودع",
+      "searchPlaceholder": "ابحث عن مستودع...",
+      "emptyMessage": "لا توجد مستودعات"
+    },
+    "departmentPicker": {
+      "placeholder": "اختر القسم",
+      "searchPlaceholder": "ابحث عن قسم...",
+      "emptyMessage": "لا توجد أقسام",
+      "noDepartment": "بدون قسم (مركزي)"
+    },
+    "userPicker": {
+      "placeholder": "اختر مستخدماً",
+      "searchPlaceholder": "ابحث عن مستخدم...",
+      "emptyMessage": "لا يوجد مستخدمون"
+    },
+    "projectPicker": {
+      "placeholder": "اختر المشروع",
+      "searchPlaceholder": "ابحث عن مشروع...",
+      "emptyMessage": "لا توجد مشاريع"
     }
   }
 }

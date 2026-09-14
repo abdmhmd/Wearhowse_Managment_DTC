@@ -803,6 +803,27 @@
       "selectedCount": "{{count}} selected",
       "page": "Page {{page}} of {{total}}",
       "confirm": "Add Selected"
+    },
+    "warehousePicker": {
+      "placeholder": "Select warehouse",
+      "searchPlaceholder": "Search warehouse...",
+      "emptyMessage": "No warehouses found"
+    },
+    "departmentPicker": {
+      "placeholder": "Select department",
+      "searchPlaceholder": "Search department...",
+      "emptyMessage": "No departments found",
+      "noDepartment": "No department (Central)"
+    },
+    "userPicker": {
+      "placeholder": "Select user",
+      "searchPlaceholder": "Search user...",
+      "emptyMessage": "No users found"
+    },
+    "projectPicker": {
+      "placeholder": "Select project",
+      "searchPlaceholder": "Search project...",
+      "emptyMessage": "No projects found"
     }
   }
 }

@@ -4,7 +4,7 @@ import { getLocalizedName } from '@/i18n/helpers';
 import { useInventoryReport } from '@/hooks/useReports';
 import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
-import { PageHeader, DataTable, Badge } from '@/components/ui';
+import { PageHeader, DataTable, Badge, SearchableSelect } from '@/components/ui';
 import { formatNumber } from '@/utils';
 import type { InventoryReportItem } from '@/types';
 import type { InventoryReportFilters } from '@/api/reports.api';
@@ -77,14 +77,21 @@ export default function ReportsPage() {
             onChange={(e) => setFilters({ ...filters, search: e.target.value || undefined, page: 1 })}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
           />
-          <select
-            value={filters.warehouse_id || ''}
-            onChange={(e) => setFilters({ ...filters, warehouse_id: e.target.value ? Number(e.target.value) : undefined, page: 1 })}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-          >
-            <option value="">{t('common.allWarehouses')}</option>
-            {warehouses.map((w: any) => <option key={w.id} value={w.id}>{getLocalizedName(w)}</option>)}
-          </select>
+          <SearchableSelect
+            aria-label={t('reports.warehouse')}
+            value={filters.warehouse_id ?? null}
+            onChange={(v) => setFilters({ ...filters, warehouse_id: v === null ? undefined : Number(v), page: 1 })}
+            options={warehouses.map((w: any) => ({
+              value: w.id,
+              label: `${w.code} — ${getLocalizedName(w)}`,
+              sublabel: w.department_name_ar || w.department_name_en
+                ? getLocalizedName({ name_ar: w.department_name_ar, name_en: w.department_name_en })
+                : undefined,
+            }))}
+            placeholder={t('common.allWarehouses')}
+            searchPlaceholder={t('components.warehousePicker.searchPlaceholder')}
+            emptyMessage={t('components.warehousePicker.emptyMessage')}
+          />
           <select
             value={filters.category_code || ''}
             onChange={(e) => setFilters({ ...filters, category_code: e.target.value || undefined, page: 1 })}
