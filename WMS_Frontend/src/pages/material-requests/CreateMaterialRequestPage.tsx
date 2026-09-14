@@ -9,7 +9,7 @@ import { useAllWarehouses } from '@/hooks/useWarehouses';
 import { useAllItems } from '@/hooks/useItems';
 import { useAllProjects } from '@/hooks/useProjects';
 import { createMaterialRequestSchema, type CreateMaterialRequestFormData } from '@/schemas/material-requests.schema';
-import { PageHeader, Button, Input, Select, LoadingSpinner } from '@/components/ui';
+import { PageHeader, Button, Input, Select, LoadingSpinner, SearchableSelect } from '@/components/ui';
 import { PlusIcon, XMarkIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { getLocalizedName } from '@/i18n/helpers';
 import { useAuthStore } from '@/store/auth.store';
@@ -93,7 +93,6 @@ export default function CreateMaterialRequestPage() {
   // it (destination_warehouse) and the UI renders it read-only. Any client
   // warehouse_id is ignored by the backend.
   const destinationWarehouse = isSupervisor ? (catalog?.destination_warehouse ?? null) : null;
-  const warehouseOptions = isSupervisor ? [] : availableWarehouses;
 
   // Auto-assignment mirrors the backend rule: sub_warehouse_manager / admin
   // resolve exactly one eligible warehouse -> auto-select; multiple -> a selector
@@ -195,13 +194,33 @@ export default function CreateMaterialRequestPage() {
                   placeholder={t('pages.materialRequests.selectWarehouseFirst')}
                   options={departments.map((d: any) => ({ value: d.id, label: getLocalizedName(d) }))}
                 />
-                <Select
-                  label={t('pages.materialRequests.warehouse')}
-                  {...form.register('warehouse_id', { onChange: (e) => handleWarehouseChange(e.target.value) })}
-                  error={form.formState.errors.warehouse_id?.message}
-                  placeholder={t('form.selectWarehouse')}
-                  options={warehouseOptions.map((w: any) => ({ value: w.id, label: getLocalizedName(w) }))}
-                />
+                <div>
+                  <label htmlFor="mr-warehouse" className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('pages.materialRequests.warehouse')}
+                  </label>
+                  <SearchableSelect
+                    id="mr-warehouse"
+                    aria-label={t('pages.materialRequests.warehouse')}
+                    value={(selectedWarehouseId ?? null) as number | null}
+                    onChange={(v) => {
+                      form.setValue('warehouse_id', v === null ? (undefined as any) : Number(v), { shouldValidate: false });
+                      handleWarehouseChange(v === null ? '' : String(v));
+                    }}
+                    options={availableWarehouses.map((w: any) => ({
+                      value: w.id,
+                      label: `${w.code} — ${getLocalizedName(w)}`,
+                      sublabel: w.department_name_ar || w.department_name_en
+                        ? getLocalizedName({ name_ar: w.department_name_ar, name_en: w.department_name_en })
+                        : undefined,
+                    }))}
+                    placeholder={t('components.warehousePicker.placeholder')}
+                    searchPlaceholder={t('components.warehousePicker.searchPlaceholder')}
+                    emptyMessage={t('components.warehousePicker.emptyMessage')}
+                  />
+                  {form.formState.errors.warehouse_id?.message && (
+                    <p className="mt-1 text-sm text-red-600">{form.formState.errors.warehouse_id.message as string}</p>
+                  )}
+                </div>
               </>
             ) : (
               <div className="col-span-2 rounded-lg bg-gray-50 border border-gray-200 px-4 py-3">
@@ -219,6 +238,7 @@ export default function CreateMaterialRequestPage() {
               </div>
             )}
             <Select
+              id="mr-request-type"
               label={t('pages.materialRequests.requestType')}
               {...form.register('request_type')}
               error={form.formState.errors.request_type?.message}
@@ -235,13 +255,28 @@ export default function CreateMaterialRequestPage() {
           )}
 
           {requestType === 'project' && (
-            <Select
-              label={t('pages.materialRequests.project')}
-              {...form.register('project_id')}
-              error={form.formState.errors.project_id?.message}
-              placeholder={t('pages.materialRequests.selectProject')}
-              options={projects.map((p: any) => ({ value: p.id, label: `${p.project_no} - ${p.name}` }))}
-            />
+            <div>
+              <label htmlFor="mr-project" className="block text-sm font-medium text-gray-700 mb-1">
+                {t('pages.materialRequests.project')}
+              </label>
+              <SearchableSelect
+                id="mr-project"
+                aria-label={t('pages.materialRequests.project')}
+                value={(form.watch('project_id') ?? null) as number | null}
+                onChange={(v) => form.setValue('project_id', v === null ? ('' as any) : Number(v), { shouldValidate: true })}
+                options={projects.map((p: any) => ({
+                  value: p.id,
+                  label: `${p.project_no} — ${p.name}`,
+                  sublabel: p.supervisor_name || undefined,
+                }))}
+                placeholder={t('components.projectPicker.placeholder')}
+                searchPlaceholder={t('components.projectPicker.searchPlaceholder')}
+                emptyMessage={t('components.projectPicker.emptyMessage')}
+              />
+              {form.formState.errors.project_id?.message && (
+                <p className="mt-1 text-sm text-red-600">{form.formState.errors.project_id.message as string}</p>
+              )}
+            </div>
           )}
 
           <div className="grid grid-cols-3 gap-4">
