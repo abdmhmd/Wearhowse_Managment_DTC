@@ -1,70 +1,83 @@
+---
+title: WMS Local Revert Report — Frontend & Docs
+date: 2026-09-14
+status: complete
+scope: frontend .env + runtime config, backend env verification, cloud-host cleanup
+---
+
 # LOCAL_REVERT_REPORT.md
 
-Revert of the Aiven PostgreSQL adaptation — return to local PostgreSQL, keeping tests green and the optional SSL code path intact.
+Final leg of the local-only revert. Backend was already local; this pass
+removed the last cloud-host (`*.pxxl.space.cv`) references from the frontend
+config so the whole stack runs on `localhost`.
 
 ## 1. Files Changed
 
-| File | Change |
-|---|---|
-| `.env.production` | Restored local-only config: `DATABASE_URL` → `localhost:5432/DTC_WMS_final_db` (`sslmode=disable`), `DB_SSL=false`, `PORT=5000`, local `POSTGRES_*` backup fields, local `CORS_ORIGINS`. JWT secrets regenerated (see §3). Gitignored — not committed. |
-| `.env.production.example` | Rewritten as a local-first template with placeholders; removed the entire Aiven section (Aiven `DATABASE_URL` example, CA-path guidance, `NODE_EXTRA_CA_CERTS`). Committed. |
-| `WMS_Managment_Backend/.env.example` | Replaced the "Database TLS (Aiven / cloud)" guidance block with generic optional-TLS guidance. The three SSL vars stay at local defaults: `DB_SSL=false`, `DB_SSL_REJECT_UNAUTHORIZED=true`, `DB_SSL_CA_PATH=`. Committed. |
-| `WMS_Managment_Backend/tests/db/pool-ssl-config.test.ts` | Kept the test (it validates the conditional SSL logic, which still exists). Swapped the Aiven host/credentials for generic local values: `postgresql://app:secret@localhost:5432/db?sslmode=require` → expects `{ ssl: true, host: 'localhost' }`. Renamed describe block to `pool SSL config (TLS opt-in / local default)`. Committed. |
-| `.gitignore` | Unchanged — `certs/*.pem` / `certs/*.crt` / `certs/*.key` rules kept (harmless, future-proof). |
-| `DEPLOYMENT_WINDOWS.md` | No Aiven references found — no change needed. |
-| `DEPLOYMENT_PREP_REPORT.md` | Left as-is (historical). |
-| Backend source (`src/config/database.ts`, `src/utils/env.ts`, `src/app.ts`, `src/server.ts`) | **Unchanged.** Conditional SSL logic, `getConnectionInfo()`, `/api/health` `ssl`/`host` fields, startup `SELECT NOW()` check, and `pool.on('connect')` logging all preserved. |
+| File | Before | After |
+|---|---|---|
+| `WMS_Frontend/.env` (gitignored) | `VITE_API_URL=https://wearhousemanagmentdtc.pxxl.space.cv/api` | `VITE_API_URL=http://localhost:5000/api` |
+| `WMS_Frontend/.env.example` | `VITE_API_URL=https://wearhousemanagmentdtc.pxxl.space.cv/api` | `VITE_API_URL=http://localhost:5000/api` (placeholder-safe template) |
+| `WMS_Frontend/src/api/client.ts` | fallback `baseURL` was `'https://wearhousemanagmentdtc.pxxl.space.cv/api'` | fallback `baseURL` is `'http://localhost:5000/api'` via `API_BASE_URL` |
+| `WMS_Frontend/.gitignore` | no `.env` rule | `.env` / `.env.*` ignored (`.env.example` kept) |
+| `WMS_Frontend/vite.config.ts` | already `server.proxy['/api'] → http://localhost:5000` | unchanged (Task 3 — no edit needed) |
+| `LOCAL_REVERT_REPORT.md` | previous report (backend pass) | rewritten per this task (YAML front matter) |
 
-## 2. Files Deleted
+## 2. Cloud Host References
 
-| File | Reason |
-|---|---|
-| `AIVEN_ADAPTATION_REPORT.md` | Aiven-specific adaptation report — no longer relevant to a local-only setup. |
-| `WMS_Managment_Backend/AIVEN_SETUP.md` | Aiven-specific setup guide — removed. |
-| `WMS_Managment_Backend/certs/ca.pem` | Did not exist; only `certs/.gitkeep` is present and is kept. |
+| File | Line | Status |
+|---|---|---|
+| `WMS_Frontend/.env` | 1 | Fixed → `http://localhost:5000/api` |
+| `WMS_Frontend/.env.example` | 3 | Fixed → `http://localhost:5000/api` |
+| `WMS_Frontend/src/api/client.ts` | 12 | Fixed (fallback → `http://localhost:5000/api`) |
+| `WMS_Frontend/package-lock.json` | 518 | Historical / not a host — `"pxxl"` is a coincidental substring inside a base64 `integrity` hash (`@esbuild/android-arm`); left as-is |
+| `DEPLOYMENT_WINDOWS.md`, `DEPLOYMENT_CHECKLIST.md`, `DEPLOYMENT_PREP_REPORT.md`, other `.md`/`.ps1`/`.ts`/`.tsx` | — | No occurrences found; nothing to fix |
 
-## 3. Local Configuration Summary
+Repo-wide scan (all files, excluding `node_modules`, `dist`, `.git`): only the
+package-lock base64 coincidence above. **Zero real references to the defunct
+host remain.**
 
-| Variable | Value (masked for secrets) |
-|---|---|
-| `NODE_ENV` | `production` (local template) |
-| `PORT` | `5000` |
-| `DATABASE_URL` | `postgresql://postgres:********@localhost:5432/DTC_WMS_final_db?sslmode=disable` |
-| `DB_SSL` | `false` |
-| `DB_SSL_REJECT_UNAUTHORIZED` | `true` |
-| `DB_SSL_CA_PATH` | empty |
-| `POSTGRES_HOST` / `POSTGRES_PORT` / `POSTGRES_DB` | `localhost` / `5432` / `DTC_WMS_final_db` |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` | `postgres` / `********` |
-| `JWT_SECRET` / `JWT_REFRESH_SECRET` | Loaded from gitignored `.env.production` (62-char random; none existed before — the pre-Aiven file was not in git or the working tree, so there was no prior value to preserve) |
-| `JWT_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | `24h` / `7d` |
-| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000,http://localhost` |
-| `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW_MS` | `10` / `900000` |
+## 3. Env Files Summary
 
-## 4. Verification
+| File | DATABASE_URL (masked) | SSL | CORS |
+|---|---|---|---|
+| `WMS_Frontend/.env` | n/a (API URL only) | n/a | n/a — `VITE_API_URL=http://localhost:5000/api` |
+| `WMS_Frontend/.env.example` | n/a | n/a | n/a — `VITE_API_URL=http://localhost:5000/api` |
+| `WMS_Managment_Backend/.env` | `postgresql://postgres:********@localhost:5432/DTC_WMS_final_db?sslmode=disable` | unset → **false** (verified via `/api/health` `ssl:false`) | `http://localhost:5173,http://localhost:5000` (includes dev origin) |
+| `WMS_Managment_Backend/.env.test` | `postgresql://postgres:123456@localhost:5432/dtc_wms_test?sslmode=disable` | unset → false | `http://localhost:5173,http://localhost:3000` |
+| `.env.production` (root, gitignored) | `postgresql://postgres:********@localhost:5432/DTC_WMS_final_db?sslmode=disable` | `DB_SSL=false` | `http://localhost:5173,http://localhost:3000,http://localhost` |
+| `WMS_Managment_Backend/.env.production` | does **not exist** — the backend loads `.env` via `dotenv.config()`; the deploy template is the root `.env.production` | — | — |
+
+## 4. Verification Results
 
 | Check | Result |
 |---|---|
-| Backend tests — `npm test` | ✅ 639 passed (67 suites) |
 | Backend typecheck — `npx tsc --noEmit` | ✅ Clean |
+| Backend tests — `npm test` | ✅ 639 passed (67 suites) |
+| Frontend typecheck — `npx tsc -b --noEmit` | ✅ Clean |
 | Frontend tests — `npx vitest run` | ✅ 126 passed (18 files) |
-| SSL config test still validates the kept code path | ✅ `pool-ssl-config.test.ts` passes as part of the 639 |
-| SSH/TLS code path (`src/config/database.ts`, `env.ts`) unchanged | ✅ `git diff` shows no edits |
-| Migration verification vs local DB — `npm run migrate -- --verify` (`NODE_ENV=development`, local `DATABASE_URL`, `DB_SSL=false`) | ✅ 0 pending migrations, checksums consistent |
-| Backend startup — local env, `node dist/server.js` | ✅ `Server running on port 5000 … Database connected (SSL: false, host: localhost)` |
-| Local PostgreSQL reachable | ✅ port 5432 open |
+| Backend build — `npm run build` | ✅ Clean |
+| Migrations vs local DB — `npm run migrate -- --verify` | ✅ 0 pending, checksums consistent (from previous pass, unchanged DB config) |
+| Backend startup — `node dist/server.js` | ✅ `Database connected (SSL: false, host: localhost)` on port 5000 |
+| Backend health — `GET /api/health` | ✅ `{ status:"ok", db:"connected", ssl:false, host:"localhost" }` |
+| Login API — `POST http://localhost:5000/api/auth/login` | ✅ `success:true`, JWT + `user: { username:"admin", role:"admin" }` |
+| Login via Vite dev server — `POST http://localhost:5173/api/auth/login` (proxy → 5000) | ✅ HTTP 200 |
+| SPA route — `GET http://localhost:5173/login` | ✅ HTTP 200 |
 
-## 5. Confirmation
+## 5. Runtime Confirmation
 
-- [x] `.env.production` points to local DB
-- [x] SSL disabled in config
-- [x] Aiven docs removed
-- [x] Code SSL logic preserved (harmless)
-- [x] All tests pass
-- [x] Backend starts and connects locally
+| Item | Result |
+|---|---|
+| Login works from `http://localhost:5173` | ✅ Yes — verified via the Vite dev server (HTTP 200 + JWT returned); not an automated browser session |
+| Network request goes to `http://localhost:5000/api/...` | ✅ Yes — absolute `VITE_API_URL` makes the browser call `localhost:5000` directly; the `/api` proxy to `localhost:5000` was also exercised and returns 200 |
+| Backend logs show `Database connected (SSL: false, host: localhost)` | ✅ Yes |
+| No request targets the defunct `*.pxxl.space.cv` host | ✅ Yes — no `pxxl.space.cv` / `wearhousemanagmentdtc` references remain |
 
-## Notes
+## 6. Residual Notes
 
-- `.env.production` and backend `.env` are gitignored and not part of the commit.
-- `WMS_Managment_Backend/.env` contains a comment with a GitHub PAT (visible locally, not committed). It is gitignored, but should be rotated and removed regardless.
-- The migration verify and startup checks were run in `NODE_ENV=development` so `assertSafeEnv` permits the localhost `DATABASE_URL`; `.env.production` keeps `NODE_ENV=production` for the deployed host, where a non-loopback host is required.
-- Commit scope is the backend revert only; the pre-existing frontend working-tree changes (Netlify config work) were intentionally left uncommitted.
+- `WMS_Frontend/package-lock.json:518` — `"pxxl"` is a base64-encoded `integrity` checksum substring for `@esbuild/android-arm`, not a deployment host. Unfixable/irrelevant; noted for auditability.
+- Historical deployment docs (`DEPLOYMENT_WINDOWS.md`, `DEPLOYMENT_CHECKLIST.md`, `DEPLOYMENT_PREP_REPORT.md`) contained **no** cloud-host references, so no edits were needed.
+- Uncommitted working-tree files left out of this commit (from an earlier, separate Netlify-prep task): `WMS_Frontend/src/utils/apiErrors.ts` (duplicate-case warning fix) and `WMS_Frontend/public/_redirects` (Netlify SPA rule). Neither affects local runtime.
+- `WMS_Managment_Backend/.env` contains a comment with a GitHub PAT (gitignored, uncommitted). Rotate the token and remove the line.
+- `DB_SSL` is neither in `WMS_Managment_Backend/.env` nor `.env.test`; the schema defaults it to `false` (`env.ts` z.string().default('false')), confirmed live by `/api/health` returning `ssl:false`.
+- Backend SSL code path (`src/config/database.ts`, `src/utils/env.ts`) intentionally untouched — it stays off locally and remains available for future cloud deploys.
+- `.env` files are never committed (`.gitignore`); only `.env.example` templates ship.

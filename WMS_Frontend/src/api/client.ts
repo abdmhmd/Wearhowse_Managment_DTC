@@ -2,8 +2,17 @@ import axios from 'axios';
 import { showError } from '@/utils/toast';
 import { getApiErrorMessage } from '@/utils/apiErrors';
 
+/**
+ * Central API base URL.
+ * - Build-time override: set VITE_API_URL in a local `.env` file (dev/preview).
+ * - Production (Netlify): set VITE_API_URL in the Netlify dashboard.
+ * - Fallback: the local backend.
+ */
+export const API_BASE_URL: string =
+  import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -60,7 +69,7 @@ api.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post('/api/auth/refresh', { refreshToken });
+        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
         const newToken = data.data.token;
         const newRefreshToken = data.data.refreshToken;
 
