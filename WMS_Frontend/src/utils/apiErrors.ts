@@ -114,8 +114,6 @@ export function mapApiError(error: any): MappedApiError {
       return { key: 'pages.purchaseRequests.errors.invalidItem' };
     case 'UNIT_INVALID':
       return { key: 'pages.purchaseRequests.errors.invalidUnit' };
-    case 'NO_DEPARTMENT':
-      return { key: 'pages.purchaseRequests.errors.noDepartment' };
 
     // ── users ────────────────────────────────────────────────────────────────
     case 'DEPARTMENT_REQUIRED_FOR_ROLE':
